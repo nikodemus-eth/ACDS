@@ -1,5 +1,9 @@
 import { providerHealthCheckJob } from '../jobs/providerHealthCheckJob.js';
 import { staleExecutionCleanupJob } from '../jobs/staleExecutionCleanupJob.js';
+import { executionScoringJob } from '../jobs/executionScoringJob.js';
+import { familyAggregationJob } from '../jobs/familyAggregationJob.js';
+import { plateauDetectionJob } from '../jobs/plateauDetectionJob.js';
+import { adaptationRecommendationJob } from '../jobs/adaptationRecommendationJob.js';
 
 export interface JobDefinition {
   name: string;
@@ -14,6 +18,10 @@ export function registerJobs(): JobDefinition[] {
   const jobs: JobDefinition[] = [
     providerHealthCheckJob,
     staleExecutionCleanupJob,
+    executionScoringJob,
+    familyAggregationJob,
+    plateauDetectionJob,
+    adaptationRecommendationJob,
   ];
 
   return jobs;

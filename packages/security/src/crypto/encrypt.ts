@@ -17,9 +17,12 @@ export async function encrypt(
   }
 
   const iv = randomBytes(config.ivLengthBytes);
-  const cipher = createCipheriv(config.algorithm, keyBuffer, iv, {
-    authTagLength: config.authTagLengthBytes,
-  });
+  const cipher = createCipheriv(
+    config.algorithm as 'aes-256-gcm',
+    keyBuffer,
+    iv,
+    { authTagLength: config.authTagLengthBytes } as any,
+  );
 
   const encrypted = Buffer.concat([
     cipher.update(plaintext, 'utf8'),

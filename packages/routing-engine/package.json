@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@acds/core-types": "workspace:*",
-    "@acds/policy-engine": "workspace:*"
+    "@acds/policy-engine": "workspace:*",
+    "@acds/adaptive-optimizer": "workspace:*"
   }
 }

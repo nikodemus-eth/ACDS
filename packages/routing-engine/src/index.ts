@@ -18,6 +18,12 @@ export { ExecutionRationaleBuilder } from './rationale/ExecutionRationaleBuilder
 export { RationaleFormatter } from './rationale/RationaleFormatter.js';
 export type { FormattedRationale } from './rationale/RationaleFormatter.js';
 
+// Adaptive Selection
+export { buildCandidatePortfolio } from './selection/AdaptiveCandidatePortfolioBuilder.js';
+export type { PortfolioBuildInputs } from './selection/AdaptiveCandidatePortfolioBuilder.js';
+
 // Resolvers
 export { DispatchResolver } from './resolvers/DispatchResolver.js';
 export type { DispatchResolverDeps, DispatchResult } from './resolvers/DispatchResolver.js';
+export { AdaptiveDispatchResolver } from './resolvers/AdaptiveDispatchResolver.js';
+export type { AdaptiveDispatchResolverDeps, AdaptiveDispatchResult } from './resolvers/AdaptiveDispatchResolver.js';

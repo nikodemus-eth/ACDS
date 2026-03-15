@@ -3,7 +3,6 @@ import {
   ExecutionRecordService,
   type ExecutionRecordRepository,
 } from '@acds/execution-orchestrator';
-import { ExecutionAuditWriter } from '@acds/audit-ledger';
 
 const DEFAULT_STALE_THRESHOLD_MS = 600_000; // 10 minutes
 

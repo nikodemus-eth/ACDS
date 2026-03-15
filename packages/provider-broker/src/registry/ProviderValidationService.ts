@@ -1,4 +1,4 @@
-import type { Provider, ProviderVendor, AuthType } from '@acds/core-types';
+import type { Provider } from '@acds/core-types';
 
 const VALID_VENDORS = new Set(['ollama', 'lmstudio', 'gemini', 'openai']);
 const VALID_AUTH_TYPES = new Set(['none', 'api_key', 'oauth', 'local']);

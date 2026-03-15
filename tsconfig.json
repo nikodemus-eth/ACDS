@@ -1,0 +1,45 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@acds/core-types": ["packages/core-types/src/index.ts"],
+      "@acds/core-types/*": ["packages/core-types/src/*"],
+      "@acds/security": ["packages/security/src/index.ts"],
+      "@acds/security/*": ["packages/security/src/*"],
+      "@acds/audit-ledger": ["packages/audit-ledger/src/index.ts"],
+      "@acds/audit-ledger/*": ["packages/audit-ledger/src/*"],
+      "@acds/provider-adapters": ["packages/provider-adapters/src/index.ts"],
+      "@acds/provider-adapters/*": ["packages/provider-adapters/src/*"],
+      "@acds/provider-broker": ["packages/provider-broker/src/index.ts"],
+      "@acds/provider-broker/*": ["packages/provider-broker/src/*"],
+      "@acds/policy-engine": ["packages/policy-engine/src/index.ts"],
+      "@acds/policy-engine/*": ["packages/policy-engine/src/*"],
+      "@acds/routing-engine": ["packages/routing-engine/src/index.ts"],
+      "@acds/routing-engine/*": ["packages/routing-engine/src/*"],
+      "@acds/execution-orchestrator": ["packages/execution-orchestrator/src/index.ts"],
+      "@acds/execution-orchestrator/*": ["packages/execution-orchestrator/src/*"],
+      "@acds/sdk": ["packages/sdk/src/index.ts"],
+      "@acds/sdk/*": ["packages/sdk/src/*"],
+      "@acds/evaluation": ["packages/evaluation/src/index.ts"],
+      "@acds/evaluation/*": ["packages/evaluation/src/*"],
+      "@acds/adaptive-optimizer": ["packages/adaptive-optimizer/src/index.ts"],
+      "@acds/adaptive-optimizer/*": ["packages/adaptive-optimizer/src/*"],
+      "@acds/shared-utils": ["packages/shared-utils/src/index.ts"],
+      "@acds/shared-utils/*": ["packages/shared-utils/src/*"]
+    },
+    "rootDir": ".",
+    "jsx": "react-jsx",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "apps/*/src/**/*.ts",
+    "apps/*/src/**/*.tsx",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/dist"]
+}

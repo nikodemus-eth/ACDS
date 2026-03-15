@@ -7,6 +7,8 @@ import { PoliciesPage } from '../features/policies/PoliciesPage';
 import { AuditPage } from '../features/audit/AuditPage';
 import { ExecutionsPage } from '../features/executions/ExecutionsPage';
 import { ExecutionDetailPage } from '../features/executions/ExecutionDetailPage';
+import { AdaptationPage } from '../features/adaptation/AdaptationPage';
+import { FamilyPerformancePage } from '../features/adaptation/FamilyPerformancePage';
 
 export function AppRouter() {
   return (
@@ -21,6 +23,8 @@ export function AppRouter() {
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/executions" element={<ExecutionsPage />} />
           <Route path="/executions/:id" element={<ExecutionDetailPage />} />
+          <Route path="/adaptation" element={<AdaptationPage />} />
+          <Route path="/adaptation/:familyKey" element={<FamilyPerformancePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

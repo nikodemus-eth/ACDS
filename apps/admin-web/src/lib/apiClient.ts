@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
+declare const __VITE_API_BASE_URL__: string | undefined;
+const BASE_URL = (typeof __VITE_API_BASE_URL__ !== 'undefined' ? __VITE_API_BASE_URL__ : undefined) ?? 'http://localhost:4000/api';
 
 export interface ApiError {
   status: number;

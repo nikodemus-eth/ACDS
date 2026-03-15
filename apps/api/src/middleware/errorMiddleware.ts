@@ -37,7 +37,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
       const safeError = redactError(error);
 
       const body: NormalisedError = {
-        error: statusCode >= 500 ? 'Internal Server Error' : safeError.name ?? 'Error',
+        error: statusCode >= 500 ? 'Internal Server Error' : (safeError.code ?? 'Error'),
         message:
           statusCode >= 500 && app.config?.nodeEnv === 'production'
             ? 'An unexpected error occurred'

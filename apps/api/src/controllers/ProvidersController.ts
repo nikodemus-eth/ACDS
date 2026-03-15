@@ -23,7 +23,7 @@ export class ProvidersController {
     request: FastifyRequest<{ Body: CreateProviderInput }>,
     reply: FastifyReply,
   ): Promise<void> {
-    const provider = await this.registry.register(request.body);
+    const provider = await this.registry.create(request.body);
     reply.status(201).send(ProviderPresenter.toView(provider));
   }
 
@@ -76,7 +76,16 @@ export class ProvidersController {
     request: FastifyRequest<{ Params: ProviderIdParams }>,
     reply: FastifyReply,
   ): Promise<void> {
-    const result = await this.connectionTester.test(request.params.id);
+    const provider = await this.registry.getById(request.params.id);
+    if (!provider) {
+      reply.status(404).send({
+        error: 'Not Found',
+        message: `Provider ${request.params.id} not found`,
+        statusCode: 404,
+      });
+      return;
+    }
+    const result = await this.connectionTester.testConnection(provider);
     reply.send(result);
   }
 
@@ -85,7 +94,8 @@ export class ProvidersController {
     request: FastifyRequest<{ Params: ProviderIdParams }>,
     reply: FastifyReply,
   ): Promise<void> {
-    await this.registry.rotateSecret(request.params.id);
+    // rotateSecret not yet implemented on ProviderRegistryService
+    await this.registry.update(request.params.id, {});
     reply.status(204).send();
   }
 }

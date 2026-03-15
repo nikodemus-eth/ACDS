@@ -22,3 +22,9 @@ export { normalizeExecutionFailure } from './result/ExecutionFailureNormalizer.j
 export { ExecutionEventEmitter } from './events/ExecutionEventEmitter.js';
 export type { ExecutionEvent, ExecutionEventType, ExecutionEventHandler } from './events/ExecutionEventEmitter.js';
 export { ExecutionLifecycleLogger } from './events/ExecutionLifecycleLogger.js';
+export { ExecutionOutcomePublisher } from './events/ExecutionOutcomePublisher.js';
+export type { ExecutionOutcome, ExecutionOutcomeStatus, ExecutionOutcomeHandler } from './events/ExecutionOutcomePublisher.js';
+
+// Evaluation Bridge
+export { evaluateOutcome } from './run/ExecutionEvaluationBridge.js';
+export type { EvaluationServices, EvaluationBridgeResult } from './run/ExecutionEvaluationBridge.js';

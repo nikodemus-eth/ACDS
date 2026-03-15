@@ -15,6 +15,7 @@
     "@acds/routing-engine": "workspace:*",
     "@acds/provider-broker": "workspace:*",
     "@acds/provider-adapters": "workspace:*",
-    "@acds/audit-ledger": "workspace:*"
+    "@acds/audit-ledger": "workspace:*",
+    "@acds/evaluation": "workspace:*"
   }
 }

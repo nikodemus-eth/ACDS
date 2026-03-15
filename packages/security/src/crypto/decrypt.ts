@@ -20,9 +20,12 @@ export async function decrypt(
   const authTag = Buffer.from(envelope.authTag, 'base64');
   const ciphertext = Buffer.from(envelope.ciphertext, 'base64');
 
-  const decipher = createDecipheriv(config.algorithm, keyBuffer, iv, {
-    authTagLength: config.authTagLengthBytes,
-  });
+  const decipher = createDecipheriv(
+    config.algorithm as 'aes-256-gcm',
+    keyBuffer,
+    iv,
+    { authTagLength: config.authTagLengthBytes } as any,
+  );
 
   decipher.setAuthTag(authTag);
 

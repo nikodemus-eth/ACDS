@@ -13,6 +13,8 @@
     "@acds/core-types": "workspace:*",
     "@acds/provider-broker": "workspace:*",
     "@acds/execution-orchestrator": "workspace:*",
-    "@acds/audit-ledger": "workspace:*"
+    "@acds/audit-ledger": "workspace:*",
+    "@acds/evaluation": "workspace:*",
+    "@acds/adaptive-optimizer": "workspace:*"
   }
 }

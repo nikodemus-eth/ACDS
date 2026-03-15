@@ -1,4 +1,4 @@
-import type { RoutingDecision, FallbackEntry, DispatchRunResponse } from '@acds/core-types';
+import type { RoutingDecision } from '@acds/core-types';
 import type { AdapterRequest, AdapterResponse } from '@acds/provider-adapters';
 import type { ExecutionStatusTracker } from '../run/ExecutionStatusTracker.js';
 import type { FallbackDecisionTracker } from './FallbackDecisionTracker.js';

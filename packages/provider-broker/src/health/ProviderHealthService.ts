@@ -1,4 +1,4 @@
-import type { ProviderHealth, ProviderHealthStatus } from '@acds/core-types';
+import type { ProviderHealth } from '@acds/core-types';
 import type { ProviderHealthRepository } from './ProviderHealthRepository.js';
 
 export class ProviderHealthService {
