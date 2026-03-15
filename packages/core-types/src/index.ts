@@ -24,3 +24,17 @@ export type { DispatchRunResponse } from './contracts/DispatchRunResponse.js';
 
 // Events
 export type { ExecutionRationale } from './events/ExecutionRationale.js';
+
+// Schemas
+export { providerSchema, createProviderSchema } from './schemas/providerSchema.js';
+export type { ProviderInput, CreateProviderInput } from './schemas/providerSchema.js';
+export { modelProfileSchema } from './schemas/modelProfileSchema.js';
+export type { ModelProfileInput } from './schemas/modelProfileSchema.js';
+export { tacticProfileSchema } from './schemas/tacticProfileSchema.js';
+export type { TacticProfileInput } from './schemas/tacticProfileSchema.js';
+export {
+  routingRequestSchema,
+  routingConstraintsSchema,
+  instanceContextSchema,
+} from './schemas/routingRequestSchema.js';
+export type { RoutingRequestInput } from './schemas/routingRequestSchema.js';
