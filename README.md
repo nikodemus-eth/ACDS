@@ -2,9 +2,41 @@
 
 A **Governed Adaptive Cognitive Dispatch System** that enables applications to safely, efficiently, and intelligently utilize both local and cloud-based AI services.
 
-## Purpose
+## What It Does
 
-Applications like **Thingstead** (governance) and **Process Swarm** (content generation) declare cognitive intent — the system determines which model, tactic, and provider should handle each request, with full auditability and adaptive optimization over time.
+ACDS sits between your applications and AI providers. Instead of hardcoding which model to call, your application declares a **cognitive intent** -- what kind of thinking is needed -- and ACDS determines the best model, execution tactic, and provider to handle the request. Every decision is policy-governed, auditable, and resilient through automatic fallback.
+
+## Why It Exists
+
+Applications like **Thingstead** (governance) and **Process Swarm** (content generation) need AI capabilities but should not be tightly coupled to specific vendors or models. ACDS provides:
+
+- **Vendor independence.** Applications describe intent, not providers. Switch from Ollama to OpenAI without changing application code.
+- **Policy governance.** A three-level policy cascade (global, application, process) controls which vendors, models, and tactics are allowed for each request.
+- **Automatic fallback.** If the primary provider fails, execution continues through a pre-computed fallback chain.
+- **Full auditability.** Every routing decision and execution is recorded with a human-readable rationale explaining why each choice was made.
+- **Adaptive optimization.** The system learns from execution outcomes to improve routing over time, within policy bounds.
+
+## Integration with Thingstead and Process Swarm
+
+Applications integrate through the `@acds/sdk` package:
+
+```typescript
+import { DispatchClient, RoutingRequestBuilder } from '@acds/sdk';
+
+const client = new DispatchClient({ baseUrl: 'http://localhost:3000' });
+
+const request = new RoutingRequestBuilder()
+  .application('process_swarm')
+  .process('content_review')
+  .step('initial_draft')
+  .taskType('generation')
+  .cognitiveGrade('standard')
+  .build();
+
+const result = await client.dispatch(request);
+```
+
+The SDK provides builders for constructing routing requests and helpers for load classification, posture defaults, and structured output flags. Applications never specify a vendor or model directly.
 
 ## Architecture
 
@@ -35,13 +67,17 @@ Applications like **Thingstead** (governance) and **Process Swarm** (content gen
 └─────────────────────────────────────────────────┘
 ```
 
+Dependencies flow strictly downward. Each layer depends only on the layers below it, enforced through the package dependency graph:
+
+`core-types` -> `security` -> `audit-ledger` -> `provider-adapters` -> `provider-broker` -> `policy-engine` -> `routing-engine` -> `execution-orchestrator` -> `sdk` -> `apps`
+
 ## Top-Level Structure
 
 ```
 adaptive-cognitive-dispatch/
 ├── apps/
-│   ├── api/              # HTTP API server
-│   ├── admin-web/        # Admin management UI
+│   ├── api/              # HTTP API server (Fastify)
+│   ├── admin-web/        # Admin management UI (React)
 │   └── worker/           # Background job processor
 ├── packages/
 │   ├── core-types/       # Canonical types, enums, contracts
@@ -61,7 +97,7 @@ adaptive-cognitive-dispatch/
 │   ├── docker/           # Container definitions
 │   ├── config/           # Profile and policy configs
 │   └── scripts/          # Operational scripts
-├── docs/                 # Architecture and operator docs
+├── docs/                 # Architecture, security, and operator docs
 └── tests/                # Integration and scenario tests
 ```
 
@@ -73,19 +109,36 @@ pnpm install
 
 # Set up environment
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your configuration (database URL, master key path, etc.)
 
 # Run database migrations
 pnpm --filter ./infra/db run migrate
 
-# Start development
+# Start development (API server, admin UI, and worker)
 pnpm dev
 ```
+
+### Register a Provider
+
+After starting, open the admin UI and register at least one provider:
+
+- **Ollama** (local): Default endpoint `http://localhost:11434`, no API key needed
+- **LM Studio** (local): Default endpoint `http://localhost:1234`, no API key needed
+- **Gemini** (cloud): Requires a Google AI API key
+- **OpenAI** (cloud): Requires an OpenAI API key
+
+See [Provider Setup](docs/operator/PROVIDER_SETUP.md) for detailed instructions.
 
 ## Key Concepts
 
 - **Model Profiles**: Abstract cognitive capabilities (e.g., `local_fast_advisory`, `cloud_frontier_reasoning`)
 - **Tactic Profiles**: Execution strategies (e.g., `single_pass_fast`, `draft_then_critique`)
 - **Execution Families**: Identity for adaptive learning (`application.process.step.posture.grade`)
-- **Policy Layers**: Global → Application → Process → Instance policy cascade
+- **Policy Layers**: Global -> Application -> Process -> Instance policy cascade
 - **Adaptive Optimization**: Policy-bounded learning from execution outcomes
+
+## Documentation
+
+- **Architecture:** [Overview](docs/architecture/ARCHITECTURE_OVERVIEW.md) | [Component Boundaries](docs/architecture/COMPONENT_BOUNDARIES.md) | [Routing Model](docs/architecture/ROUTING_MODEL.md) | [Execution Flow](docs/architecture/EXECUTION_FLOW.md)
+- **Security:** [Secret Storage](docs/security/SECRET_STORAGE.md) | [Audit Model](docs/security/AUDIT_MODEL.md)
+- **Operator:** [Admin Guide](docs/operator/ADMIN_GUIDE.md) | [Provider Setup](docs/operator/PROVIDER_SETUP.md) | [Policy Configuration](docs/operator/POLICY_CONFIGURATION.md) | [Troubleshooting](docs/operator/TROUBLESHOOTING.md)

@@ -3,6 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run integration",
+    "test:scenarios": "vitest run scenarios"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@acds/core-types": "workspace:*",
+    "@acds/provider-broker": "workspace:*",
+    "@acds/routing-engine": "workspace:*",
+    "@acds/execution-orchestrator": "workspace:*",
+    "@acds/policy-engine": "workspace:*",
+    "@acds/provider-adapters": "workspace:*",
+    "@acds/security": "workspace:*",
+    "@acds/shared-utils": "workspace:*"
   }
 }
