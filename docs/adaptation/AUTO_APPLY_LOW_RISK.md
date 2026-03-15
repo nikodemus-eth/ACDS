@@ -19,7 +19,7 @@ The family must be classified as `low` risk by the `FamilyRiskProvider`. Familie
 The family posture must be one of:
 - `exploratory`
 - `advisory`
-- `draft`
+- `operational`
 
 Families with `final` or `evidentiary` postures are never eligible for auto-apply regardless of risk level or mode. These postures indicate outputs that have legal, compliance, or binding significance.
 

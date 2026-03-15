@@ -1,0 +1,34 @@
+FROM node:20-alpine AS base
+RUN corepack enable
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/core-types/package.json packages/core-types/
+COPY packages/security/package.json packages/security/
+COPY packages/audit-ledger/package.json packages/audit-ledger/
+COPY packages/provider-adapters/package.json packages/provider-adapters/
+COPY packages/provider-broker/package.json packages/provider-broker/
+COPY packages/policy-engine/package.json packages/policy-engine/
+COPY packages/routing-engine/package.json packages/routing-engine/
+COPY packages/execution-orchestrator/package.json packages/execution-orchestrator/
+COPY packages/evaluation/package.json packages/evaluation/
+COPY packages/adaptive-optimizer/package.json packages/adaptive-optimizer/
+COPY packages/persistence-pg/package.json packages/persistence-pg/
+COPY packages/shared-utils/package.json packages/shared-utils/
+COPY apps/worker/package.json apps/worker/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS build
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/*/node_modules ./packages/*/node_modules
+COPY . .
+RUN pnpm -r build
+
+FROM base AS production
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages/*/dist ./packages/*/dist
+COPY --from=build /app/packages/*/package.json ./packages/*/
+COPY --from=build /app/apps/worker/dist ./apps/worker/dist
+COPY --from=build /app/apps/worker/package.json ./apps/worker/
+CMD ["node", "apps/worker/dist/main.js"]

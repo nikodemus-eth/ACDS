@@ -27,7 +27,9 @@ Layer 0   packages/core-types    Canonical types, enums, contracts
 Supporting packages that sit outside the main dispatch path:
 
 - `packages/evaluation` -- Metrics, scoring, aggregation
-- `packages/adaptive-optimizer` -- Adaptive state, ranking, plateau detection
+- `packages/adaptive-optimizer` -- Adaptive state, ranking, plateau detection, meta guidance, global budget allocation
+- `packages/persistence-pg` -- PostgreSQL repository implementations
+- `packages/observability` -- Abstract metrics and tracing interfaces (vendor-agnostic)
 
 ## Dependency Direction
 

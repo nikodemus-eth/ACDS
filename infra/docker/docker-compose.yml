@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: acds
+      POSTGRES_USER: acds
+      POSTGRES_PASSWORD: acds_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://acds:acds_dev@postgres:5432/acds
+      NODE_ENV: production
+    depends_on:
+      - postgres
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgres://acds:acds_dev@postgres:5432/acds
+      NODE_ENV: production
+    depends_on:
+      - postgres
+
+  admin-web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.admin
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

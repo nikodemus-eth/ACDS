@@ -176,8 +176,8 @@ describe('Low-Risk Auto-Apply – Qualification', () => {
     expect(result).not.toBeNull();
   });
 
-  it('qualifies for draft posture', async () => {
-    postureProvider.setPosture('test.family.advisory', 'draft');
+  it('qualifies for operational posture', async () => {
+    postureProvider.setPosture('test.family.advisory', 'operational');
 
     const result = await service.inspectAndApply(
       'test.family.advisory',

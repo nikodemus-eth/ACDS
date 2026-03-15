@@ -6,6 +6,11 @@ export interface TacticProfile {
   name: string;
   description: string;
   executionMethod: string;
+  systemPromptTemplate: string;
+  outputSchema?: Record<string, unknown>;
+  maxRetries: number;
+  temperature: number;
+  topP: number;
   supportedTaskTypes: TaskType[];
   supportedLoadTiers: LoadTier[];
   multiStage: boolean;

@@ -113,7 +113,7 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
           style={inputStyle}
           value={loadTiers}
           onChange={(e) => setLoadTiers(e.target.value)}
-          placeholder="light, standard, heavy"
+          placeholder="single_shot, batch, streaming, high_throughput"
         />
       </div>
 
@@ -123,8 +123,9 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
           <select style={inputStyle} value={cognitiveGrade} onChange={(e) => setCognitiveGrade(e.target.value)}>
             <option value="basic">basic</option>
             <option value="standard">standard</option>
-            <option value="advanced">advanced</option>
-            <option value="expert">expert</option>
+            <option value="enhanced">enhanced</option>
+            <option value="frontier">frontier</option>
+            <option value="specialized">specialized</option>
           </select>
         </div>
       )}

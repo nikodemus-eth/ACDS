@@ -12,7 +12,7 @@ The adaptive system operates as a feedback loop across three layers:
 
 ### Evaluation Layer (`@acds/evaluation`)
 
-Scores each execution against six metrics:
+Scores each execution against nine metrics:
 
 - **Acceptance** -- whether the output was accepted by the downstream consumer.
 - **Schema Compliance** -- structural correctness of the output.
@@ -20,6 +20,9 @@ Scores each execution against six metrics:
 - **Latency** -- time-to-completion relative to thresholds.
 - **Cost** -- token and API cost relative to budget.
 - **Unsupported Claims** -- factual grounding failures.
+- **Confidence Alignment** -- how well model confidence scores correlate with actual outcomes.
+- **Artifact Quality** -- completeness and coherence of generated artifacts.
+- **Retry Frequency** -- penalizes high retry rates that indicate instability.
 
 The `ExecutionScoreCalculator` produces a weighted composite score per execution. The `ExecutionHistoryAggregator` and `FamilyPerformanceSummary` roll individual scores into family-level rolling averages and trend signals.
 
@@ -32,6 +35,8 @@ Consumes family-level performance summaries to:
 3. **Select candidates** via `AdaptiveSelectionService` using exploitation (pick the best) or exploration (try an alternative) policies.
 4. **Generate recommendations** via `AdaptationRecommendationService` when ranking changes are warranted but the current mode requires human approval.
 5. **Record adaptation events** via `AdaptationEventBuilder` and `AdaptationLedgerWriter` for full auditability.
+6. **Generate meta guidance** via `MetaGuidanceService` when plateau signals are moderate or severe, suggesting strategy changes (task splitting, critique insertion, model escalation, reasoning scaffold changes, multi-stage pipelines).
+7. **Allocate cognitive budget globally** via `GlobalBudgetAllocator`, which shifts budget across execution families based on observed value scores (acceptance × volume / cost).
 
 ### Routing Layer (`@acds/routing-engine`)
 

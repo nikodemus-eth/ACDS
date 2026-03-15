@@ -33,3 +33,8 @@ export type { EvaluationServices, EvaluationBridgeResult } from './run/Execution
 export type { StagedEscalationDecision } from './staged/StagedEscalationDecision.js';
 export { translateTuning } from './staged/StagedEscalationPolicyBridge.js';
 export type { StagedPolicyConstraints } from './staged/StagedEscalationPolicyBridge.js';
+
+// Staged Execution
+export type { ExecutionStage, StagedExecutionPlan } from './staged/StagedExecutionPlan.js';
+export { StagedExecutionRunner } from './staged/StagedExecutionRunner.js';
+export type { StageExecutor, StageResult, StagedExecutionResult } from './staged/StagedExecutionRunner.js';

@@ -44,7 +44,7 @@ The `AdaptiveMode` type (defined in `@acds/adaptive-optimizer`) controls how agg
 **What happens:**
 - `LowRiskAutoApplyService.inspectAndApply()` evaluates qualification criteria:
   - Family risk level is `low` (per `AdaptiveModePolicy.isAutoApplyPermitted()`).
-  - Family posture is exploratory, advisory, or draft (not final or evidentiary).
+  - Family posture is exploratory, advisory, or operational (not final or evidentiary).
   - No recent execution failures.
   - Rolling score is above the configured threshold (default: 0.5).
 - If all criteria are met, the ranking change is applied and an `AutoApplyDecisionRecord` is persisted.

@@ -27,6 +27,7 @@ export interface RoutingRequest {
   loadTier: LoadTier;
   decisionPosture: DecisionPosture;
   cognitiveGrade: CognitiveGrade;
+  input: string | Record<string, unknown>;
   constraints: RoutingConstraints;
   instanceContext?: InstanceContext;
 }

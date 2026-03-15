@@ -28,6 +28,7 @@ export const routingRequestSchema = z.object({
   loadTier: z.nativeEnum(LoadTier),
   decisionPosture: z.nativeEnum(DecisionPosture),
   cognitiveGrade: z.nativeEnum(CognitiveGrade),
+  input: z.union([z.string(), z.record(z.unknown())]),
   constraints: routingConstraintsSchema,
   instanceContext: instanceContextSchema.optional(),
 });

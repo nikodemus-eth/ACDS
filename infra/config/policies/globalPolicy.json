@@ -4,22 +4,23 @@
   "defaultPrivacy": "standard",
   "costSensitivity": "moderate",
   "maxLatencyByLoadTier": {
-    "simple": 5000,
-    "moderate": 15000,
-    "complex": 60000
+    "single_shot": 5000,
+    "batch": 15000,
+    "streaming": 30000,
+    "high_throughput": 60000
   },
   "structuredOutputByGrade": {
-    "utility": false,
-    "working": false,
-    "strong": true,
-    "final": true,
-    "evidentiary": true
+    "basic": false,
+    "standard": false,
+    "enhanced": true,
+    "frontier": true,
+    "specialized": true
   },
   "traceabilityByGrade": {
-    "utility": "minimal",
-    "working": "standard",
-    "strong": "standard",
-    "final": "full",
-    "evidentiary": "full"
+    "basic": "minimal",
+    "standard": "standard",
+    "enhanced": "standard",
+    "frontier": "full",
+    "specialized": "full"
   }
 }

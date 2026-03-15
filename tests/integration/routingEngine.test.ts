@@ -19,9 +19,15 @@ import {
 function makeProfile(overrides: Partial<ModelProfile> & { id: string; name: string }): ModelProfile {
   return {
     description: 'Test profile',
-    supportedTaskTypes: [TaskType.ANALYSIS],
-    supportedLoadTiers: [LoadTier.SIMPLE, LoadTier.MODERATE],
-    minimumCognitiveGrade: CognitiveGrade.UTILITY,
+    vendor: ProviderVendor.OLLAMA,
+    modelId: 'test-model',
+    contextWindow: 32768,
+    maxTokens: 4096,
+    costPer1kInput: 0,
+    costPer1kOutput: 0,
+    supportedTaskTypes: [TaskType.ANALYTICAL],
+    supportedLoadTiers: [LoadTier.SINGLE_SHOT, LoadTier.BATCH],
+    minimumCognitiveGrade: CognitiveGrade.BASIC,
     localOnly: false,
     cloudAllowed: true,
     enabled: true,
@@ -35,8 +41,12 @@ function makeTactic(overrides: Partial<TacticProfile> & { id: string; name: stri
   return {
     description: 'Test tactic',
     executionMethod: 'single_prompt',
-    supportedTaskTypes: [TaskType.ANALYSIS],
-    supportedLoadTiers: [LoadTier.SIMPLE, LoadTier.MODERATE],
+    systemPromptTemplate: 'You are a helpful assistant.',
+    maxRetries: 2,
+    temperature: 0.7,
+    topP: 0.9,
+    supportedTaskTypes: [TaskType.ANALYTICAL],
+    supportedLoadTiers: [LoadTier.SINGLE_SHOT, LoadTier.BATCH],
     multiStage: false,
     requiresStructuredOutput: false,
     enabled: true,
@@ -70,10 +80,11 @@ function makeRequest(overrides: Partial<RoutingRequest> = {}): RoutingRequest {
     application: 'thingstead',
     process: 'governance',
     step: 'advisory',
-    taskType: TaskType.ANALYSIS,
-    loadTier: LoadTier.SIMPLE,
+    taskType: TaskType.ANALYTICAL,
+    loadTier: LoadTier.SINGLE_SHOT,
     decisionPosture: DecisionPosture.ADVISORY,
-    cognitiveGrade: CognitiveGrade.WORKING,
+    cognitiveGrade: CognitiveGrade.STANDARD,
+    input: 'test input',
     constraints: {
       privacy: 'cloud_allowed',
       maxLatencyMs: null,
@@ -100,11 +111,11 @@ describe('Routing Engine – Eligibility Calculation', () => {
 
   it('filters profiles by task type', () => {
     const profiles = [
-      makeProfile({ id: 'p1', name: 'Analysis Model', supportedTaskTypes: [TaskType.ANALYSIS] }),
+      makeProfile({ id: 'p1', name: 'Analysis Model', supportedTaskTypes: [TaskType.ANALYTICAL] }),
       makeProfile({ id: 'p2', name: 'Creative Model', supportedTaskTypes: [TaskType.CREATIVE] }),
     ];
     const policy = makePolicy();
-    const request = makeRequest({ taskType: TaskType.ANALYSIS });
+    const request = makeRequest({ taskType: TaskType.ANALYTICAL });
 
     const eligible = profilesService.computeEligible(profiles, policy, request);
     expect(eligible).toHaveLength(1);
@@ -113,11 +124,11 @@ describe('Routing Engine – Eligibility Calculation', () => {
 
   it('filters profiles by load tier', () => {
     const profiles = [
-      makeProfile({ id: 'p1', name: 'Simple Only', supportedLoadTiers: [LoadTier.SIMPLE] }),
-      makeProfile({ id: 'p2', name: 'Complex Only', supportedLoadTiers: [LoadTier.COMPLEX] }),
+      makeProfile({ id: 'p1', name: 'Simple Only', supportedLoadTiers: [LoadTier.SINGLE_SHOT] }),
+      makeProfile({ id: 'p2', name: 'Complex Only', supportedLoadTiers: [LoadTier.HIGH_THROUGHPUT] }),
     ];
     const policy = makePolicy();
-    const request = makeRequest({ loadTier: LoadTier.SIMPLE });
+    const request = makeRequest({ loadTier: LoadTier.SINGLE_SHOT });
 
     const eligible = profilesService.computeEligible(profiles, policy, request);
     expect(eligible).toHaveLength(1);
@@ -165,11 +176,11 @@ describe('Routing Engine – Eligibility Calculation', () => {
 
   it('filters tactics by task type and load tier', () => {
     const tactics = [
-      makeTactic({ id: 't1', name: 'Analysis Tactic', supportedTaskTypes: [TaskType.ANALYSIS] }),
+      makeTactic({ id: 't1', name: 'Analysis Tactic', supportedTaskTypes: [TaskType.ANALYTICAL] }),
       makeTactic({ id: 't2', name: 'Creative Tactic', supportedTaskTypes: [TaskType.CREATIVE] }),
     ];
     const policy = makePolicy();
-    const request = makeRequest({ taskType: TaskType.ANALYSIS });
+    const request = makeRequest({ taskType: TaskType.ANALYTICAL });
 
     const eligible = tacticsService.computeEligible(tactics, policy, request);
     expect(eligible).toHaveLength(1);

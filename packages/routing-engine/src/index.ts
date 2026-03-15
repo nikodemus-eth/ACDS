@@ -27,3 +27,7 @@ export { DispatchResolver } from './resolvers/DispatchResolver.js';
 export type { DispatchResolverDeps, DispatchResult } from './resolvers/DispatchResolver.js';
 export { AdaptiveDispatchResolver } from './resolvers/AdaptiveDispatchResolver.js';
 export type { AdaptiveDispatchResolverDeps, AdaptiveDispatchResult } from './resolvers/AdaptiveDispatchResolver.js';
+
+// Confidence Escalation
+export { ConfidenceEscalationResolver } from './selection/ConfidenceEscalationResolver.js';
+export type { ConfidenceEscalationConfig } from './selection/ConfidenceEscalationResolver.js';

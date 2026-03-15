@@ -16,3 +16,8 @@ export type { ProviderHealthRepository } from './health/ProviderHealthRepository
 export { ProviderHealthService } from './health/ProviderHealthService.js';
 export { ProviderHealthScheduler } from './health/ProviderHealthScheduler.js';
 export type { HealthCheckSchedulerConfig } from './health/ProviderHealthScheduler.js';
+
+// Lease
+export type { ExecutionLease } from './lease/ExecutionLease.js';
+export { LeaseManager } from './lease/LeaseManager.js';
+export type { LeaseConfig } from './lease/LeaseManager.js';

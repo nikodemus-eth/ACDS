@@ -12,7 +12,7 @@ export type { ProcessContext } from './builders/ProcessContextBuilder.js';
 
 // Helpers
 export { classifyLoad } from './helpers/classifyLoad.js';
-export type { LoadClassificationThresholds } from './helpers/classifyLoad.js';
+export type { LoadClassificationOptions } from './helpers/classifyLoad.js';
 export { defaultPosture } from './helpers/defaultPosture.js';
 export { structuredOutputRequired } from './helpers/structuredOutputFlags.js';
 

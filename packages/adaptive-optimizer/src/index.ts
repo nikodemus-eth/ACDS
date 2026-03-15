@@ -99,3 +99,13 @@ export {
   type PerformanceSummaryForTuning,
   type PolicyConstraints,
 } from './adaptation/EscalationTuningService.js';
+
+// Meta Guidance
+export type { StrategyType, StrategyRecommendation } from './guidance/StrategyRecommendation.js';
+export { MetaGuidanceService } from './guidance/MetaGuidanceService.js';
+
+// Global Budget Allocation
+export type { FamilyValueInput } from './global/FamilyValueScore.js';
+export { FamilyValueScorer } from './global/FamilyValueScore.js';
+export type { FamilyBudgetAllocation, BudgetAllocationState } from './global/BudgetAllocationState.js';
+export { GlobalBudgetAllocator } from './global/GlobalBudgetAllocator.js';

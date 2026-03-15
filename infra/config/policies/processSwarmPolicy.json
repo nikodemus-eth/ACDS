@@ -10,9 +10,10 @@
     "preferredModelProfile": "cloud_frontier_creative",
     "preferredTaskTypes": ["creative", "transformation", "planning"],
     "maxLatencyByLoadTier": {
-      "simple": 5000,
-      "moderate": 20000,
-      "complex": 90000
+      "single_shot": 5000,
+      "batch": 20000,
+      "streaming": 45000,
+      "high_throughput": 90000
     }
   }
 }

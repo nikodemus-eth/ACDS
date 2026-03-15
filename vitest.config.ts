@@ -19,6 +19,7 @@ export default defineConfig({
       '@acds/evaluation': resolve('evaluation'),
       '@acds/adaptive-optimizer': resolve('adaptive-optimizer'),
       '@acds/shared-utils': resolve('shared-utils'),
+      '@acds/persistence-pg': resolve('persistence-pg'),
     },
   },
   test: {

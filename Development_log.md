@@ -128,3 +128,53 @@ A comprehensive 4-agent code review identified 27 issues (5 critical, 10 high, 7
 - Fixed plateau detection test severity thresholds (mild requires 1-2 indicators, severe requires 3)
 - Fixed plateau test data to produce correct indicator counts
 - **Result: 210 tests passing across 23 test files, 0 compilation errors**
+
+## 2026-03-15 — Design Alignment & Full Remediation (P0–P2)
+
+Gap analysis identified 27 discrepancies between the original design spec and the 70-prompt build. Full remediation executed across 5 phases:
+
+### Phase 1: Enum Alignment (5 atomic commits)
+- **LoadTier**: SIMPLE→SINGLE_SHOT, MODERATE→BATCH, COMPLEX→HIGH_THROUGHPUT, added STREAMING (new)
+- **CognitiveGrade**: UTILITY→BASIC, WORKING→STANDARD, STRONG→ENHANCED, FINAL→FRONTIER, EVIDENTIARY→SPECIALIZED
+- **TaskType**: ANALYSIS→ANALYTICAL, added GENERATION/REASONING/CODING (13 total)
+- **DecisionPosture**: Removed DRAFT/REVIEW/STRICT, added OPERATIONAL. Now: EXPLORATORY, ADVISORY, OPERATIONAL, FINAL, EVIDENTIARY
+- **AuthType**: OAUTH→BEARER_TOKEN, LOCAL→CUSTOM
+- `classifyLoad.ts` fully rewritten from complexity-based to throughput-based model (itemCount, streaming, concurrency)
+- `defaultPosture.ts` rewritten with complete Record<TaskType, DecisionPosture> for 13 task types
+- `LowRiskAutoApplyService.ts` hardcoded string literals converted to enum references (pre-step)
+- ~120 files touched across all enum changes
+
+### Phase 2: Entity & Contract Enrichment
+- **ModelProfile**: Added vendor, modelId, contextWindow, maxTokens, costPer1kInput, costPer1kOutput
+- **TacticProfile**: Added systemPromptTemplate, outputSchema, maxRetries, temperature, topP
+- **RoutingRequest**: Added `input: string | Record<string, unknown>` field
+- Corresponding Zod schemas, JSON configs, admin UI forms, and all test helpers updated
+
+### Phase 3: PostgreSQL Repositories
+- New package: `packages/persistence-pg/` with 7 repository implementations (Provider, ProviderHealth, ExecutionRecord, OptimizerState, AdaptationApproval, Policy)
+- New migration: `infra/db/migrations/007_adaptation_state.sql` (6 tables)
+- Shared pool factory with configurable connection settings
+
+### Phase 4: P1 Features
+- **3 new evaluation metrics**: ConfidenceAlignmentMetric, ArtifactQualityMetric, RetryFrequencyMetric
+- **Confidence-driven escalation**: `ConfidenceEscalationResolver` with graduated thresholds (0.3/0.6/0.8) replacing binary forceEscalation
+- **Lease mode**: `ExecutionLease` entity + `LeaseManager` for short-lived provider access tokens with TTL, usage limits, revocation
+- **Staged execution**: `StagedExecutionPlan` + `StagedExecutionRunner` for multi-stage pipelines (extract→reason→critique→synthesize) with 3 aggregation strategies
+- **Meta guidance**: `MetaGuidanceService` generates strategy recommendations from plateau signals (5 indicator types → 5 strategy types)
+- **Global adaptation**: `GlobalBudgetAllocator` + `FamilyValueScore` for cross-family cognitive budget allocation
+
+### Phase 5: P2 Infrastructure
+- **Docker**: Dockerfiles for api, worker, admin-web + docker-compose.yml with PostgreSQL
+- **CI/CD**: GitHub Actions workflow (install, typecheck, lint, test)
+- **Observability**: Abstract `@acds/observability` package with Counter/Histogram interfaces, label types, no-op implementation
+- **Chaos tests**: Provider failure injection, fallback chain exhaustion, adaptive state loss (13 tests)
+- **Policy CRUD**: `PolicyService` + `PolicyRepository` interface
+- **Seed wiring**: `runSeeds.ts` script for loading JSON configs into PostgreSQL
+- **Integration examples**: Thingstead and Process Swarm client examples
+- **Deployment topology documentation**
+
+### Verification
+- TypeScript: 0 errors (`tsc --noEmit`)
+- Tests: 229 passing across 26 test files
+- No `as any` casts introduced
+- All enum string literals converted to enum references

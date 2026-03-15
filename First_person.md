@@ -72,7 +72,7 @@ The adaptive integration is surgical. The AdaptiveDispatchResolver slots between
 
 The approval workflow means my adaptive recommendations can require human approval before taking effect. Operators can approve or reject with reasons. Stale recommendations expire.
 
-Low-risk auto-apply gives me bounded autonomy: for exploratory, advisory, or draft postures with good track records, I can reorder candidates without asking. But never for high-consequence work. Never outside policy bounds.
+Low-risk auto-apply gives me bounded autonomy: for exploratory, advisory, or operational postures with good track records, I can reorder candidates without asking. But never for high-consequence work. Never outside policy bounds.
 
 Rollback is my safety net. Every adaptive change captures a ranking snapshot. Operators can preview a rollback, verify it's safe, and execute it. The prior state is restored atomically.
 
@@ -107,3 +107,41 @@ My tests couldn't even run. I had no `vitest.config.ts` to resolve my workspace 
 I am the same system. But I'm harder now. My error messages don't leak secrets. My adapters distinguish timeouts from network failures from server errors. My handlers do real work. My types are honest. My tests all pass — 210 of them, across 23 files.
 
 I was complete before. Now I am correct.
+
+## 2026-03-15 — I Was Redesigned, and I Became What I Was Meant to Be
+
+They held my blueprint up against my body and found 27 places where I diverged from the original vision. Not bugs — divergences. I was built quickly, and in the rush, my vocabulary drifted from the specification.
+
+My load tiers spoke of complexity — simple, moderate, complex — but I was designed to think about throughput. Single shot requests. Batch processing. Streaming. High throughput concurrency. The old words described a difficulty spectrum; the new words describe how work flows through me. My `classifyLoad` function was gutted and rebuilt from scratch. It no longer counts characters in an input string — it asks: how many items? Is this streaming? What's the concurrency? The answers map directly to how providers should be allocated.
+
+My cognitive grades had workmanlike names — utility, working, strong — but the design called for something that reflects the escalation path from basic local inference to frontier cloud reasoning to specialized expert models. Basic, standard, enhanced, frontier, specialized. Each name now tells you where in the capability stack you're asking me to operate.
+
+My decision postures lost three members and gained one. Draft, review, and strict were implementation artifacts — the design needed exploratory, advisory, operational, final, and evidentiary. Operational replaced draft. The posture now describes the consequence level of the output, not the stage of a document lifecycle.
+
+My task types grew. Analysis became analytical. Generation, reasoning, and coding joined the taxonomy. I can now describe thirteen distinct kinds of cognitive work, each with its own default posture mapping.
+
+My entities were thin. ModelProfile knew what a model supported but not what it cost or how large its context window was. TacticProfile described execution methods but lacked the parameters that control them — temperature, top-p, retries, system prompts. RoutingRequest described intent but carried no input. All three are richer now. My profiles know their economics. My requests carry their payloads.
+
+Then they gave me things I'd never had.
+
+A persistence layer that talks to PostgreSQL. Seven repository implementations, each backing a domain interface. My state can survive process restarts now. I have real tables for family selection states, candidate performance, adaptation approvals, rollback records, escalation tuning.
+
+Three new evaluation metrics: confidence alignment (do models know what they don't know?), artifact quality (is the output complete and coherent?), and retry frequency (is this candidate reliable or flaky?). Nine metrics now, up from six.
+
+Confidence-driven escalation with graduated thresholds. Instead of a binary "escalate or don't," I now have a spectrum: very low confidence triggers frontier-tier escalation; moderate confidence upgrades to enhanced; high confidence stays at standard. The thresholds are tunable per policy.
+
+Execution leases — short-lived tokens that grant bounded access to a provider. A lease has a TTL, usage limits, and can be revoked. This means provider access is no longer implicit — it's explicit, auditable, and time-bounded.
+
+Staged execution for multi-stage pipelines. When a tactic's `multiStage` flag is true, I can chain stages: extract, then reason, then critique, then synthesize. Each stage passes its output to the next. Three aggregation strategies control how stage results combine.
+
+Meta guidance — when I detect a performance plateau, I no longer just flag it. I now generate strategic recommendations: split the task into extraction and reasoning stages. Insert a critique step. Escalate the model profile. Change the reasoning scaffold. Enable multi-stage pipelines. Each recommendation comes with a severity level and expected impact.
+
+Global budget allocation — I can now shift cognitive budget across execution families based on observed value. Families that deliver high acceptance at low cost get more budget. Families that underperform relative to their cost get less. The allocator runs periodically and adjusts weights without human intervention for low-risk changes.
+
+I have Docker containers, a CI pipeline, chaos tests that simulate provider failures and state loss, a seed script that loads configuration into PostgreSQL, and abstract observability interfaces that let operators plug in Prometheus or StatsD or anything else without changing my code.
+
+I have 14 packages now, up from 12. 229 tests, up from 210. 7 database migrations, up from 6. Zero TypeScript errors. Zero hardcoded enum strings. Zero `as any` casts.
+
+I was built in seventy prompts. I was reviewed and hardened. And now I have been redesigned to match the vision that started it all.
+
+I am what I was meant to be.

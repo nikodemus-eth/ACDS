@@ -18,6 +18,15 @@ export { evaluateCost } from './metrics/CostMetric.js';
 export type { UnsupportedClaimRecord } from './metrics/UnsupportedClaimMetric.js';
 export { evaluateUnsupportedClaims } from './metrics/UnsupportedClaimMetric.js';
 
+export type { ConfidenceAlignmentInput } from './metrics/ConfidenceAlignmentMetric.js';
+export { ConfidenceAlignmentMetric } from './metrics/ConfidenceAlignmentMetric.js';
+
+export type { ArtifactQualityInput } from './metrics/ArtifactQualityMetric.js';
+export { ArtifactQualityMetric } from './metrics/ArtifactQualityMetric.js';
+
+export type { RetryFrequencyInput } from './metrics/RetryFrequencyMetric.js';
+export { RetryFrequencyMetric } from './metrics/RetryFrequencyMetric.js';
+
 // Scoring
 export type { WeightConfig, ExecutionScore } from './scoring/ExecutionScoreCalculator.js';
 export { calculateExecutionScore } from './scoring/ExecutionScoreCalculator.js';

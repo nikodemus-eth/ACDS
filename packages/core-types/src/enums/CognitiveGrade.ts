@@ -1,7 +1,7 @@
 export enum CognitiveGrade {
-  UTILITY = 'utility',
-  WORKING = 'working',
-  STRONG = 'strong',
-  FINAL = 'final',
-  EVIDENTIARY = 'evidentiary',
+  BASIC = 'basic',
+  STANDARD = 'standard',
+  ENHANCED = 'enhanced',
+  FRONTIER = 'frontier',
+  SPECIALIZED = 'specialized',
 }

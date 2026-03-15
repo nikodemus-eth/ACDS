@@ -4,7 +4,7 @@
  * current adaptive mode policy.
  *
  * Qualification criteria:
- * - Posture is exploratory, advisory, or draft (not final/evidentiary).
+ * - Posture is exploratory, advisory, or operational (not final/evidentiary).
  * - No recent failures recorded in the family state.
  * - Rolling score is above a configurable threshold.
  * - Family is not classified as high-consequence.
@@ -13,6 +13,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { DecisionPosture } from '@acds/core-types';
 import type { FamilySelectionState } from '../state/FamilySelectionState.js';
 import type { AdaptationRecommendation } from './AdaptationRecommendationService.js';
 import type { RankedCandidate } from '../selection/CandidateRanker.js';
@@ -38,9 +39,9 @@ const DEFAULT_CONFIG: LowRiskAutoApplyConfig = {
 // ── Postures that qualify for low-risk auto-apply ──────────────────────────
 
 const QUALIFYING_POSTURES: ReadonlySet<string> = new Set([
-  'exploratory',
-  'advisory',
-  'draft',
+  DecisionPosture.EXPLORATORY,
+  DecisionPosture.ADVISORY,
+  DecisionPosture.OPERATIONAL,
 ]);
 
 // ── Interfaces required by the service ─────────────────────────────────────

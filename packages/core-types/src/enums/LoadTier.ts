@@ -1,5 +1,6 @@
 export enum LoadTier {
-  SIMPLE = 'simple',
-  MODERATE = 'moderate',
-  COMPLEX = 'complex',
+  SINGLE_SHOT = 'single_shot',
+  BATCH = 'batch',
+  STREAMING = 'streaming',
+  HIGH_THROUGHPUT = 'high_throughput',
 }

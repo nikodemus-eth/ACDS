@@ -1,0 +1,15 @@
+FROM node:20-alpine AS base
+RUN corepack enable
+WORKDIR /app
+
+FROM base AS build
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/admin-web/package.json apps/admin-web/
+RUN pnpm install --frozen-lockfile
+COPY apps/admin-web/ apps/admin-web/
+RUN pnpm --filter @acds/admin-web build
+
+FROM nginx:alpine
+COPY --from=build /app/apps/admin-web/dist /usr/share/nginx/html
+COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

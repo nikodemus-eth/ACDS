@@ -9,9 +9,10 @@
     "preferredModelProfile": "local_balanced_reasoning",
     "governanceAware": true,
     "maxLatencyByLoadTier": {
-      "simple": 3000,
-      "moderate": 10000,
-      "complex": 30000
+      "single_shot": 3000,
+      "batch": 10000,
+      "streaming": 20000,
+      "high_throughput": 30000
     }
   }
 }

@@ -23,3 +23,7 @@ export { TacticEligibilityResolver } from './resolvers/TacticEligibilityResolver
 export { PolicyValidator } from './validators/PolicyValidator.js';
 export { PolicyConflictDetector } from './validators/PolicyConflictDetector.js';
 export type { PolicyConflict } from './validators/PolicyConflictDetector.js';
+
+// Services
+export type { PolicyRepository } from './services/PolicyRepository.js';
+export { PolicyService } from './services/PolicyService.js';

@@ -188,7 +188,7 @@ describe('Provider Broker – Provider Registration', () => {
     const disabled = await service.create({
       name: 'Will Disable',
       vendor: ProviderVendor.LMSTUDIO,
-      authType: AuthType.LOCAL,
+      authType: AuthType.CUSTOM,
       baseUrl: 'http://localhost:1234',
       enabled: true,
       environment: 'development',
