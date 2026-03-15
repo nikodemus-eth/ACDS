@@ -50,7 +50,13 @@ export class OllamaAdapter implements ProviderAdapter {
       return fromOllamaResponse(data, latencyMs);
     } catch (error) {
       if (error instanceof AdapterError) throw error;
-      throw new AdapterError({ message: 'Ollama execution failed', code: 'EXECUTION_FAILED', retryable: true, cause: error instanceof Error ? error : undefined });
+      const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+      throw new AdapterError({
+        message: isTimeout ? 'Ollama request timed out' : 'Ollama execution failed',
+        code: isTimeout ? 'TIMEOUT' : 'EXECUTION_FAILED',
+        retryable: !isTimeout && !(error instanceof TypeError),
+        cause: error instanceof Error ? error : undefined,
+      });
     }
   }
 }

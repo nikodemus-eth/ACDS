@@ -31,7 +31,13 @@ export class SecretRedactor {
   redactRecord(record: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(record)) {
-      result[key] = this.redactValue(key, value);
+      if (this.isSensitiveKey(key)) {
+        result[key] = REDACTED;
+      } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = this.redactRecord(value as Record<string, unknown>);
+      } else {
+        result[key] = value;
+      }
     }
     return result;
   }

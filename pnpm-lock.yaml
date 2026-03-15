@@ -124,6 +124,9 @@ importers:
 
   packages/execution-orchestrator:
     dependencies:
+      '@acds/adaptive-optimizer':
+        specifier: workspace:*
+        version: link:../adaptive-optimizer
       '@acds/audit-ledger':
         specifier: workspace:*
         version: link:../audit-ledger

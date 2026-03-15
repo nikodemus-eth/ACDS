@@ -51,9 +51,13 @@ export class ExecutionStatusTracker {
 
   private updateStatus(id: string, status: ExecutionStatus): void {
     const execution = this.executions.get(id);
-    if (execution) {
-      execution.status = status;
-      execution.updatedAt = new Date();
+    if (!execution) {
+      console.error(
+        `[execution-tracker] Cannot update status to '${status}': execution ${id} not found in tracker`,
+      );
+      return;
     }
+    execution.status = status;
+    execution.updatedAt = new Date();
   }
 }

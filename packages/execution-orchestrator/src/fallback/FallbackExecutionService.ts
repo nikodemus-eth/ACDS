@@ -36,10 +36,19 @@ export class FallbackExecutionService {
         await this.statusTracker.markFallbackSucceeded(executionId);
         return response;
       } catch (error) {
-        this.fallbackTracker.recordFailure(executionId, entry, error instanceof Error ? error.message : 'Unknown');
+        const message = error instanceof Error ? error.message : 'Unknown';
+        console.error(
+          `[fallback-execution] Attempt failed for execution ${executionId}, ` +
+          `provider ${entry.providerId}, model ${entry.modelProfileId}: ${message}`,
+        );
+        this.fallbackTracker.recordFailure(executionId, entry, message);
       }
     }
 
+    console.error(
+      `[fallback-execution] All ${chain.length} fallback(s) exhausted for execution ${executionId}. ` +
+      `Original error: ${originalError}`,
+    );
     await this.statusTracker.markFallbackFailed(executionId);
     return null;
   }

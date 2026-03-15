@@ -5,6 +5,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AdaptationApprovalRepository } from '@acds/adaptive-optimizer';
 import { AdaptationApprovalService, type ApprovalAuditEmitter } from '@acds/adaptive-optimizer';
+import { NotFoundError, ConflictError } from '@acds/core-types';
 import { AdaptationApprovalPresenter } from '../presenters/AdaptationApprovalPresenter.js';
 
 // ── Route-level param/body types ──────────────────────────────────────────
@@ -66,11 +67,12 @@ export class AdaptationApprovalController {
       const updated = await this.service.approve(request.params.id, actor, reason);
       reply.send(AdaptationApprovalPresenter.toView(updated));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('not found')) {
-        reply.status(404).send({ error: 'Not Found', message, statusCode: 404 });
+      if (error instanceof NotFoundError) {
+        reply.status(404).send({ error: 'Not Found', message: error.message, statusCode: 404 });
+      } else if (error instanceof ConflictError) {
+        reply.status(409).send({ error: 'Conflict', message: error.message, statusCode: 409 });
       } else {
-        reply.status(409).send({ error: 'Conflict', message, statusCode: 409 });
+        throw error;
       }
     }
   }
@@ -85,11 +87,12 @@ export class AdaptationApprovalController {
       const updated = await this.service.reject(request.params.id, actor, reason);
       reply.send(AdaptationApprovalPresenter.toView(updated));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('not found')) {
-        reply.status(404).send({ error: 'Not Found', message, statusCode: 404 });
+      if (error instanceof NotFoundError) {
+        reply.status(404).send({ error: 'Not Found', message: error.message, statusCode: 404 });
+      } else if (error instanceof ConflictError) {
+        reply.status(409).send({ error: 'Conflict', message: error.message, statusCode: 409 });
       } else {
-        reply.status(409).send({ error: 'Conflict', message, statusCode: 409 });
+        throw error;
       }
     }
   }

@@ -23,6 +23,7 @@ export async function providersRoutes(
   const controller = new ProvidersController(
     app.diContainer?.registryService ?? ({} as any),
     app.diContainer?.connectionTester ?? ({} as any),
+    app.diContainer?.secretRotationService ?? ({} as any),
   );
 
   // Apply auth to all routes in this plugin scope

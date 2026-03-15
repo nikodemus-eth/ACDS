@@ -7,13 +7,14 @@
  */
 
 import type {
-  OptimizerStateRepository,
   PlateauSignal,
   AdaptiveMode,
   AdaptationRecommendation,
 } from '@acds/adaptive-optimizer';
 import { generateRecommendation, rankCandidates } from '@acds/adaptive-optimizer';
 import { randomUUID } from 'node:crypto';
+import { getSharedOptimizerStateRepository } from '../repositories/InMemoryOptimizerStateRepository.js';
+import { getPlateauSignalRepository } from './runPlateauDetection.js';
 
 // ── Abstract repository interfaces ────────────────────────────────────────
 
@@ -101,32 +102,74 @@ export async function runAdaptationRecommendations(): Promise<void> {
   console.log(
     `[adaptation-recommendation] Completed: ${generated} generated, ${skipped} skipped, ${errors} errors.`,
   );
+
+  if (errors > 0 && generated === 0 && skipped === 0) {
+    throw new Error(
+      `[adaptation-recommendation] All ${errors} attempt(s) failed. This indicates a systemic issue.`,
+    );
+  }
+}
+
+function getOptimizerStateRepository() {
+  return getSharedOptimizerStateRepository();
 }
 
 /**
- * Placeholder factories for repositories.
- * Will be replaced by DI container resolution.
+ * In-memory PlateauSignalReader that reads from the shared plateau signal repository.
  */
-function getOptimizerStateRepository(): OptimizerStateRepository {
-  throw new Error(
-    'OptimizerStateRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+class InMemoryPlateauSignalReader implements PlateauSignalReader {
+  async listActivePlateaus(): Promise<PlateauSignal[]> {
+    return getPlateauSignalRepository().getActiveSignals();
+  }
 }
+
+/**
+ * In-memory AdaptationRecommendationRepository.
+ */
+class InMemoryAdaptationRecommendationRepository implements AdaptationRecommendationRepository {
+  private readonly recommendations: AdaptationRecommendation[] = [];
+
+  async save(recommendation: AdaptationRecommendation): Promise<void> {
+    this.recommendations.push(recommendation);
+  }
+
+  getAll(): AdaptationRecommendation[] {
+    return [...this.recommendations];
+  }
+
+  getPending(): AdaptationRecommendation[] {
+    return this.recommendations.filter((r) => r.status === 'pending');
+  }
+}
+
+/**
+ * Default AdaptiveModeProvider that returns the configured default mode.
+ * Defaults to 'recommend_only' — the safest non-passive mode.
+ */
+class DefaultAdaptiveModeProvider implements AdaptiveModeProvider {
+  private readonly defaultMode: AdaptiveMode;
+
+  constructor(defaultMode: AdaptiveMode = 'recommend_only') {
+    this.defaultMode = defaultMode;
+  }
+
+  async getModeForFamily(_familyKey: string): Promise<AdaptiveMode> {
+    return this.defaultMode;
+  }
+}
+
+const plateauSignalReader = new InMemoryPlateauSignalReader();
+const recommendationRepo = new InMemoryAdaptationRecommendationRepository();
+const adaptiveModeProvider = new DefaultAdaptiveModeProvider();
 
 function getPlateauSignalReader(): PlateauSignalReader {
-  throw new Error(
-    'PlateauSignalReader not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return plateauSignalReader;
 }
 
-function getAdaptationRecommendationRepository(): AdaptationRecommendationRepository {
-  throw new Error(
-    'AdaptationRecommendationRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+export function getAdaptationRecommendationRepository(): AdaptationRecommendationRepository & { getPending(): AdaptationRecommendation[] } {
+  return recommendationRepo;
 }
 
-function getAdaptiveModeProvider(): AdaptiveModeProvider {
-  throw new Error(
-    'AdaptiveModeProvider not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+export function getAdaptiveModeProvider(): AdaptiveModeProvider {
+  return adaptiveModeProvider;
 }

@@ -6,6 +6,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ProviderRegistryService } from '@acds/provider-broker';
 import type { ProviderConnectionTester } from '@acds/provider-broker';
 import type { CreateProviderInput } from '@acds/core-types';
+import type { SecretRotationService } from '@acds/security';
 import { ProviderPresenter } from '../presenters/ProviderPresenter.js';
 
 interface ProviderIdParams {
@@ -16,6 +17,7 @@ export class ProvidersController {
   constructor(
     private readonly registry: ProviderRegistryService,
     private readonly connectionTester: ProviderConnectionTester,
+    private readonly secretRotation: SecretRotationService,
   ) {}
 
   // ── POST / ──────────────────────────────────────────────────────────
@@ -91,11 +93,35 @@ export class ProvidersController {
 
   // ── POST /:id/rotate-secret ───────────────────────────────────────
   async rotateSecret(
-    request: FastifyRequest<{ Params: ProviderIdParams }>,
+    request: FastifyRequest<{ Params: ProviderIdParams; Body: { newSecret: string } }>,
     reply: FastifyReply,
   ): Promise<void> {
-    // rotateSecret not yet implemented on ProviderRegistryService
-    await this.registry.update(request.params.id, {});
-    reply.status(204).send();
+    const provider = await this.registry.getById(request.params.id);
+    if (!provider) {
+      reply.status(404).send({
+        error: 'Not Found',
+        message: `Provider ${request.params.id} not found`,
+        statusCode: 404,
+      });
+      return;
+    }
+
+    const { newSecret } = request.body ?? {};
+    if (!newSecret || typeof newSecret !== 'string' || newSecret.trim().length === 0) {
+      reply.status(400).send({
+        error: 'Bad Request',
+        message: 'Field newSecret is required and must be a non-empty string.',
+        statusCode: 400,
+      });
+      return;
+    }
+
+    const result = await this.secretRotation.rotateSecret(request.params.id, newSecret);
+    reply.status(200).send({
+      message: `Secret rotated for provider ${request.params.id}`,
+      providerId: result.providerId,
+      rotatedAt: result.rotatedAt.toISOString(),
+      newKeyId: result.newKeyId,
+    });
   }
 }

@@ -16,6 +16,7 @@
     "@acds/provider-broker": "workspace:*",
     "@acds/provider-adapters": "workspace:*",
     "@acds/audit-ledger": "workspace:*",
-    "@acds/evaluation": "workspace:*"
+    "@acds/evaluation": "workspace:*",
+    "@acds/adaptive-optimizer": "workspace:*"
   }
 }

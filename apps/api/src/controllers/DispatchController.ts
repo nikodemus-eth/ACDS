@@ -23,13 +23,27 @@ export class DispatchController {
     request: FastifyRequest<{ Body: RoutingRequest }>,
     reply: FastifyReply,
   ): Promise<void> {
-    const result = this.resolver.resolve(
-      request.body,
-      // Dependencies are injected via the DI container; cast for now.
-      (request.server as any).diContainer?.resolverDeps ?? ({} as any),
-    );
+    const deps = (request.server as any).diContainer?.resolverDeps;
+    if (!deps) {
+      reply.status(500).send({
+        error: 'Internal Server Error',
+        message: 'DispatchResolver dependencies not configured. Ensure DI container is initialized.',
+        statusCode: 500,
+      });
+      return;
+    }
 
-    reply.send(RoutingDecisionPresenter.toView(result.decision));
+    try {
+      const result = this.resolver.resolve(request.body, deps);
+      reply.send(RoutingDecisionPresenter.toView(result.decision));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      reply.status(400).send({
+        error: 'Bad Request',
+        message,
+        statusCode: 400,
+      });
+    }
   }
 
   // ── POST /run ────────────────────────────────────────────────────────

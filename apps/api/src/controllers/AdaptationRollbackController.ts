@@ -4,6 +4,7 @@
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AdaptationRollbackService } from '@acds/adaptive-optimizer';
+import { NotFoundError, ConflictError } from '@acds/core-types';
 import { AdaptationRollbackPresenter } from '../presenters/AdaptationRollbackPresenter.js';
 
 // ── Route-level param/query/body types ────────────────────────────────────
@@ -54,11 +55,10 @@ export class AdaptationRollbackController {
         preview: AdaptationRollbackPresenter.toView(preview.preview),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('not found')) {
-        reply.status(404).send({ error: 'Not Found', message, statusCode: 404 });
+      if (error instanceof NotFoundError) {
+        reply.status(404).send({ error: 'Not Found', message: error.message, statusCode: 404 });
       } else {
-        reply.status(400).send({ error: 'Bad Request', message, statusCode: 400 });
+        throw error;
       }
     }
   }
@@ -89,13 +89,12 @@ export class AdaptationRollbackController {
       );
       reply.status(201).send(AdaptationRollbackPresenter.toView(record));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('not found')) {
-        reply.status(404).send({ error: 'Not Found', message, statusCode: 404 });
-      } else if (message.includes('not safe')) {
-        reply.status(409).send({ error: 'Conflict', message, statusCode: 409 });
+      if (error instanceof NotFoundError) {
+        reply.status(404).send({ error: 'Not Found', message: error.message, statusCode: 404 });
+      } else if (error instanceof ConflictError) {
+        reply.status(409).send({ error: 'Conflict', message: error.message, statusCode: 409 });
       } else {
-        reply.status(400).send({ error: 'Bad Request', message, statusCode: 400 });
+        throw error;
       }
     }
   }

@@ -16,8 +16,9 @@ export class GeminiAdapter implements ProviderAdapter {
 
   async testConnection(config: AdapterConfig): Promise<AdapterConnectionResult> {
     const start = Date.now();
+    const baseUrl = `${config.baseUrl}/v1beta/models`;
     try {
-      const response = await fetch(`${config.baseUrl}/v1beta/models?key=${config.apiKey}`, {
+      const response = await fetch(`${baseUrl}?key=${config.apiKey}`, {
         signal: AbortSignal.timeout(config.timeout ?? 15000),
       });
       const latencyMs = Date.now() - start;
@@ -26,16 +27,17 @@ export class GeminiAdapter implements ProviderAdapter {
       const models = data.models?.map((m) => m.name) ?? [];
       return { success: true, latencyMs, message: 'Connected', models };
     } catch (error) {
-      return { success: false, latencyMs: Date.now() - start, message: error instanceof Error ? error.message : 'Unknown error' };
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, latencyMs: Date.now() - start, message: msg.replace(/key=[^&\s]+/gi, 'key=[REDACTED]') };
     }
   }
 
   async execute(config: AdapterConfig, request: AdapterRequest): Promise<AdapterResponse> {
     const geminiRequest = toGeminiRequest(request);
     const start = Date.now();
-    const url = `${config.baseUrl}/v1beta/models/${request.model}:generateContent?key=${config.apiKey}`;
+    const baseEndpoint = `${config.baseUrl}/v1beta/models/${request.model}:generateContent`;
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${baseEndpoint}?key=${config.apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(geminiRequest),
@@ -47,7 +49,13 @@ export class GeminiAdapter implements ProviderAdapter {
       return fromGeminiResponse(data, latencyMs);
     } catch (error) {
       if (error instanceof AdapterError) throw error;
-      throw new AdapterError({ message: 'Gemini execution failed', code: 'EXECUTION_FAILED', retryable: true, cause: error instanceof Error ? error : undefined });
+      const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+      throw new AdapterError({
+        message: isTimeout ? `Gemini request timed out for ${baseEndpoint}` : `Gemini execution failed for ${baseEndpoint}`,
+        code: isTimeout ? 'TIMEOUT' : 'EXECUTION_FAILED',
+        retryable: !isTimeout && !(error instanceof TypeError),
+        cause: error instanceof Error ? error : undefined,
+      });
     }
   }
 }

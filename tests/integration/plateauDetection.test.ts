@@ -83,10 +83,10 @@ function detectPlateau(familyKey: string, window: QualityWindow): PlateauSignal 
   let severity: PlateauSeverity;
   let recommendation: string;
 
-  if (detectedCount >= 2) {
+  if (detectedCount >= 3) {
     severity = 'severe';
     recommendation = 'consider exploring alternative model profiles or tactics';
-  } else if (detectedCount === 1) {
+  } else if (detectedCount >= 1) {
     severity = 'mild';
     recommendation = 'monitor for further stagnation before adapting';
   } else {
@@ -156,7 +156,7 @@ describe('Plateau Detection – Mild Plateau for Flat Quality', () => {
   });
 
   it('recommends monitoring rather than immediate action', () => {
-    const scores = [0.80, 0.80, 0.80, 0.80, 0.80, 0.81, 0.81, 0.81];
+    const scores = [0.79, 0.79, 0.80, 0.80, 0.81, 0.81, 0.82, 0.82];
     const window: QualityWindow = { scores, timestamps: makeTimestamps(scores.length) };
 
     const signal = detectPlateau('app.process.step', window);

@@ -2,8 +2,11 @@ import type { ExecutionEvent } from './ExecutionEventEmitter.js';
 
 export class ExecutionLifecycleLogger {
   log(event: ExecutionEvent): void {
-    // Structured log entry for execution lifecycle events
-    // In production, emit to structured logging system
-    void event;
+    const details = Object.keys(event.details).length > 0
+      ? ` | ${JSON.stringify(event.details)}`
+      : '';
+    console.log(
+      `[execution-lifecycle] ${event.type} | execution=${event.executionId} | time=${event.timestamp.toISOString()}${details}`,
+    );
   }
 }

@@ -74,3 +74,57 @@ Tracking major development events for the Adaptive Cognitive Dispatch System.
 - Compile-fix pass: 0 errors across full monorepo
 - Release readiness checklist published
 - **All 70 prompts complete. TypeScript compiles clean.**
+
+## 2026-03-15 — Post-Build Code Review & Repair
+
+A comprehensive 4-agent code review identified 27 issues (5 critical, 10 high, 7 medium, 5 low). All have been repaired:
+
+### Security Fixes
+- Fixed AES-256-GCM IV length from 16 → 12 bytes (NIST compliance) in `cipherTypes.ts`
+- Added recursive nested-object redaction to `SecretRedactor`
+- Added Bearer token, URL-embedded credential, and JSON key-value patterns to `redactError.ts`
+- Fixed Gemini adapter API key leak: separated base URL from key-containing URL, added key redaction in error messages
+
+### Execution Orchestrator Fixes
+- Added error logging to `FallbackExecutionService` for each failed attempt and exhaustion summary
+- Added per-handler try-catch error isolation in `ExecutionEventEmitter` (matching `ExecutionOutcomePublisher` pattern)
+- Fixed `ExecutionStatusTracker` silent ignore: now logs when execution record not found
+- Replaced no-op `ExecutionLifecycleLogger` with real structured logging
+
+### Type Safety Fixes
+- Created typed domain errors (`NotFoundError`, `ConflictError`, `ValidationError`) in `core-types`
+- `PolicyMergeResolver.merge()` now accepts `CognitiveGrade` and `LoadTier` enums, eliminating all `as any` casts
+- `GlobalPolicy.maxLatencyMsByLoadTier` typed as `Partial<Record<LoadTier, number>>` instead of `Record<string, number>`
+- `ProviderValidationService` uses `ProviderVendor` and `AuthType` enum values instead of hardcoded strings
+- `AdaptationApprovalController` and `AdaptationRollbackController` use `instanceof` typed errors instead of string matching
+
+### Adaptive Layer Fixes
+- Added `parseCandidateId()` function to `CandidatePerformanceState.ts` with validation, exported from `adaptive-optimizer`
+- `AdaptiveDispatchResolver` uses `parseCandidateId` instead of raw `split(':')`
+- Added fallback logging when adaptive selection falls back to deterministic routing
+- `DeterministicProfileSelector` now prefers cloud-capable profiles when `forceEscalation: true`
+
+### Provider Adapter Fixes
+- All 4 adapters (OpenAI, Ollama, LMStudio, Gemini) now differentiate timeout vs network vs execution errors
+- Timeout: `DOMException` with `AbortError` → `TIMEOUT` code, not retryable
+- Network: `TypeError` → `EXECUTION_FAILED`, not retryable
+- Server: other errors → `EXECUTION_FAILED`, retryable
+
+### Worker Handler Fixes
+- All 6 worker handlers have real in-memory repository implementations (no stubs)
+- Shared `InMemoryOptimizerStateRepository` singleton across plateau, recommendations, and auto-apply handlers
+- Cross-handler data flow: plateau signals → recommendations → auto-apply via exported repository accessors
+- `parseInt` NaN guards on all environment variable parsing
+- Error propagation: handlers throw if all processing attempts fail
+- `cleanupStaleExecutions` builds family key from `executionFamily` object (not nonexistent `familyKey` string)
+
+### API Controller Fixes
+- `ProvidersController.rotateSecret` uses `SecretRotationService` with proper encrypt-and-store
+- `DispatchController.resolve` validates DI dependencies exist before use
+- Added `@acds/adaptive-optimizer` to `execution-orchestrator` package.json dependencies
+
+### Test Infrastructure
+- Created `vitest.config.ts` with path aliases matching `tsconfig.json` for module resolution
+- Fixed plateau detection test severity thresholds (mild requires 1-2 indicators, severe requires 3)
+- Fixed plateau test data to produce correct indicator counts
+- **Result: 210 tests passing across 23 test files, 0 compilation errors**

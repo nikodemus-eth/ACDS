@@ -42,3 +42,25 @@ export function buildCandidateId(
 ): string {
   return `${modelProfileId}:${tacticProfileId}:${providerId}`;
 }
+
+/**
+ * Parses a composite candidateId back into its constituent identifiers.
+ * Throws if the candidateId does not contain exactly three colon-separated parts.
+ */
+export function parseCandidateId(candidateId: string): {
+  modelProfileId: string;
+  tacticProfileId: string;
+  providerId: string;
+} {
+  const parts = candidateId.split(':');
+  if (parts.length !== 3 || parts.some((p) => p.length === 0)) {
+    throw new Error(
+      `Invalid candidateId "${candidateId}": expected format "modelProfileId:tacticProfileId:providerId"`,
+    );
+  }
+  return {
+    modelProfileId: parts[0],
+    tacticProfileId: parts[1],
+    providerId: parts[2],
+  };
+}

@@ -32,10 +32,11 @@ const DEFAULT_WINDOW_SIZE = 50;
 export async function runFamilyAggregation(): Promise<void> {
   const scoreRepo = getFamilyScoreRepository();
   const perfRepo = getFamilyPerformanceRepository();
-  const windowSize = parseInt(
+  const parsed = parseInt(
     process.env.AGGREGATION_WINDOW_SIZE ?? String(DEFAULT_WINDOW_SIZE),
     10,
   );
+  const windowSize = Number.isNaN(parsed) ? DEFAULT_WINDOW_SIZE : parsed;
 
   const families = await scoreRepo.listActiveFamilies();
 
@@ -75,26 +76,60 @@ export async function runFamilyAggregation(): Promise<void> {
   console.log(
     `[family-aggregation] Completed: ${updated} updated, ${errors} errors.`,
   );
+
+  if (errors > 0 && updated === 0) {
+    throw new Error(
+      `[family-aggregation] All ${errors} aggregation attempt(s) failed. This indicates a systemic issue.`,
+    );
+  }
 }
 
 /**
- * Placeholder factory for FamilyScoreRepository.
- * Will be replaced by DI container resolution.
+ * In-memory FamilyScoreRepository.
+ * Tracks scored executions per family key.
  */
-function getFamilyScoreRepository(): FamilyScoreRepository {
-  // TODO: Wire to actual database-backed repository
-  throw new Error(
-    'FamilyScoreRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+class InMemoryFamilyScoreRepository implements FamilyScoreRepository {
+  private readonly scoresByFamily = new Map<string, ExecutionScore[]>();
+
+  addScore(familyKey: string, score: ExecutionScore): void {
+    const scores = this.scoresByFamily.get(familyKey) ?? [];
+    scores.push(score);
+    this.scoresByFamily.set(familyKey, scores);
+  }
+
+  async listActiveFamilies(): Promise<string[]> {
+    return [...this.scoresByFamily.keys()];
+  }
+
+  async getRecentScores(familyKey: string, limit: number): Promise<ExecutionScore[]> {
+    const scores = this.scoresByFamily.get(familyKey) ?? [];
+    return scores.slice(-limit);
+  }
 }
 
 /**
- * Placeholder factory for FamilyPerformanceRepository.
- * Will be replaced by DI container resolution.
+ * In-memory FamilyPerformanceRepository.
+ * Stores the latest performance summary per family.
  */
-function getFamilyPerformanceRepository(): FamilyPerformanceRepository {
-  // TODO: Wire to actual database-backed repository
-  throw new Error(
-    'FamilyPerformanceRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+class InMemoryFamilyPerformanceRepository implements FamilyPerformanceRepository {
+  private readonly summaries = new Map<string, FamilyPerformanceSummary>();
+
+  async saveSummary(summary: FamilyPerformanceSummary): Promise<void> {
+    this.summaries.set(summary.familyKey, summary);
+  }
+
+  getSummary(familyKey: string): FamilyPerformanceSummary | undefined {
+    return this.summaries.get(familyKey);
+  }
+}
+
+const familyScoreRepo = new InMemoryFamilyScoreRepository();
+const familyPerfRepo = new InMemoryFamilyPerformanceRepository();
+
+export function getFamilyScoreRepository(): FamilyScoreRepository & { addScore(familyKey: string, score: ExecutionScore): void } {
+  return familyScoreRepo;
+}
+
+export function getFamilyPerformanceRepository(): FamilyPerformanceRepository & { getSummary(familyKey: string): FamilyPerformanceSummary | undefined } {
+  return familyPerfRepo;
 }

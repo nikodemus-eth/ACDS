@@ -3,7 +3,7 @@
 // State Layer (Prompt 49)
 export type { FamilySelectionState, RecentTrend } from './state/FamilySelectionState.js';
 export type { CandidatePerformanceState } from './state/CandidatePerformanceState.js';
-export { buildCandidateId } from './state/CandidatePerformanceState.js';
+export { buildCandidateId, parseCandidateId } from './state/CandidatePerformanceState.js';
 export type { OptimizerStateRepository } from './state/OptimizerStateRepository.js';
 
 // Ranking Layer (Prompt 50)

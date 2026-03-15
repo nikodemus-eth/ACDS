@@ -37,3 +37,15 @@ Tracking lessons learned to prevent repeating pain points.
 
 - Node.js `createCipheriv`/`createDecipheriv` with `@types/node` >= 20 has overload ambiguity when the algorithm is a string literal. Cast the algorithm to the specific type (e.g. `'aes-256-gcm'`) to resolve.
 - Envelope encryption pattern works well for provider secrets: abstract `KeyResolver` interface allows swapping file-based vs environment-based key storage without touching crypto logic.
+
+## 2026-03-15 — Post-Build Code Review
+
+- **AES-256-GCM IV must be 12 bytes per NIST**, not 16. The Node.js docs and many examples silently accept 16 but it weakens the cryptographic guarantee. Always verify IV length against the algorithm specification.
+- **Never put API keys in URLs that appear in error messages.** Gemini adapter was constructing `?key=...` URLs and using the full URL in `AdapterError` messages. Fix: separate base endpoint from key-appended URL, redact key patterns in error messages.
+- **Typed domain errors beat string matching.** `error.message.includes('not found')` is fragile — refactored to `error instanceof NotFoundError`. Create error classes in a shared types package so all layers can throw and catch them consistently.
+- **`as any` casts in `.includes()` calls are a code smell for wrong parameter types.** `PolicyMergeResolver` was casting `cognitiveGrade` to `any` to satisfy `.includes()` on `CognitiveGrade[]` — the real fix is accepting the enum type in the method signature.
+- **Stubs that pass type-check but fail at runtime are worse than compilation errors.** Worker handlers with `throw new Error('Not implemented')` satisfy the compiler but break the system silently. Every handler must have a working implementation or the function shouldn't exist.
+- **Shared singleton repositories solve cross-handler data flow in workers.** When plateau detection feeds recommendations which feed auto-apply, a shared state repository singleton ensures they all read/write the same data. Export factory functions for each handler to access shared state.
+- **Vitest needs explicit path aliases when packages use `main: ./dist/index.js`.** Without a `vitest.config.ts` that maps `@acds/*` to source paths, integration tests can't resolve workspace packages. The `tsconfig.json` paths work for `tsc` but not for vitest's Vite-based resolver.
+- **Adapter error differentiation matters for retry decisions.** `DOMException` with `name === 'AbortError'` means timeout (not retryable). `TypeError` means network-level failure (DNS, connection refused — not retryable). Other errors may be server-side (retryable). All four adapters should use the same categorization logic.
+- **Deterministic selectors must respect escalation policy.** `DeterministicProfileSelector` returned the first eligible profile regardless of `forceEscalation`. When escalation is forced, cloud-capable profiles should be preferred over local-only ones.

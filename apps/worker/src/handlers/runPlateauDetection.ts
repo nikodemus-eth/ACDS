@@ -7,11 +7,11 @@
  */
 
 import type {
-  OptimizerStateRepository,
   PlateauSignal,
   PerformanceSummary,
 } from '@acds/adaptive-optimizer';
 import { detect } from '@acds/adaptive-optimizer';
+import { getSharedOptimizerStateRepository } from '../repositories/InMemoryOptimizerStateRepository.js';
 
 // ── Abstract repository interfaces ────────────────────────────────────────
 
@@ -74,26 +74,59 @@ export async function runPlateauDetection(): Promise<void> {
   console.log(
     `[plateau-detection] Completed: ${checked} checked, ${detected} plateaus detected, ${errors} errors.`,
   );
+
+  if (errors > 0 && checked === 0) {
+    throw new Error(
+      `[plateau-detection] All ${errors} detection attempt(s) failed. This indicates a systemic issue.`,
+    );
+  }
 }
 
 /**
- * Placeholder factories for repositories.
- * Will be replaced by DI container resolution.
+ * In-memory PerformanceSummaryRepository.
  */
-function getOptimizerStateRepository(): OptimizerStateRepository {
-  throw new Error(
-    'OptimizerStateRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+class InMemoryPerformanceSummaryRepository implements PerformanceSummaryRepository {
+  private readonly summaries = new Map<string, PerformanceSummary>();
+
+  async getSummary(familyKey: string): Promise<PerformanceSummary | undefined> {
+    return this.summaries.get(familyKey);
+  }
+
+  setSummary(familyKey: string, summary: PerformanceSummary): void {
+    this.summaries.set(familyKey, summary);
+  }
 }
 
-function getPerformanceSummaryRepository(): PerformanceSummaryRepository {
-  throw new Error(
-    'PerformanceSummaryRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+/**
+ * In-memory PlateauSignalRepository.
+ */
+class InMemoryPlateauSignalRepository implements PlateauSignalRepository {
+  private readonly signals: PlateauSignal[] = [];
+
+  async saveSignal(signal: PlateauSignal): Promise<void> {
+    this.signals.push(signal);
+  }
+
+  getSignals(): PlateauSignal[] {
+    return [...this.signals];
+  }
+
+  getActiveSignals(): PlateauSignal[] {
+    return this.signals.filter((s) => s.detected);
+  }
 }
 
-function getPlateauSignalRepository(): PlateauSignalRepository {
-  throw new Error(
-    'PlateauSignalRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+const summaryRepo = new InMemoryPerformanceSummaryRepository();
+const signalRepo = new InMemoryPlateauSignalRepository();
+
+function getOptimizerStateRepository() {
+  return getSharedOptimizerStateRepository();
+}
+
+export function getPerformanceSummaryRepository(): PerformanceSummaryRepository & { setSummary(familyKey: string, summary: PerformanceSummary): void } {
+  return summaryRepo;
+}
+
+export function getPlateauSignalRepository(): PlateauSignalRepository & { getActiveSignals(): PlateauSignal[] } {
+  return signalRepo;
 }

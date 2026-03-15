@@ -25,6 +25,9 @@ export type { DispatchRunResponse } from './contracts/DispatchRunResponse.js';
 // Events
 export type { ExecutionRationale } from './events/ExecutionRationale.js';
 
+// Errors
+export { NotFoundError, ConflictError, ValidationError } from './errors/DomainErrors.js';
+
 // Schemas
 export { providerSchema, createProviderSchema } from './schemas/providerSchema.js';
 export type { ProviderInput, CreateProviderInput } from './schemas/providerSchema.js';

@@ -46,7 +46,13 @@ export class LMStudioAdapter implements ProviderAdapter {
       return fromLMStudioResponse(data, latencyMs);
     } catch (error) {
       if (error instanceof AdapterError) throw error;
-      throw new AdapterError({ message: 'LM Studio execution failed', code: 'EXECUTION_FAILED', retryable: true, cause: error instanceof Error ? error : undefined });
+      const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+      throw new AdapterError({
+        message: isTimeout ? 'LM Studio request timed out' : 'LM Studio execution failed',
+        code: isTimeout ? 'TIMEOUT' : 'EXECUTION_FAILED',
+        retryable: !isTimeout && !(error instanceof TypeError),
+        cause: error instanceof Error ? error : undefined,
+      });
     }
   }
 }

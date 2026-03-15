@@ -8,7 +8,7 @@ export interface GlobalPolicy {
   defaultCostSensitivity: 'low' | 'medium' | 'high';
   structuredOutputRequiredForGrades: CognitiveGrade[];
   traceabilityRequiredForGrades: CognitiveGrade[];
-  maxLatencyMsByLoadTier: Record<string, number>;
+  maxLatencyMsByLoadTier: Partial<Record<LoadTier, number>>;
   localPreferredTaskTypes: TaskType[];
   cloudRequiredLoadTiers: LoadTier[];
   enabled: boolean;

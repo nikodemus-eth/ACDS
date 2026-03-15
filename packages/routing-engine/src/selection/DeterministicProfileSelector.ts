@@ -11,6 +11,12 @@ export class DeterministicProfileSelector {
       if (defaultProfile) return defaultProfile;
     }
 
+    // When escalation is forced, prefer cloud-capable profiles over local-only
+    if (policy.forceEscalation) {
+      const cloudProfile = eligible.find((p) => p.cloudAllowed);
+      if (cloudProfile) return cloudProfile;
+    }
+
     // Prefer local-only profiles when privacy is local_only
     if (policy.privacy === 'local_only') {
       const localProfile = eligible.find((p) => p.localOnly);

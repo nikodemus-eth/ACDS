@@ -8,9 +8,9 @@
  */
 
 import type {
-  OptimizerStateRepository,
   AdaptiveMode,
   AdaptationRecommendation,
+  AutoApplyDecisionRecord,
 } from '@acds/adaptive-optimizer';
 import {
   LowRiskAutoApplyService,
@@ -18,8 +18,11 @@ import {
   type FamilyPostureProvider,
   type RecentFailureCounter,
   type AutoApplyDecisionWriter,
+  type FamilyRiskLevel,
 } from '@acds/adaptive-optimizer';
 import { rankCandidates } from '@acds/adaptive-optimizer';
+import { getSharedOptimizerStateRepository } from '../repositories/InMemoryOptimizerStateRepository.js';
+import { getAdaptationRecommendationRepository, getAdaptiveModeProvider as getSharedModeProvider } from './runAdaptationRecommendations.js';
 
 // ── Abstract reader interfaces ─────────────────────────────────────────────
 
@@ -112,48 +115,96 @@ export async function runLowRiskAutoApply(): Promise<void> {
   console.log(
     `[low-risk-auto-apply] Completed: ${applied} applied, ${skipped} skipped, ${errors} errors.`,
   );
+
+  if (errors > 0 && applied === 0 && skipped === 0) {
+    throw new Error(
+      `[low-risk-auto-apply] All ${errors} attempt(s) failed. This indicates a systemic issue.`,
+    );
+  }
 }
 
-// ── Placeholder factories ──────────────────────────────────────────────────
+// ── Working implementations ────────────────────────────────────────────────
 
-function getOptimizerStateRepository(): OptimizerStateRepository {
-  throw new Error(
-    'OptimizerStateRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+function getOptimizerStateRepository() {
+  return getSharedOptimizerStateRepository();
+}
+
+class InMemoryPendingRecommendationReader implements PendingRecommendationReader {
+  async listPendingForAutoApply(): Promise<AdaptationRecommendation[]> {
+    return getAdaptationRecommendationRepository().getPending();
+  }
 }
 
 function getPendingRecommendationReader(): PendingRecommendationReader {
-  throw new Error(
-    'PendingRecommendationReader not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return new InMemoryPendingRecommendationReader();
 }
 
 function getAdaptiveModeProvider(): AdaptiveModeProvider {
-  throw new Error(
-    'AdaptiveModeProvider not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return getSharedModeProvider();
 }
 
+/**
+ * Default risk provider — classifies all families as low-risk.
+ * In a database-backed setup, this would read from a risk classification table.
+ */
+class DefaultFamilyRiskProvider implements FamilyRiskProvider {
+  async getRiskLevel(_familyKey: string): Promise<FamilyRiskLevel> {
+    return 'low';
+  }
+}
+
+/**
+ * Default posture provider — returns 'advisory' for all families.
+ * In a database-backed setup, this would read the family's configured posture.
+ */
+class DefaultFamilyPostureProvider implements FamilyPostureProvider {
+  async getPosture(_familyKey: string): Promise<string> {
+    return 'advisory';
+  }
+}
+
+/**
+ * Default failure counter — returns 0 recent failures.
+ * In a database-backed setup, this would count recent failed executions.
+ */
+class DefaultRecentFailureCounter implements RecentFailureCounter {
+  async countRecentFailures(_familyKey: string): Promise<number> {
+    return 0;
+  }
+}
+
+/**
+ * In-memory auto-apply decision writer.
+ */
+class InMemoryAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
+  private readonly decisions: AutoApplyDecisionRecord[] = [];
+
+  async save(record: AutoApplyDecisionRecord): Promise<void> {
+    this.decisions.push(record);
+  }
+
+  getAll(): AutoApplyDecisionRecord[] {
+    return [...this.decisions];
+  }
+}
+
+const riskProvider = new DefaultFamilyRiskProvider();
+const postureProvider = new DefaultFamilyPostureProvider();
+const failureCounter = new DefaultRecentFailureCounter();
+const decisionWriter = new InMemoryAutoApplyDecisionWriter();
+
 function getFamilyRiskProvider(): FamilyRiskProvider {
-  throw new Error(
-    'FamilyRiskProvider not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return riskProvider;
 }
 
 function getFamilyPostureProvider(): FamilyPostureProvider {
-  throw new Error(
-    'FamilyPostureProvider not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return postureProvider;
 }
 
 function getRecentFailureCounter(): RecentFailureCounter {
-  throw new Error(
-    'RecentFailureCounter not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return failureCounter;
 }
 
 function getAutoApplyDecisionWriter(): AutoApplyDecisionWriter {
-  throw new Error(
-    'AutoApplyDecisionWriter not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+  return decisionWriter;
 }

@@ -25,7 +25,14 @@ export class ExecutionEventEmitter {
 
   emit(event: ExecutionEvent): void {
     for (const handler of this.handlers) {
-      handler(event);
+      try {
+        handler(event);
+      } catch (error) {
+        console.error(
+          `[event-emitter] Handler error for ${event.type} (execution ${event.executionId}):`,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     }
   }
 }

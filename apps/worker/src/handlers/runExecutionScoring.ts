@@ -24,10 +24,11 @@ const DEFAULT_BATCH_SIZE = 50;
 
 export async function runExecutionScoring(): Promise<void> {
   const repository = getUnscoredExecutionRepository();
-  const batchSize = parseInt(
+  const parsed = parseInt(
     process.env.SCORING_BATCH_SIZE ?? String(DEFAULT_BATCH_SIZE),
     10,
   );
+  const batchSize = Number.isNaN(parsed) ? DEFAULT_BATCH_SIZE : parsed;
 
   const unscored = await repository.fetchUnscored(batchSize);
 
@@ -58,15 +59,44 @@ export async function runExecutionScoring(): Promise<void> {
   console.log(
     `[execution-scoring] Completed: ${scored} scored, ${errors} errors.`,
   );
+
+  if (errors > 0 && scored === 0) {
+    throw new Error(
+      `[execution-scoring] All ${errors} scoring attempt(s) failed. This indicates a systemic issue.`,
+    );
+  }
 }
 
 /**
- * Placeholder factory for UnscoredExecutionRepository.
- * Will be replaced by DI container resolution.
+ * In-memory UnscoredExecutionRepository.
+ *
+ * Stores execution outcomes and scores in memory. Outcomes are submitted
+ * via `submitOutcome` (called by the ExecutionOutcomePublisher bridge)
+ * and consumed by `fetchUnscored`.
  */
-function getUnscoredExecutionRepository(): UnscoredExecutionRepository {
-  // TODO: Wire to actual database-backed repository
-  throw new Error(
-    'UnscoredExecutionRepository not yet wired. Configure DI container or set DATABASE_URL.',
-  );
+class InMemoryUnscoredExecutionRepository implements UnscoredExecutionRepository {
+  private readonly unscored: ExecutionOutcome[] = [];
+  private readonly scored = new Map<string, ExecutionScore>();
+
+  submitOutcome(outcome: ExecutionOutcome): void {
+    this.unscored.push(outcome);
+  }
+
+  async fetchUnscored(limit: number): Promise<ExecutionOutcome[]> {
+    return this.unscored.splice(0, limit);
+  }
+
+  async markScored(executionId: string, score: ExecutionScore): Promise<void> {
+    this.scored.set(executionId, score);
+  }
+
+  getScore(executionId: string): ExecutionScore | undefined {
+    return this.scored.get(executionId);
+  }
+}
+
+const unscoredRepo = new InMemoryUnscoredExecutionRepository();
+
+export function getUnscoredExecutionRepository(): UnscoredExecutionRepository & { submitOutcome(outcome: ExecutionOutcome): void } {
+  return unscoredRepo;
 }

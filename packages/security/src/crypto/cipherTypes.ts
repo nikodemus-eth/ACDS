@@ -8,7 +8,7 @@ export interface CipherConfig {
 export const DEFAULT_CIPHER_CONFIG: CipherConfig = {
   algorithm: 'aes-256-gcm',
   keyLengthBytes: 32,
-  ivLengthBytes: 16,
+  ivLengthBytes: 12,
   authTagLengthBytes: 16,
 };
 

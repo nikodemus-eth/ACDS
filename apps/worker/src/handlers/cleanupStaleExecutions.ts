@@ -11,11 +11,12 @@ const DEFAULT_STALE_THRESHOLD_MS = 600_000; // 10 minutes
  * and marks them as failed.
  */
 export async function cleanupStaleExecutions(): Promise<void> {
-  const thresholdMs = parseInt(
+  const parsed = parseInt(
     process.env.STALE_EXECUTION_THRESHOLD_MS ??
       String(DEFAULT_STALE_THRESHOLD_MS),
     10
   );
+  const thresholdMs = Number.isNaN(parsed) ? DEFAULT_STALE_THRESHOLD_MS : parsed;
 
   // TODO: Replace with DI-resolved instances once container is wired
   const executionRepository = getExecutionRecordRepository();
@@ -64,12 +65,49 @@ export async function cleanupStaleExecutions(): Promise<void> {
 }
 
 /**
- * Placeholder factory for ExecutionRecordRepository.
- * Will be replaced by DI container resolution.
+ * In-memory ExecutionRecordRepository.
+ * Stores execution records in memory for the worker process lifetime.
  */
+class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
+  private readonly records = new Map<string, ExecutionRecord>();
+  private nextId = 1;
+
+  async create(record: Omit<ExecutionRecord, 'id'>): Promise<ExecutionRecord> {
+    const id = `exec-${String(this.nextId++).padStart(6, '0')}`;
+    const full: ExecutionRecord = { ...record, id } as ExecutionRecord;
+    this.records.set(id, full);
+    return full;
+  }
+
+  async findById(id: string): Promise<ExecutionRecord | null> {
+    return this.records.get(id) ?? null;
+  }
+
+  async findByFamily(familyKey: string, limit = 100): Promise<ExecutionRecord[]> {
+    return [...this.records.values()]
+      .filter((r) => {
+        const fam = r.executionFamily;
+        const key = `${fam.application}:${fam.process}:${fam.step}`;
+        return key === familyKey;
+      })
+      .slice(-limit);
+  }
+
+  async findRecent(limit = 100): Promise<ExecutionRecord[]> {
+    return [...this.records.values()].slice(-limit);
+  }
+
+  async update(id: string, updates: Partial<ExecutionRecord>): Promise<ExecutionRecord> {
+    const existing = this.records.get(id);
+    if (!existing) throw new Error(`Execution record ${id} not found`);
+    const updated = { ...existing, ...updates };
+    this.records.set(id, updated);
+    return updated;
+  }
+}
+
+const executionRecordRepo = new InMemoryExecutionRecordRepository();
+
 function getExecutionRecordRepository(): ExecutionRecordRepository {
-  // TODO: Wire to actual database-backed repository
-  throw new Error(
-    'ExecutionRecordRepository not yet wired. Configure DI container or set DATABASE_URL.'
-  );
+  return executionRecordRepo;
 }

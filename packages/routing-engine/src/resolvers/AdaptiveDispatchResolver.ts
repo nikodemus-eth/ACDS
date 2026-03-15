@@ -26,6 +26,7 @@ import { FallbackChainBuilder } from '../selection/FallbackChainBuilder.js';
 import { RoutingDecisionResolver } from '../selection/RoutingDecisionResolver.js';
 import { ExecutionRationaleBuilder } from '../rationale/ExecutionRationaleBuilder.js';
 import { buildCandidatePortfolio } from '../selection/AdaptiveCandidatePortfolioBuilder.js';
+import { parseCandidateId } from '@acds/adaptive-optimizer';
 
 export interface AdaptiveDispatchResolverDeps {
   allProfiles: ModelProfile[];
@@ -99,6 +100,10 @@ export class AdaptiveDispatchResolver {
           effectivePolicy,
         );
       }
+
+      console.log(
+        `[adaptive-dispatch] family=${familyKey}: adaptive selection returned no result, falling back to deterministic`,
+      );
     }
 
     // ── Step 5: Deterministic fallback ────────────────────────────────
@@ -158,20 +163,16 @@ export class AdaptiveDispatchResolver {
     effectivePolicy: EffectivePolicy,
   ): AdaptiveDispatchResult {
     const candidateId = adaptiveResult.selectedCandidate.candidate.candidateId;
-    const [modelProfileId, tacticProfileId, providerId] = candidateId.split(':');
+    const parsed = parseCandidateId(candidateId);
 
-    const selectedProfile = eligibleProfileList.find((p) => p.id === modelProfileId);
+    const selectedProfile = eligibleProfileList.find((p) => p.id === parsed.modelProfileId);
     if (!selectedProfile) {
-      throw new Error(`Adaptive selection chose unavailable profile: ${modelProfileId}`);
+      throw new Error(`Adaptive selection chose unavailable profile: ${parsed.modelProfileId}`);
     }
 
-    const selectedTactic = eligibleTacticList.find((t) => t.id === tacticProfileId);
+    const selectedTactic = eligibleTacticList.find((t) => t.id === parsed.tacticProfileId);
     if (!selectedTactic) {
-      throw new Error(`Adaptive selection chose unavailable tactic: ${tacticProfileId}`);
-    }
-
-    if (!providerId) {
-      throw new Error(`Adaptive selection candidate missing provider: ${candidateId}`);
+      throw new Error(`Adaptive selection chose unavailable tactic: ${parsed.tacticProfileId}`);
     }
 
     const fallbackChain = this.fallbackBuilder.build(
@@ -188,7 +189,7 @@ export class AdaptiveDispatchResolver {
       normalized,
       selectedProfile,
       selectedTactic,
-      providerId,
+      parsed.providerId,
       effectivePolicy,
       eligibleProfileList.length,
       eligibleTacticList.length,
@@ -197,7 +198,7 @@ export class AdaptiveDispatchResolver {
     const decision = this.decisionResolver.resolve(
       selectedProfile,
       selectedTactic,
-      providerId,
+      parsed.providerId,
       fallbackChain,
       rationale.id,
       adaptiveRationale,

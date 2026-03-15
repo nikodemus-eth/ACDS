@@ -2,7 +2,7 @@ import type { GlobalPolicy } from '../global/GlobalPolicy.js';
 import type { ApplicationPolicy } from '../application/ApplicationPolicy.js';
 import type { ProcessPolicy } from '../process/ProcessPolicy.js';
 import type { InstancePolicyOverrides } from '../instance/InstancePolicyOverlay.js';
-import type { ProviderVendor } from '@acds/core-types';
+import type { ProviderVendor, CognitiveGrade, LoadTier } from '@acds/core-types';
 
 export interface EffectivePolicy {
   allowedVendors: ProviderVendor[];
@@ -26,8 +26,8 @@ export class PolicyMergeResolver {
     application: ApplicationPolicy | null,
     process: ProcessPolicy | null,
     instanceOverrides: InstancePolicyOverrides,
-    cognitiveGrade: string,
-    loadTier: string
+    cognitiveGrade: CognitiveGrade,
+    loadTier: LoadTier
   ): EffectivePolicy {
     const blockedVendors = [
       ...global.blockedVendors,
@@ -45,10 +45,10 @@ export class PolicyMergeResolver {
       ? 'high' as const
       : (process?.costSensitivityOverride ?? application?.costSensitivityOverride ?? global.defaultCostSensitivity);
 
-    const structuredOutputRequired = global.structuredOutputRequiredForGrades.includes(cognitiveGrade as any)
-      || (application?.structuredOutputRequiredForGrades?.includes(cognitiveGrade as any) ?? false);
+    const structuredOutputRequired = global.structuredOutputRequiredForGrades.includes(cognitiveGrade)
+      || (application?.structuredOutputRequiredForGrades?.includes(cognitiveGrade) ?? false);
 
-    const traceabilityRequired = global.traceabilityRequiredForGrades.includes(cognitiveGrade as any);
+    const traceabilityRequired = global.traceabilityRequiredForGrades.includes(cognitiveGrade);
 
     const maxLatencyMs = global.maxLatencyMsByLoadTier[loadTier] ?? null;
 
@@ -58,7 +58,7 @@ export class PolicyMergeResolver {
     ];
 
     const forceEscalation = instanceOverrides.forceEscalation
-      || (process?.forceEscalationForGrades?.includes(cognitiveGrade as any) ?? false);
+      || (process?.forceEscalationForGrades?.includes(cognitiveGrade) ?? false);
 
     return {
       allowedVendors,
