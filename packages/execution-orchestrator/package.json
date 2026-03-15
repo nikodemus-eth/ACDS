@@ -9,5 +9,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@acds/core-types": "workspace:*",
+    "@acds/routing-engine": "workspace:*",
+    "@acds/provider-broker": "workspace:*",
+    "@acds/provider-adapters": "workspace:*",
+    "@acds/audit-ledger": "workspace:*"
   }
 }
