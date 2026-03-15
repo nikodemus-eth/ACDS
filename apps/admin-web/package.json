@@ -1,0 +1,11 @@
+{
+  "name": "@acds/admin-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  }
+}

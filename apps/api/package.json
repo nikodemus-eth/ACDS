@@ -1,0 +1,11 @@
+{
+  "name": "@acds/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  }
+}
