@@ -1,0 +1,42 @@
+[
+  {
+    "name": "local_fast_advisory",
+    "supportedTaskTypes": ["classification", "extraction", "summarization"],
+    "supportedLoadTiers": ["simple"],
+    "minimumCognitiveGrade": "utility",
+    "localOnly": true,
+    "cloudAllowed": false
+  },
+  {
+    "name": "local_balanced_reasoning",
+    "supportedTaskTypes": ["analysis", "decision_support", "planning", "critique", "summarization"],
+    "supportedLoadTiers": ["simple", "moderate"],
+    "minimumCognitiveGrade": "working",
+    "localOnly": true,
+    "cloudAllowed": false
+  },
+  {
+    "name": "local_strict_classifier",
+    "supportedTaskTypes": ["classification", "extraction"],
+    "supportedLoadTiers": ["simple", "moderate"],
+    "minimumCognitiveGrade": "strong",
+    "localOnly": true,
+    "cloudAllowed": false
+  },
+  {
+    "name": "cloud_frontier_reasoning",
+    "supportedTaskTypes": ["analysis", "decision_support", "planning", "critique", "retrieval_synthesis"],
+    "supportedLoadTiers": ["moderate", "complex"],
+    "minimumCognitiveGrade": "final",
+    "localOnly": false,
+    "cloudAllowed": true
+  },
+  {
+    "name": "cloud_frontier_creative",
+    "supportedTaskTypes": ["creative", "transformation", "planning"],
+    "supportedLoadTiers": ["moderate", "complex"],
+    "minimumCognitiveGrade": "strong",
+    "localOnly": false,
+    "cloudAllowed": true
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "application": "processSwarm",
+  "overrides": {
+    "allowedVendors": ["ollama", "lmstudio", "gemini", "openai"],
+    "blockedVendors": [],
+    "defaultPrivacy": "standard",
+    "costSensitivity": "moderate",
+    "preferLocalOnly": false,
+    "cloudAllowed": true,
+    "preferredModelProfile": "cloud_frontier_creative",
+    "preferredTaskTypes": ["creative", "transformation", "planning"],
+    "maxLatencyByLoadTier": {
+      "simple": 5000,
+      "moderate": 20000,
+      "complex": 90000
+    }
+  }
+}

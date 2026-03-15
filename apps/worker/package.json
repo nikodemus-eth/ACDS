@@ -5,7 +5,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@acds/core-types": "workspace:*",
+    "@acds/provider-broker": "workspace:*",
+    "@acds/execution-orchestrator": "workspace:*",
+    "@acds/audit-ledger": "workspace:*"
   }
 }

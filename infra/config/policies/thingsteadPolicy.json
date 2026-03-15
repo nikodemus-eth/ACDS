@@ -1,0 +1,17 @@
+{
+  "application": "thingstead",
+  "overrides": {
+    "allowedVendors": ["ollama", "lmstudio"],
+    "blockedVendors": ["openai"],
+    "defaultPrivacy": "strict",
+    "costSensitivity": "low",
+    "preferLocalOnly": true,
+    "preferredModelProfile": "local_balanced_reasoning",
+    "governanceAware": true,
+    "maxLatencyByLoadTier": {
+      "simple": 3000,
+      "moderate": 10000,
+      "complex": 30000
+    }
+  }
+}

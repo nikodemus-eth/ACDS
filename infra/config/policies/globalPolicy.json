@@ -1,0 +1,25 @@
+{
+  "allowedVendors": ["ollama", "lmstudio", "gemini", "openai"],
+  "blockedVendors": [],
+  "defaultPrivacy": "standard",
+  "costSensitivity": "moderate",
+  "maxLatencyByLoadTier": {
+    "simple": 5000,
+    "moderate": 15000,
+    "complex": 60000
+  },
+  "structuredOutputByGrade": {
+    "utility": false,
+    "working": false,
+    "strong": true,
+    "final": true,
+    "evidentiary": true
+  },
+  "traceabilityByGrade": {
+    "utility": "minimal",
+    "working": "standard",
+    "strong": "standard",
+    "final": "full",
+    "evidentiary": "full"
+  }
+}

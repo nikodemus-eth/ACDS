@@ -5,11 +5,9 @@
 import type { FastifyInstance } from 'fastify';
 import { healthRoutes } from '../routes/healthRoutes.js';
 import { providersRoutes } from '../routes/providersRoutes.js';
-
-// Placeholder imports – uncomment as implementations land
-// import { dispatchRoutes } from '../routes/dispatchRoutes.js';
-// import { executionsRoutes } from '../routes/executionsRoutes.js';
-// import { auditRoutes } from '../routes/auditRoutes.js';
+import { dispatchRoutes } from '../routes/dispatchRoutes.js';
+import { executionsRoutes } from '../routes/executionsRoutes.js';
+import { auditRoutes } from '../routes/auditRoutes.js';
 
 /**
  * Registers all route modules with appropriate URL prefixes.
@@ -18,8 +16,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes);
   await app.register(providersRoutes, { prefix: '/providers' });
 
-  // Future route modules
-  // await app.register(dispatchRoutes,    { prefix: '/dispatch' });
-  // await app.register(executionsRoutes,  { prefix: '/executions' });
-  // await app.register(auditRoutes,       { prefix: '/audit' });
+  await app.register(dispatchRoutes,    { prefix: '/dispatch' });
+  await app.register(executionsRoutes,  { prefix: '/executions' });
+  await app.register(auditRoutes,       { prefix: '/audit' });
 }
