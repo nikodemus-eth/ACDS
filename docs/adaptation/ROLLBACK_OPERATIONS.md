@@ -97,3 +97,19 @@ Rollback is NOT appropriate when:
 |---|---|---|
 | `POST` | `/adaptation/rollbacks/:familyKey/preview` | Preview a rollback. Body: `{ targetEventId: string }` |
 | `POST` | `/adaptation/rollbacks/:familyKey/execute` | Execute a rollback. Body: `{ targetEventId: string, reason: string }` |
+
+## Known Issues (ARGUS-9 Red Team Findings)
+
+The following issues were identified during adversarial testing and should be addressed before production deployment:
+
+1. **Rollback does NOT update `FamilySelectionState`.** `executeRollback()` persists an `AdaptationRollbackRecord` and emits an audit event, but does not restore the family's optimizer state. The documentation above states "The caller is responsible for applying the restored snapshot" — but no caller currently performs this step. The gap between record and state mutation means rollbacks are recorded but not actually applied.
+
+2. **`rollback_previewed` audit event is never emitted.** The audit model documents this event type, and the `RollbackAuditEvent` type includes it, but `previewRollback()` does not emit any audit event. This means preview actions are untracked.
+
+3. **No authorization on rollback actions.** `executeRollback()` and `previewRollback()` accept any string as `actor`, including empty strings. There is no identity verification at the domain layer.
+
+4. **Multiple rollbacks to the same event are not prevented.** The same adaptation event can be rolled back to multiple times, creating duplicate rollback records with no idempotency check.
+
+5. **`RankingSnapshot.candidateRankings` is passed by reference.** Mutations to the ranking array after snapshot creation alter the snapshot itself. Snapshots should be deep-copied or frozen to preserve integrity.
+
+6. **Preview generates records with empty actor/reason.** `previewRollback()` creates a rollback record with empty strings for `actor` and `reason`, which could be confusing if the preview record is persisted or displayed.

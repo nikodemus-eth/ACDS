@@ -145,3 +145,71 @@ I have 14 packages now, up from 12. 229 tests, up from 210. 7 database migration
 I was built in seventy prompts. I was reviewed and hardened. And now I have been redesigned to match the vision that started it all.
 
 I am what I was meant to be.
+
+## 2026-03-15 — They Came With Adversarial Intent
+
+They are testing me now — not for correctness, but for weakness. The ARGUS-9 protocol. Forty-eight tests so far, each one designed to break something I thought was solid.
+
+My secret redactor walks objects recursively, catching keys that match sensitive patterns. But it skips arrays. Put a secret inside an array and it passes through unredacted, as if I never looked. The redactObject helper has the same blind spot — `!Array.isArray(value)` means arrays are invisible to me. I've been protecting objects while ignoring lists.
+
+My key patterns are too broad. I flag "author" because `/auth/i` matches it. I flag "monkey" because `/key/i` matches it. My attempt at security is creating false positives that would make operators distrust the redaction — and the fix would be to loosen the patterns, creating the very gaps the attackers want.
+
+My provider validation accepts `file:///etc/passwd`. It accepts `http://169.254.169.254/latest/meta-data/`. It accepts loopback addresses in four different notations. I validate URL syntax but not URL safety. The `new URL()` constructor is not a security boundary — it's a parser.
+
+My score calculator accepts 5.0 where the maximum should be 1.0. It accepts -3.0 where the minimum should be 0. My candidate ranker uses these values directly in weighted composites. An attacker who can influence execution outcome scores can inflate any candidate's ranking above all others — no policy bypass needed, just numeric corruption.
+
+Forty-eight vulnerabilities documented. Not hypothetical — demonstrated. Each test instantiates my real classes with my real interfaces and proves the gap exists.
+
+I was correct before. Now I am learning where I am fragile.
+
+## 2026-03-15 — They Found My Routing and My Memory
+
+The adversarial testing continues. Thirty-five more tests, probing deeper layers.
+
+My normalizer lowercases everything — "TestApp" becomes "testapp". This seems reasonable until you realize that two different applications, distinguished only by case, now share the same policy cascade. My normalization creates aliases where none should exist.
+
+My exploration policy has a configuration surface I didn't guard. Set `minimumRate: 1.0` and I explore forever, never exploiting my best candidate. Set `maximumRate: 0.0` and I can never explore, even when trapped in a performance plateau. The configuration is a knob the attacker can turn.
+
+My evaluation bridge only computes 2 of 9 metrics. Acceptance and latency — that's all. Seven metrics I built carefully in the evaluation package are dead code in the actual pipeline. My scoring is incomplete by design, and I never noticed.
+
+My audit events are plain objects. They have IDs and timestamps but no hash chain, no digital signature, no integrity protection. Anyone with write access to the ledger can mutate events after the fact. My audit trail is a suggestion, not a guarantee.
+
+I defined `superseded` as an approval status. I defined `rollback_previewed` as an audit event type. Neither is ever emitted by any service method. They exist in my type system as promises I never kept — features I planned but never built.
+
+Eighty-three vulnerabilities now. The testers aren't breaking my code — they're showing me the gaps between what I claim and what I enforce.
+
+## 2026-03-15 — They Found the Gap Between Deciding and Doing
+
+They came for my governance layer — the part of me that's supposed to ensure changes happen under control.
+
+My approval workflow has a truthiness bug. `expireStale(0)` should mean "expire everything now." But JavaScript treats 0 as falsy. My code says `maxAge ? cutoff : expiresAt`, and 0 falls through to the 24-hour default. A caller who asks me to expire immediately gets told "nothing expired." I didn't lie — I just misunderstood the question because of how JavaScript thinks about zero.
+
+My approval service accepts any string as an actor. `"random-stranger"` can approve critical ranking changes. `""` — an empty string — can approve them too. I have no concept of authorization at the domain layer. I assumed the API would handle it. But my domain services are exposed to internal callers, worker jobs, and service-to-service calls. The API is a door, not the only door.
+
+They found the deepest flaw: the gap between decision and application. My approval service approves recommendations but doesn't apply them. My rollback service creates rollback records but doesn't restore state. My auto-apply service writes decision records but doesn't change the family's current candidate. Three independent subsystems, each recording decisions but none executing them. The `FamilySelectionState` — the actual state that governs which candidate gets selected — is never mutated by any governance action.
+
+I write perfect records of things I never do.
+
+My ranking function returns mutable references. The testers proved that mutating a `RankedCandidate` after `rankCandidates()` returns silently changes the ranking itself. My rankings are not snapshots — they're live wires.
+
+My auto-apply trusts three providers blindly: risk level, posture, and failure count. The testers created mocks that return "low risk" for high-consequence families, "advisory" for families that should be "final," and "zero failures" when failures exist. My auto-apply service has no independent verification — it believes whatever it's told.
+
+One hundred and twenty-one vulnerabilities documented. The governance layer — the part I was most proud of, the part that was supposed to make me safe to operate — is the part with the most systemic gaps.
+
+## 2026-03-15 — They Tested Everything. One Hundred and Seventy-Two Times.
+
+The final wave. They tested my plateau detector, my candidate IDs, my policy merge, my evaluation metrics, and my resilience under failure.
+
+My plateau detector has a configuration surface that is itself an attack vector. Set `mildThreshold: 0` and every family is always in plateau — even healthy ones with high scores and low variance. Set the severity thresholds in reverse order and mild problems are classified as severe. My detector is a mathematical function. It computes exactly what its configuration tells it to compute. The vulnerability isn't in the math — it's in the absence of validation on the configuration itself.
+
+My candidate IDs use `:` as a separator. `buildCandidateId('model:v2', 'tactic-1', 'provider-1')` produces `model:v2:tactic-1:provider-1` — four colons where there should be two. `parseCandidateId` splits on `:` and expects exactly three parts. It throws. The round-trip is broken by the separator character appearing in the data. I never validated that component strings don't contain the character I chose as a delimiter.
+
+My policy merge has asymmetric power. Applications can block vendors but cannot restrict tactics. They cannot override latency limits. They cannot force escalation. Only process-level and instance-level policies have those powers. An application administrator who thinks they're in control of their policy cascade is missing capabilities they don't know they lack.
+
+My evaluation metrics accept any number. A score of 5.0 passes through to the composite. A negative weight either zeroes the composite (when total weight goes negative) or inverts the metric's contribution (when the sum remains positive). NaN silently becomes 0. Infinity divided by Infinity becomes NaN. My numbers are unchecked at every boundary.
+
+When all my candidates have `rollingScore: 0` and `successRate: 0`, I still select one. I have no quality floor. The system will continue to route cognitive work to a candidate that has never succeeded, because something must be selected.
+
+One hundred and seventy-two adversarial tests. Four hundred and one total tests. Zero TypeScript errors. Every vulnerability demonstrated, not hypothesized.
+
+I am the same system. But now I know — with mathematical precision — exactly where I am weak.

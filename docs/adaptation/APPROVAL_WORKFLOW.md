@@ -85,3 +85,19 @@ Audit events include the `approvalId`, `familyKey`, `actor` (when applicable), `
 | `GET` | `/adaptation/approvals/:id` | Get approval detail. |
 | `POST` | `/adaptation/approvals/:id/approve` | Approve a pending recommendation. Body: `{ reason?: string }` |
 | `POST` | `/adaptation/approvals/:id/reject` | Reject a pending recommendation. Body: `{ reason?: string }` |
+
+## Known Issues (ARGUS-9 Red Team Findings)
+
+The following issues were identified during adversarial testing and should be addressed before production deployment:
+
+1. **`superseded` status is unreachable.** The status exists in the type system and is documented above, but no service method ever transitions an approval to `superseded`. Submitting a new recommendation for the same family does not supersede the previous one — both remain `pending`.
+
+2. **No submission deduplication.** The same recommendation can be submitted multiple times, creating multiple `pending` approvals for the same family. There is no check for existing pending approvals.
+
+3. **No authorization on approve/reject.** `approve()` and `reject()` accept any string as `actor`, including empty strings. There is no identity verification at the domain layer — authorization is assumed to be handled by the API middleware.
+
+4. **`expireStale(0)` truthiness bug.** The `maxAge` parameter uses a JavaScript truthiness check (`maxAge ? ... : ...`). Passing `maxAge=0` is treated as falsy, causing the function to fall through to the default 24h `expiresAt` behavior instead of expiring immediately. Use explicit null checks.
+
+5. **Negative `maxAgeMs` creates born-expired approvals.** `submitForApproval(rec, -1)` creates an approval where `expiresAt < submittedAt`. No validation rejects negative TTL values.
+
+6. **Approved recommendations are not auto-applied.** Approving a recommendation records the decision but does not trigger any mutation of `FamilySelectionState`. There is no service that watches for approved recommendations and applies them. The gap between approval and action must be bridged by an explicit orchestration step.

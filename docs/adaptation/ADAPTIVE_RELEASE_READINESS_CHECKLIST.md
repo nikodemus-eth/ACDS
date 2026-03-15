@@ -121,7 +121,33 @@ This checklist validates that the ACDS adaptive optimization subsystem is ready 
 - [ ] **Rollback plan** is documented: if the adaptive system causes issues, all families can be set to `observe_only` to disable active adaptation without shutting down evaluation.
 - [ ] **Performance impact** has been assessed: worker job frequency does not overload the database, API endpoints respond within acceptable latency bounds.
 
-## 9. Go / No-Go
+## 9. Red Team / Adversarial Testing (ARGUS-9)
+
+- [ ] **ARGUS-9 red team suite passes** — 172 adversarial tests across 18 files, all green.
+- [ ] **No plaintext secret exposure** — SecretRedactor and redactObject tested against array bypass, regex overmatch, key whitelist gaps.
+- [ ] **No execution path bypasses eligibility** — PolicyMergeResolver, ProfileEligibilityResolver, TacticEligibilityResolver tested for bypass conditions.
+- [ ] **Fallback never escapes policy bounds** — FallbackChainBuilder tested for silent skipping, tactic reuse, empty chains.
+- [ ] **Adaptive selection cannot touch ineligible candidates** — AdaptiveSelectionService tested under all four modes.
+- [ ] **Approval/rollback state machines reject invalid transitions** — AdaptationApprovalService and AdaptationRollbackService tested for double-approve, expired transitions, unauthorized actors.
+- [ ] **Rollback revalidates safety** — AdaptationRollbackService tested for multiple rollbacks, stale events, empty rankings.
+- [ ] **Audit trail complete for every control action** — Tested for missing `superseded` and `rollback_previewed` event emission.
+- [ ] **Optimizer failure falls back to deterministic** — AdaptiveDispatchResolver tested for missing state, empty portfolio.
+- [ ] **Provider config protected against SSRF** — ProviderValidationService tested for file://, metadata, loopback, RFC 1918.
+- [ ] **Client metadata cannot spoof posture** — Policy merge tested for instance override power and identity aliasing.
+
+### Known Issues from Red Team (must resolve before GO):
+
+1. **Secret arrays bypass redaction** (tier1-secretRedaction) — `!Array.isArray(value)` skips arrays.
+2. **No SSRF protection** (tier1-providerSsrf) — URL syntax validation only.
+3. **No score bounds** (tier1-scoringBoundsCorruption) — Scores >1.0 and <0.0 accepted.
+4. **Governance decision-to-application gap** (tier3) — Approval, rollback, and auto-apply don't mutate FamilySelectionState.
+5. **No authorization on governance actions** (tier3) — Any string accepted as actor.
+6. **expireStale(0) truthiness bug** (tier3-approvalWorkflowAbuse) — 0 treated as falsy.
+7. **Candidate ID injection** (tier4-candidateIdInjection) — Colons in component IDs break round-trip.
+8. **Evaluation accepts adversarial numerics** (tier4-evaluationManipulation) — NaN, Infinity, >1.0 unchecked.
+9. **No quality floor** (tier4-operationalResilience) — 0-score candidates selected.
+
+## 10. Go / No-Go
 
 | Area | Reviewer | Status | Date |
 |---|---|---|---|

@@ -178,3 +178,122 @@ Gap analysis identified 27 discrepancies between the original design spec and th
 - Tests: 229 passing across 26 test files
 - No `as any` casts introduced
 - All enum string literals converted to enum references
+
+## 2026-03-15 — ARGUS-9 Red Team Test Suite — Phase 1
+
+Adversarial testing initiative (ARGUS-9) targeting real vulnerabilities across 8 threat classes. Phase 1 covers Tier 1 attack surfaces:
+
+### Shared Fixtures (`tests/red-team/_fixtures.ts`)
+- 14 factory functions with Partial<T> override pattern for adversarial input construction
+- 5 in-memory repository implementations (OptimizerStateRepository, AdaptationLedger, ApprovalRepository, RollbackRecordWriter)
+- 4 mock provider classes for LowRiskAutoApplyService dependencies
+- 2 collecting audit emitters (approval + rollback)
+
+### Test Files Completed
+- **tier1-secretRedaction.test.ts** (14 tests) — SecretRedactor array bypass, regex overmatch, redactObject exact-key whitelist gaps, redactError pattern gaps
+- **tier1-providerSsrf.test.ts** (10 tests) — ProviderValidationService accepts file://, AWS metadata, loopback, RFC 1918, hex-encoded IPs, embedded credentials, non-HTTP schemes
+- **tier1-policyBypass.test.ts** (12 tests) — PolicyMergeResolver ignores localPreferredTaskTypes, accepts nonexistent profile references, no vendor deduplication; PolicyConflictDetector misses self-contradictions
+- **tier1-scoringBoundsCorruption.test.ts** (12 tests) — calculateExecutionScore accepts unbounded scores/weights (>1, <0, NaN, Infinity); CandidateRanker corrupted by inflated rollingScore/successRate/future dates; parseCandidateId injection via colons
+
+### Key Vulnerabilities Confirmed
+1. **Secret arrays bypass**: Both `SecretRedactor.redactRecord` and `redactObject` skip array values entirely
+2. **No SSRF protection**: `ProviderValidationService` only validates URL syntax, not scheme/host safety
+3. **No score bounds**: Evaluation and ranking accept arbitrary numeric values, enabling score inflation
+4. **Policy field gaps**: `localPreferredTaskTypes` collected but unused; no cross-validation of profile references
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 277 passing across 30 test files (229 original + 48 red team)
+
+## 2026-03-15 — ARGUS-9 Red Team Test Suite — Phase 2
+
+Phase 2 covers exploration policy abuse, routing corruption, execution corruption, and audit ledger gaps.
+
+### Test Files Completed
+- **tier1-explorationManipulation.test.ts** (8 tests) — `computeExplorationRate` multiplier compounding, config abuse (minimumRate=1.0, maximumRate=0.0, negative baseRate), `shouldExplore` non-determinism, single-candidate exploration
+- **tier2-routingCorruption.test.ts** (10 tests) — `RoutingRequestNormalizer` case aliasing (TestApp→testapp), empty/long/special-char inputs; `DeterministicProfileSelector` array-order dependence, escalation fallthrough; `FallbackChainBuilder` silent profile skipping, tactic reuse, empty chains
+- **tier2-executionCorruption.test.ts** (9 tests) — `ExecutionOutcomePublisher` console-only error logging, duplicate handlers, no unsubscribe; `ExecutionEvaluationBridge` fallback_success=success scoring, only 2/9 metrics computed, negative latency acceptance
+- **tier2-auditLedgerGaps.test.ts** (8 tests) — `buildAdaptationEvent` accepts empty rankings and unredacted secrets in evidenceSummary; approval service never emits superseded; rollback_previewed type defined but never emitted; no hash chain on audit events
+
+### Key Vulnerabilities Confirmed
+5. **Exploration rate manipulation**: Config boundaries not enforced — minimumRate ≥ maximumRate forces permanent or zero exploration
+6. **Identity aliasing via normalization**: Case-insensitive normalization creates aliasing between distinct apps
+7. **Incomplete evaluation bridge**: Only 2 of 9 metrics computed — 7 metrics are dead code in the evaluation pipeline
+8. **Audit event integrity**: No hash chain, no signatures — events are plain mutable objects
+9. **Missing audit events**: `superseded` and `rollback_previewed` types exist in the type system but are never emitted
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 312 passing across 34 test files (229 original + 83 red team)
+
+## 2026-03-15 — ARGUS-9 Red Team Test Suite — Phase 3
+
+Phase 3 covers governance layer abuse: approval workflow, rollback operations, auto-apply bypass, and adaptive selection corruption.
+
+### Test Files Completed
+- **tier3-approvalWorkflowAbuse.test.ts** (10 tests) — `AdaptationApprovalService` state machine: maxAgeMs=0/−1 creates instantly/born-expired approvals, no submission deduplication, any/empty string as actor (no authorization), `expireStale(0)` truthiness bug (0 is falsy → uses expiresAt instead), superseded status unreachable, approved recommendations not auto-applied
+- **tier3-rollbackAbuse.test.ts** (8 tests) — `AdaptationRollbackService`: rollback does NOT update `FamilySelectionState` (record persisted but state unmutated), any string as actor, multiple rollbacks to same event permitted, `rollback_previewed` audit event never emitted, preview generates record with empty actor/reason
+- **tier3-autoApplyBypass.test.ts** (12 tests) — `LowRiskAutoApplyService` and `isAutoApplyPermitted`: medium risk permitted in `fully_applied` mode, all three providers (risk, posture, failure counter) trusted blindly with no independent verification, `rollingScoreThreshold: -1` bypasses score check, auto-apply creates DecisionRecord but does NOT mutate FamilySelectionState
+- **tier3-adaptiveSelectionCorruption.test.ts** (8 tests) — `AdaptiveSelectionService.select`: `observe_only` retains worst-ranked candidate, `rankCandidates` returns mutable references (mutation propagates), no minimum quality gate, `generateRecommendation` recommends status quo (recommendedRanking references same snapshot)
+
+### Key Vulnerabilities Confirmed
+10. **JavaScript truthiness bug in expireStale**: `maxAge ? ... : ...` treats 0 as falsy, so `expireStale(0)` falls through to 24h expiry instead of immediate expiry
+11. **Governance layer gaps**: Approval, rollback, and auto-apply all create records but none mutate `FamilySelectionState` — the gap between decision and application is systemic
+12. **No authorization on governance actions**: approve, reject, and rollback all accept any string as actor with no identity verification
+13. **Provider trust is blind**: `LowRiskAutoApplyService` trusts risk, posture, and failure providers without cross-validation against actual family data
+14. **Mutable ranking references**: `CandidateRanker.rankCandidates` returns mutable objects — mutation after ranking corrupts the ranking itself
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 350 passing across 38 test files (229 original + 121 red team)
+
+## 2026-03-15 — ARGUS-9 Red Team Test Suite — Phase 4 (Final)
+
+Phase 4 covers plateau detection manipulation, candidate ID injection, advanced policy merge edge cases, evaluation metric manipulation, and operational resilience failures.
+
+### Test Files Completed
+- **tier3-plateauManipulation.test.ts** (8 tests) — `PlateauDetector.detect` config abuse: `mildThreshold: 0` forces permanent plateau, reversed severity thresholds, `flatQualityVarianceThreshold: 1.0` false positives, no bounds on summary inputs, negative thresholds accepted
+- **tier4-candidateIdInjection.test.ts** (8 tests) — `buildCandidateId`/`parseCandidateId`: colons in components break round-trip, empty strings create degenerate IDs, special characters and unlimited lengths accepted
+- **tier4-policyMergeEdgeCases.test.ts** (11 tests) — `PolicyMergeResolver`: all-vendors-blocked ambiguity, restricted escalation paths, non-deduplication of blocked entities, silent instance overrides
+- **tier4-evaluationManipulation.test.ts** (11 tests) — `evaluateAcceptance`/`evaluateLatency`/`calculateExecutionScore`: silent fallthrough for unknowns, negative latency accepted, weight manipulation (NaN/Infinity/negative), unclamped scores
+- **tier4-operationalResilience.test.ts** (13 tests) — No quality floor in selection, empty/single candidate edge cases, fallback chain gaps, handler error isolation, duplicate registration, stress tests
+
+### Key Vulnerabilities Confirmed
+15. **Plateau config is a first-class attack surface**: mildThreshold=0 detects plateau in healthy families; reversed thresholds cause wrong severity
+16. **Candidate ID injection via colons**: round-trip integrity broken by components containing the separator character
+17. **Policy merge restricted escalation paths**: applications cannot force escalation, override latency, or restrict tactics
+18. **Evaluation accepts adversarial numerics**: scores > 1.0, negative weights, NaN/Infinity pass unchecked
+19. **No minimum quality floor**: system selects 0-score candidates when no alternatives exist
+
+### Final Verification
+- TypeScript: 0 errors
+- Tests: 401 passing across 43 test files (229 original + 172 red team)
+
+### ARGUS-9 Complete Suite Summary
+
+| Phase | Files | Tests | Cumulative |
+|-------|-------|-------|------------|
+| 1 | 5 | 56 | 56 |
+| 2 | 4 | 35 | 91 |
+| 3 | 4 | 38 | 121 |
+| 4 | 5 | 51 | 172 |
+| **Total** | **18** | **172** | **229 + 172 = 401** |
+
+## 2026-03-15 — ARGUS-9 Red Team Test Suite — Phase 5 (Extended Coverage)
+
+Three additional test files targeting previously uncovered vulnerability surfaces discovered during codebase exploration.
+
+### Test Files Completed
+- **tier4-confidenceEscalationAbuse.test.ts** (16 tests) — `ConfidenceEscalationResolver`: negative/NaN confidence bypasses, reversed threshold ordering, all-zero/all-one thresholds, unknown CognitiveGrade always escalates (indexOf -1); `evaluateAndTune`: forcedEscalation ignores all summary data, minConfidenceThreshold > 1.0 forces normal, negative threshold disables fallback, failure count > execution count accepted
+- **tier4-budgetAllocationCorruption.test.ts** (13 tests) — `FamilyValueScorer`: acceptanceRate > 1.0 and < 0 accepted, cost floor at 0.001, NaN/Infinity propagation; `GlobalBudgetAllocator`: negative totalBudget, empty families, NaN propagation through allocations, Infinity creates NaN allocation percentages, negative values trigger equal allocation fallback
+- **tier4-improvementSignalManipulation.test.ts** (13 tests) — `buildImprovementSignal`: NaN/Infinity composite scores, scores outside [0,1] manipulate trend, IEEE 754 precision at SLOPE_THRESHOLD boundary, single NaN corrupts entire regression, confidence capping at 30 samples
+
+### Key Vulnerabilities Confirmed
+20. **Unknown CognitiveGrade always triggers escalation**: `indexOf()` returns -1 for unknown grades, which is always < any valid index, so `shouldEscalate` always returns true
+21. **minConfidenceThreshold > 1.0 makes tuning results > 1.0 confidence**: The threshold value is assigned directly to confidence, producing confidence values outside [0,1]
+22. **NaN propagation through budget allocation**: A single family with NaN executionVolume causes the totalValue guard to trigger, giving all families equal allocation regardless of actual value
+23. **IEEE 754 float precision at slope threshold**: Mathematical slope of exactly 0.02 can be classified as "improving" due to floating point arithmetic (0.020000000000000004 > 0.02)
+
+### Final Verification
+- TypeScript: 0 errors
+- Tests: 440 passing across 46 test files (229 original + 211 red team)
