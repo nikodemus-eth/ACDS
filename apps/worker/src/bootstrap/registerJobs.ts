@@ -4,6 +4,7 @@ import { executionScoringJob } from '../jobs/executionScoringJob.js';
 import { familyAggregationJob } from '../jobs/familyAggregationJob.js';
 import { plateauDetectionJob } from '../jobs/plateauDetectionJob.js';
 import { adaptationRecommendationJob } from '../jobs/adaptationRecommendationJob.js';
+import { lowRiskAutoApplyJob } from '../jobs/lowRiskAutoApplyJob.js';
 
 export interface JobDefinition {
   name: string;
@@ -22,6 +23,7 @@ export function registerJobs(): JobDefinition[] {
     familyAggregationJob,
     plateauDetectionJob,
     adaptationRecommendationJob,
+    lowRiskAutoApplyJob,
   ];
 
   return jobs;

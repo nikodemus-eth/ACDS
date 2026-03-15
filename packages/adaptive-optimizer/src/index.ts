@@ -47,3 +47,55 @@ export type {
   GenerateRecommendationParams,
 } from './adaptation/AdaptationRecommendationService.js';
 export { generateRecommendation } from './adaptation/AdaptationRecommendationService.js';
+
+// Adaptation Approval Workflow (Prompt 61)
+export type {
+  AdaptationApprovalStatus,
+  AdaptationApproval,
+} from './adaptation/AdaptationApprovalState.js';
+export type { AdaptationApprovalRepository } from './adaptation/AdaptationApprovalRepository.js';
+export {
+  AdaptationApprovalService,
+  type ApprovalAuditEventType,
+  type ApprovalAuditEvent,
+  type ApprovalAuditEmitter,
+} from './adaptation/AdaptationApprovalService.js';
+
+// Low-Risk Auto-Apply Mode (Prompt 62)
+export type { FamilyRiskLevel } from './adaptation/AdaptiveModePolicy.js';
+export { isAutoApplyPermitted } from './adaptation/AdaptiveModePolicy.js';
+export type { AutoApplyDecisionRecord } from './adaptation/AutoApplyDecisionRecord.js';
+export {
+  LowRiskAutoApplyService,
+  type LowRiskAutoApplyConfig,
+  type FamilyRiskProvider,
+  type FamilyPostureProvider,
+  type RecentFailureCounter,
+  type AutoApplyDecisionWriter,
+} from './adaptation/LowRiskAutoApplyService.js';
+
+// Adaptation Rollback Tooling (Prompt 63)
+export type {
+  RankingSnapshot,
+  CandidateRankingEntry,
+} from './adaptation/RankingSnapshot.js';
+export type { AdaptationRollbackRecord } from './adaptation/AdaptationRollbackRecord.js';
+export {
+  AdaptationRollbackService,
+  type RollbackAuditEventType,
+  type RollbackAuditEvent,
+  type RollbackAuditEmitter,
+  type RollbackRecordWriter,
+  type RollbackPreview,
+} from './adaptation/AdaptationRollbackService.js';
+
+// Staged Escalation Tuning (Prompt 64)
+export type {
+  EscalationPreference,
+  EscalationTuningState,
+} from './adaptation/EscalationTuningState.js';
+export {
+  evaluateAndTune,
+  type PerformanceSummaryForTuning,
+  type PolicyConstraints,
+} from './adaptation/EscalationTuningService.js';

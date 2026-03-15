@@ -28,3 +28,8 @@ export type { ExecutionOutcome, ExecutionOutcomeStatus, ExecutionOutcomeHandler 
 // Evaluation Bridge
 export { evaluateOutcome } from './run/ExecutionEvaluationBridge.js';
 export type { EvaluationServices, EvaluationBridgeResult } from './run/ExecutionEvaluationBridge.js';
+
+// Staged Escalation (Prompt 64)
+export type { StagedEscalationDecision } from './staged/StagedEscalationDecision.js';
+export { translateTuning } from './staged/StagedEscalationPolicyBridge.js';
+export type { StagedPolicyConstraints } from './staged/StagedEscalationPolicyBridge.js';

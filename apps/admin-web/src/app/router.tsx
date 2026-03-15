@@ -9,6 +9,10 @@ import { ExecutionsPage } from '../features/executions/ExecutionsPage';
 import { ExecutionDetailPage } from '../features/executions/ExecutionDetailPage';
 import { AdaptationPage } from '../features/adaptation/AdaptationPage';
 import { FamilyPerformancePage } from '../features/adaptation/FamilyPerformancePage';
+import { ApprovalQueuePage } from '../features/adaptation/ApprovalQueuePage';
+import { ApprovalDetailPage } from '../features/adaptation/ApprovalDetailPage';
+import { RollbackQueuePage } from '../features/adaptation/RollbackQueuePage';
+import { RollbackDetailPage } from '../features/adaptation/RollbackDetailPage';
 
 export function AppRouter() {
   return (
@@ -24,6 +28,10 @@ export function AppRouter() {
           <Route path="/executions" element={<ExecutionsPage />} />
           <Route path="/executions/:id" element={<ExecutionDetailPage />} />
           <Route path="/adaptation" element={<AdaptationPage />} />
+          <Route path="/adaptation/approvals" element={<ApprovalQueuePage />} />
+          <Route path="/adaptation/approvals/:id" element={<ApprovalDetailPage />} />
+          <Route path="/adaptation/rollbacks" element={<RollbackQueuePage />} />
+          <Route path="/adaptation/rollbacks/:familyKey" element={<RollbackDetailPage />} />
           <Route path="/adaptation/:familyKey" element={<FamilyPerformancePage />} />
         </Route>
       </Routes>
