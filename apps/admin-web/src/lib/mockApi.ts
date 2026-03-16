@@ -655,5 +655,33 @@ export async function mockRequest<T>(
     return asJson((executions.find((entry) => entry.id === id) ?? null) as T);
   }
 
+  if (method === 'GET' && path === '/apple-intelligence/health') {
+    return asJson({
+      status: 'healthy',
+      platform: 'macOS',
+      version: '1.0.0',
+    } as T);
+  }
+  if (method === 'GET' && path === '/apple-intelligence/capabilities') {
+    return asJson({
+      models: ['apple-fm-fast', 'apple-fm-structured', 'apple-fm-reasoning'],
+      supportedTaskTypes: ['classification', 'extraction', 'summarization', 'generation', 'decision_support'],
+      maxTokens: 4096,
+      platform: 'macOS',
+    } as T);
+  }
+  if (method === 'POST' && path === '/apple-intelligence/execute') {
+    const req = body as { model?: string; prompt?: string };
+    return asJson({
+      model: req?.model ?? 'apple-fm-fast',
+      content: `[Apple Intelligence mock] Processed: ${(req?.prompt ?? '').slice(0, 80)}`,
+      done: true,
+      inputTokens: Math.ceil((req?.prompt?.length ?? 0) / 4),
+      outputTokens: 24,
+      durationMs: 42,
+      capabilities: ['text-generation'],
+    } as T);
+  }
+
   throw new Error(`Mock API route not implemented: ${method} ${path}`);
 }

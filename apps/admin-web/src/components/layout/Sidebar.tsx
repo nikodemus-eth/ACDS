@@ -7,6 +7,7 @@ const navItems = [
   { to: '/adaptation', label: 'Adaptation' },
   { to: '/audit', label: 'Audit' },
   { to: '/executions', label: 'Executions' },
+  { to: '/apple-intelligence', label: 'Apple Intelligence' },
 ] as const;
 
 export function Sidebar() {
