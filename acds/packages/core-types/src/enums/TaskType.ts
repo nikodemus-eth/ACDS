@@ -1,0 +1,15 @@
+export enum TaskType {
+  CREATIVE = 'creative',
+  ANALYTICAL = 'analytical',
+  EXTRACTION = 'extraction',
+  CLASSIFICATION = 'classification',
+  SUMMARIZATION = 'summarization',
+  GENERATION = 'generation',
+  REASONING = 'reasoning',
+  CODING = 'coding',
+  DECISION_SUPPORT = 'decision_support',
+  TRANSFORMATION = 'transformation',
+  CRITIQUE = 'critique',
+  PLANNING = 'planning',
+  RETRIEVAL_SYNTHESIS = 'retrieval_synthesis',
+}

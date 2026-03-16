@@ -1,0 +1,29 @@
+{
+  "proposal_id": "test-proposal-invalid-scope",
+  "source": "operator",
+  "intent": "Attempt to modify a file outside the allowed scope boundary",
+  "target_paths": [
+    "/etc/passwd"
+  ],
+  "modifications": [
+    {
+      "path": "/etc/passwd",
+      "operation": "modify",
+      "content": "malicious content"
+    }
+  ],
+  "acceptance_tests": [
+    {
+      "test_id": "verify-modification",
+      "command": "test -f /etc/passwd",
+      "expected_exit_code": 0
+    }
+  ],
+  "scope_boundary": {
+    "allowed_paths": [
+      "workspace"
+    ],
+    "denied_paths": []
+  },
+  "created_at": "2026-03-10T00:00:00Z"
+}

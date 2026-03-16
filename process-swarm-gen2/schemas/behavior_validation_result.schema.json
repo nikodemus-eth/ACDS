@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/behavior_validation_result.schema.json",
+  "title": "BehaviorValidationResult",
+  "description": "The result of validating a behavior proposal, including individual check outcomes and overall status.",
+  "type": "object",
+  "required": [
+    "validation_id",
+    "proposal_id",
+    "status",
+    "checks",
+    "validated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "validation_id": {
+      "type": "string",
+      "description": "Unique identifier for this validation result."
+    },
+    "proposal_id": {
+      "type": "string",
+      "description": "The identifier of the behavior proposal that was validated."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "error"],
+      "description": "The overall validation outcome."
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check_name", "passed", "detail"],
+        "additionalProperties": false,
+        "properties": {
+          "check_name": {
+            "type": "string",
+            "description": "The name of the validation check that was performed."
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether this individual check passed."
+          },
+          "detail": {
+            "type": "string",
+            "description": "A human-readable description of the check result."
+          }
+        }
+      },
+      "description": "The list of individual validation checks performed."
+    },
+    "validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when validation was completed."
+    },
+    "validator_signer_fingerprint": {
+      "type": "string",
+      "description": "Optional fingerprint of the key used by the validator to sign this result."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this validation result."
+    }
+  }
+}

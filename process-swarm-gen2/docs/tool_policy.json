@@ -1,0 +1,102 @@
+{
+  "$schema": "process-swarm-gen2://tool-policy/v2.0",
+  "_comment": "Default tool policy configuration. Maps to ToolGate capabilities and CAP_MAP from runtime/gate/toolgate.py. All capabilities are default-deny; a valid lease must grant each one explicitly.",
+  "capabilities": {
+    "FILESYSTEM_READ": {
+      "cap_map_key": "filesystem",
+      "description": "Read access to files within allowed scope paths",
+      "default_policy": "deny",
+      "lease_grant": {
+        "allowed": true,
+        "allowed_paths": [
+          "/workspace/project"
+        ]
+      },
+      "denied_patterns": [
+        "**/.keys/*.key",
+        "**/.env",
+        "**/credentials.*",
+        "**/*.pem"
+      ],
+      "rate_limit": {
+        "max_requests_per_minute": 300,
+        "burst_size": 50
+      }
+    },
+    "FILESYSTEM_WRITE": {
+      "cap_map_key": "filesystem",
+      "description": "Write access to files within allowed scope paths. Requires filesystem.write=true in lease grant.",
+      "default_policy": "deny",
+      "lease_grant": {
+        "allowed": true,
+        "write": true,
+        "allowed_paths": [
+          "/workspace/project/output"
+        ]
+      },
+      "denied_patterns": [
+        "**/.keys/*",
+        "**/.git/objects/*",
+        "**/node_modules/**",
+        "**/__pycache__/**"
+      ],
+      "rate_limit": {
+        "max_requests_per_minute": 60,
+        "burst_size": 10
+      }
+    },
+    "TEST_EXECUTION": {
+      "cap_map_key": "test_execution",
+      "description": "Permission to execute test suites and validation runs",
+      "default_policy": "deny",
+      "lease_grant": {
+        "allowed": true
+      },
+      "denied_patterns": [],
+      "rate_limit": {
+        "max_requests_per_minute": 30,
+        "burst_size": 5
+      }
+    },
+    "ARTIFACT_GENERATION": {
+      "cap_map_key": "artifact_generation",
+      "description": "Permission to generate compiled artifacts, reports, and bundles",
+      "default_policy": "deny",
+      "lease_grant": {
+        "allowed": true
+      },
+      "denied_patterns": [],
+      "rate_limit": {
+        "max_requests_per_minute": 20,
+        "burst_size": 3
+      }
+    },
+    "REPOSITORY_MODIFICATION": {
+      "cap_map_key": "repository_modification",
+      "description": "Permission to modify repository state (commits, branches). Path-scoped like filesystem capabilities.",
+      "default_policy": "deny",
+      "lease_grant": {
+        "allowed": true,
+        "allowed_paths": [
+          "/workspace/project"
+        ]
+      },
+      "denied_patterns": [
+        "**/main",
+        "**/production"
+      ],
+      "rate_limit": {
+        "max_requests_per_minute": 10,
+        "burst_size": 2
+      }
+    }
+  },
+  "enforcement": {
+    "default_action": "deny",
+    "require_lease": true,
+    "check_time_bounds": true,
+    "check_path_scope": true,
+    "check_denied_capabilities": true
+  },
+  "version": "2.0"
+}

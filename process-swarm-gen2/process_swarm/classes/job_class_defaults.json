@@ -1,0 +1,44 @@
+{
+  "briefing_document": {
+    "execution_mode": "sequential",
+    "artifact_types": ["document"],
+    "artifact_formats": ["markdown"],
+    "source_scope": ["curated_sources"]
+  },
+  "document_plus_tts": {
+    "execution_mode": "sequential",
+    "artifact_types": ["document", "audio"],
+    "artifact_formats": ["markdown", "mp3"],
+    "source_scope": ["curated_sources"]
+  },
+  "grits_integrity_report": {
+    "execution_mode": "sequential",
+    "artifact_types": ["report"],
+    "artifact_formats": ["markdown"],
+    "source_scope": ["runtime_logs"]
+  },
+  "research_brief": {
+    "execution_mode": "sequential",
+    "artifact_types": ["report"],
+    "artifact_formats": ["markdown"],
+    "source_scope": ["web_research"]
+  },
+  "news_intake": {
+    "execution_mode": "sequential",
+    "artifact_types": ["document"],
+    "artifact_formats": ["markdown"],
+    "source_scope": ["news_feeds"]
+  },
+  "monitoring_diagnostic": {
+    "execution_mode": "sequential",
+    "artifact_types": ["report"],
+    "artifact_formats": ["json"],
+    "source_scope": ["runtime_logs"]
+  },
+  "generic_job": {
+    "execution_mode": "sequential",
+    "artifact_types": ["document"],
+    "artifact_formats": ["markdown"],
+    "source_scope": []
+  }
+}

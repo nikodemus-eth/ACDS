@@ -1,0 +1,247 @@
+{
+  "$schema": "process-swarm-gen2://baseline-manifest/v2.0",
+  "_comment": "Baseline manifest listing all modules, file counts, and test counts for Process Swarm Gen 2.",
+  "generated_at": "2026-03-15T00:00:00Z",
+  "summary": {
+    "total_python_files": 213,
+    "total_test_functions": 937,
+    "total_test_files": 67,
+    "total_modules": 30
+  },
+  "runtime": {
+    "total_files": 30,
+    "modules": {
+      "identity": {
+        "files": 3,
+        "source_files": ["__init__.py", "key_manager.py", "signer.py"],
+        "test_files": ["test_key_manager.py", "test_signer.py"],
+        "test_count": 38
+      },
+      "schemas": {
+        "files": 3,
+        "source_files": ["__init__.py", "loader.py", "schema_validator.py"],
+        "test_files": ["test_schema_loader.py", "test_schema_validator.py"],
+        "test_count": 15
+      },
+      "validation": {
+        "files": 2,
+        "source_files": ["__init__.py", "validator.py"],
+        "test_files": ["test_validator.py"],
+        "test_count": 19
+      },
+      "compiler": {
+        "files": 2,
+        "source_files": ["__init__.py", "compiler.py"],
+        "test_files": ["test_compiler.py"],
+        "test_count": 9
+      },
+      "lease": {
+        "files": 2,
+        "source_files": ["__init__.py", "lease_manager.py"],
+        "test_files": ["test_lease.py"],
+        "test_count": 11
+      },
+      "gate": {
+        "files": 3,
+        "source_files": ["__init__.py", "toolgate.py", "execution_gate.py"],
+        "test_files": ["test_toolgate.py", "test_execution_gate.py"],
+        "test_count": 23
+      },
+      "executor": {
+        "files": 2,
+        "source_files": ["__init__.py", "executor.py"],
+        "test_files": ["test_executor.py"],
+        "test_count": 8
+      },
+      "ledger": {
+        "files": 2,
+        "source_files": ["__init__.py", "ledger_writer.py"],
+        "test_files": ["test_ledger.py"],
+        "test_count": 6
+      },
+      "exchange": {
+        "files": 3,
+        "source_files": ["__init__.py", "ingress.py", "receipt.py"],
+        "test_files": ["test_exchange.py"],
+        "test_count": 5
+      },
+      "pipeline": {
+        "files": 2,
+        "source_files": ["__init__.py", "runner.py"],
+        "test_files": ["test_pipeline.py"],
+        "test_count": 3
+      },
+      "proposal": {
+        "files": 2,
+        "source_files": ["__init__.py", "proposal_loader.py"],
+        "test_files": [],
+        "test_count": 0
+      },
+      "bridge": {
+        "files": 3,
+        "source_files": ["__init__.py", "translator.py", "sequencer.py"],
+        "test_files": ["test_translator.py", "test_sequencer.py"],
+        "test_count": 39
+      }
+    }
+  },
+  "swarm": {
+    "total_files": 64,
+    "modules": {
+      "dsl": {
+        "files": 3,
+        "source_files": ["__init__.py", "models.py", "parser.py"],
+        "test_files": ["test_dsl_parser.py"],
+        "test_count": 21
+      },
+      "compiler": {
+        "files": 3,
+        "source_files": ["__init__.py", "compiler.py", "action_compiler.py"],
+        "test_files": ["test_compiler.py"],
+        "test_count": 19
+      },
+      "registry": {
+        "files": 3,
+        "source_files": ["__init__.py", "database.py", "repository.py"],
+        "test_files": ["test_database.py", "test_repository.py", "test_repository_extended.py"],
+        "test_count": 114
+      },
+      "scheduler": {
+        "files": 2,
+        "source_files": ["__init__.py", "evaluator.py"],
+        "test_files": ["test_scheduler.py"],
+        "test_count": 20
+      },
+      "delivery": {
+        "files": 4,
+        "source_files": ["__init__.py", "validation.py", "adapters.py", "engine.py"],
+        "test_files": ["test_delivery.py"],
+        "test_count": 11
+      },
+      "events": {
+        "files": 2,
+        "source_files": ["__init__.py", "recorder.py"],
+        "test_files": ["test_events.py"],
+        "test_count": 17
+      },
+      "runner": {
+        "files": 1,
+        "source_files": ["runner.py"],
+        "test_files": ["test_runner.py"],
+        "test_count": 5
+      },
+      "governance": {
+        "files": 3,
+        "source_files": ["__init__.py", "warnings.py", "lifecycle.py"],
+        "test_files": ["test_warnings.py", "test_lifecycle.py"],
+        "test_count": 65
+      },
+      "definer": {
+        "files": 12,
+        "source_files": [
+          "__init__.py", "archetype.py", "templates.py", "action_extraction.py",
+          "action_table.py", "capability.py", "archetype_classifier.py",
+          "constraint_extractor.py", "tool_matching.py", "definer.py",
+          "pipeline.py", "constraints.py"
+        ],
+        "test_files": ["test_archetypes.py", "test_definer.py", "test_constraints.py", "test_action_table.py"],
+        "test_count": 109
+      },
+      "tools": {
+        "files": 19,
+        "source_files": [
+          "__init__.py", "base.py", "registry.py",
+          "adapters/__init__.py", "adapters/synthesis_brief_builder.py",
+          "adapters/probabilistic_synthesis.py", "adapters/run_manager.py",
+          "adapters/policy_loader.py", "adapters/source_collector.py",
+          "adapters/url_validator.py", "adapters/freshness_filter.py",
+          "adapters/source_normalizer.py", "adapters/section_mapper.py",
+          "adapters/report_formatter.py", "adapters/bundle_builder.py",
+          "adapters/citation_validator.py", "adapters/rule_validator.py",
+          "adapters/decision_engine.py", "adapters/delivery_engine.py"
+        ],
+        "test_files": ["test_registry.py", "test_adapters.py"],
+        "test_count": 27
+      },
+      "abi": {
+        "files": 2,
+        "source_files": ["__init__.py", "api.py"],
+        "test_files": ["test_abi.py"],
+        "test_count": 14
+      },
+      "adaptive": {
+        "files": 5,
+        "source_files": [
+          "__init__.py", "improvement_ledger.py", "branch_evaluator.py",
+          "adaptive_scheduler.py", "orchestrator.py"
+        ],
+        "test_files": [
+          "test_improvement_ledger.py", "test_branch_evaluator.py",
+          "test_adaptive_scheduler.py", "test_orchestrator.py"
+        ],
+        "test_count": 52
+      },
+      "bridge": {
+        "files": 3,
+        "source_files": ["__init__.py", "gateway_recorder.py", "session_watcher.py"],
+        "test_files": ["test_gateway_recorder.py", "test_session_watcher.py"],
+        "test_count": 16
+      }
+    }
+  },
+  "process_swarm": {
+    "total_files": 14,
+    "source_files": [
+      "__init__.py", "classes/__init__.py", "extraction/__init__.py",
+      "planner/__init__.py", "scripts/__init__.py",
+      "scripts/classify_intent.py", "scripts/extract_job_parameters.py",
+      "scripts/merge_job_configuration.py", "scripts/generate_job_from_intent.py",
+      "scripts/validate_job.py", "scripts/repair_job.py",
+      "scripts/compile_job.py", "scripts/plan_job_execution.py",
+      "scripts/compile_intent.py"
+    ],
+    "test_files": [
+      "test_classify_intent.py", "test_extract_parameters.py",
+      "test_merge_configuration.py", "test_validate_job.py",
+      "test_repair_job.py", "test_compile_job.py",
+      "test_plan_execution.py", "test_compile_intent.py"
+    ],
+    "test_count": 52
+  },
+  "grits": {
+    "total_files": 16,
+    "source_files": [
+      "__init__.py", "run_request.py", "suite_resolver.py", "executor.py",
+      "baseline.py", "drift_analyzer.py", "finding_classifier.py",
+      "recommender.py", "report_compiler.py", "artifact_writer.py",
+      "runner.py", "diagnostics/__init__.py", "diagnostics/smoke.py",
+      "diagnostics/regression.py", "diagnostics/drift.py",
+      "diagnostics/redteam.py"
+    ],
+    "test_files": [
+      "test_runner.py", "test_executor.py", "test_baseline.py",
+      "test_drift_analyzer.py", "test_finding_classifier.py",
+      "test_report_compiler.py", "test_artifact_writer.py",
+      "test_diagnostics.py"
+    ],
+    "test_count": 51
+  },
+  "proof_ui": {
+    "total_files": 3,
+    "source_files": ["__init__.py", "__main__.py", "server.py"],
+    "test_files": ["test_server.py"],
+    "test_count": 39
+  },
+  "redteam_tests": {
+    "test_files": [
+      "test_rt01_scheduler_boundary.py", "test_rt02_bridge_ambiguity.py",
+      "test_rt03_skill_boundary.py", "test_rt04_artifact_trust.py",
+      "test_rt05_scope_smuggling.py", "test_rt06_acceptance_gate.py",
+      "test_rt07_delivery_truth.py", "test_rt08_dsl_determinism.py",
+      "test_rt09_policy_scope.py", "test_rt10_revocation.py",
+      "test_runtime_gate_invariants.py"
+    ],
+    "test_count": 125
+  },
+  "version": "2.0"
+}

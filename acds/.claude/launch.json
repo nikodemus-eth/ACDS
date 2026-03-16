@@ -1,0 +1,42 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Admin Web (Mock API)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@acds/admin-web", "run", "dev:mock"],
+      "port": 4173
+    },
+    {
+      "name": "Admin Web (Live API)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@acds/admin-web", "run", "dev"],
+      "port": 4173
+    },
+    {
+      "name": "API Server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@acds/api", "run", "dev"],
+      "port": 3100
+    },
+    {
+      "name": "GRITS Worker",
+      "runtimeExecutable": "./apps/api/node_modules/.bin/tsx",
+      "runtimeArgs": ["watch", "apps/grits-worker/src/main.ts"],
+      "port": 0
+    },
+    {
+      "name": "Worker",
+      "runtimeExecutable": "./apps/api/node_modules/.bin/tsx",
+      "runtimeArgs": ["watch", "apps/worker/src/main.ts"],
+      "port": 0,
+      "autoPort": true
+    },
+    {
+      "name": "Apple Intelligence Bridge",
+      "runtimeExecutable": "swift",
+      "runtimeArgs": ["run", "--package-path", "apps/apple-intelligence-bridge"],
+      "port": 11435
+    }
+  ]
+}

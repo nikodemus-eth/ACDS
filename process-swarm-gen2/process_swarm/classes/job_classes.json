@@ -1,0 +1,129 @@
+[
+  {
+    "class_id": "briefing_document",
+    "description": "Produces intelligence briefings, summaries, and reports",
+    "default_job_type": "intelligence_briefing",
+    "routing_keywords": ["briefing", "intelligence", "summary", "weekly report"],
+    "suggested_inputs": [
+      {"input_id": "topic_scope", "description": "The topic or domain to cover", "type": "string", "required": true}
+    ],
+    "suggested_agents": [
+      {"agent_id": "research_agent", "role": "source synthesis", "model": "claude", "responsibilities": ["Gather and synthesize sources"]}
+    ],
+    "suggested_tools": [{"tool_id": "source_collector", "description": "Collect source materials", "required": true}],
+    "suggested_artifacts": [
+      {"artifact_id": "briefing_report", "artifact_type": "document", "description": "The briefing document", "format": "markdown", "producer_agent": "research_agent"}
+    ],
+    "suggested_constraints": [{"constraint_id": "source_count", "description": "Minimum source count", "severity": "medium"}],
+    "suggested_success_criteria": ["Briefing document produced with at least 3 sources"],
+    "default_execution_mode": "sequential"
+  },
+  {
+    "class_id": "document_plus_tts",
+    "description": "Document with narrated audio output",
+    "default_job_type": "document_with_audio",
+    "routing_keywords": ["audio", "mp3", "narrated", "tts", "voice", "spoken"],
+    "suggested_inputs": [{"input_id": "topic_scope", "description": "Topic to cover", "type": "string", "required": true}],
+    "suggested_agents": [
+      {"agent_id": "research_agent", "role": "content creation", "model": "claude", "responsibilities": ["Create document content"]},
+      {"agent_id": "tts_agent", "role": "audio narration", "model": "local-tts", "responsibilities": ["Convert document to audio"]}
+    ],
+    "suggested_tools": [{"tool_id": "source_collector", "description": "Collect sources", "required": true}],
+    "suggested_artifacts": [
+      {"artifact_id": "document", "artifact_type": "document", "description": "Written document", "format": "markdown", "producer_agent": "research_agent"},
+      {"artifact_id": "audio", "artifact_type": "audio", "description": "Narrated audio", "format": "mp3", "producer_agent": "tts_agent"}
+    ],
+    "suggested_constraints": [],
+    "suggested_success_criteria": ["Document and audio produced"],
+    "default_execution_mode": "sequential"
+  },
+  {
+    "class_id": "grits_integrity_report",
+    "description": "Runtime integrity and drift detection report",
+    "default_job_type": "integrity_reporting",
+    "routing_keywords": ["grits", "integrity", "drift", "red team", "diagnostic"],
+    "suggested_inputs": [
+      {"input_id": "target_system", "description": "System to audit", "type": "string", "required": true},
+      {"input_id": "suite_ids", "description": "Diagnostic suites to run", "type": "array", "required": false}
+    ],
+    "suggested_agents": [
+      {"agent_id": "diagnostic_agent", "role": "integrity testing", "model": "local-runtime", "responsibilities": ["Run diagnostic suites"]},
+      {"agent_id": "report_agent", "role": "report compilation", "model": "claude", "responsibilities": ["Compile integrity report"]}
+    ],
+    "suggested_tools": [{"tool_id": "grits_runner", "description": "GRITS diagnostic runner", "required": true}],
+    "suggested_artifacts": [
+      {"artifact_id": "integrity_report", "artifact_type": "report", "description": "Integrity assessment report", "format": "markdown", "producer_agent": "report_agent"}
+    ],
+    "suggested_constraints": [{"constraint_id": "baseline_required", "description": "Must compare against baseline", "severity": "high"}],
+    "suggested_success_criteria": ["All diagnostic suites executed", "Report generated with findings"],
+    "default_execution_mode": "sequential"
+  },
+  {
+    "class_id": "research_brief",
+    "description": "Topic investigation and synthesis",
+    "default_job_type": "research",
+    "routing_keywords": ["research", "investigate", "findings", "analysis", "study"],
+    "suggested_inputs": [{"input_id": "research_topic", "description": "Topic to research", "type": "string", "required": true}],
+    "suggested_agents": [
+      {"agent_id": "research_agent", "role": "investigation", "model": "claude", "responsibilities": ["Research and synthesize findings"]}
+    ],
+    "suggested_tools": [{"tool_id": "source_collector", "description": "Collect sources", "required": true}],
+    "suggested_artifacts": [
+      {"artifact_id": "research_report", "artifact_type": "report", "description": "Research findings", "format": "markdown", "producer_agent": "research_agent"}
+    ],
+    "suggested_constraints": [],
+    "suggested_success_criteria": ["Research report produced with supporting evidence"],
+    "default_execution_mode": "sequential"
+  },
+  {
+    "class_id": "news_intake",
+    "description": "News aggregation and curation",
+    "default_job_type": "news_aggregation",
+    "routing_keywords": ["news", "headlines", "intake", "aggregation", "curate"],
+    "suggested_inputs": [{"input_id": "news_scope", "description": "News topics or sources", "type": "string", "required": true}],
+    "suggested_agents": [
+      {"agent_id": "intake_agent", "role": "news collection", "model": "claude", "responsibilities": ["Aggregate and curate news"]}
+    ],
+    "suggested_tools": [{"tool_id": "source_collector", "description": "Collect news sources", "required": true}],
+    "suggested_artifacts": [
+      {"artifact_id": "news_digest", "artifact_type": "document", "description": "Curated news digest", "format": "markdown", "producer_agent": "intake_agent"}
+    ],
+    "suggested_constraints": [],
+    "suggested_success_criteria": ["News digest produced"],
+    "default_execution_mode": "sequential"
+  },
+  {
+    "class_id": "monitoring_diagnostic",
+    "description": "System status checks and monitoring",
+    "default_job_type": "system_monitoring",
+    "routing_keywords": ["monitor", "health check", "system status", "uptime"],
+    "suggested_inputs": [{"input_id": "target_systems", "description": "Systems to monitor", "type": "array", "required": true}],
+    "suggested_agents": [
+      {"agent_id": "monitor_agent", "role": "status checking", "model": "local-runtime", "responsibilities": ["Check system health"]}
+    ],
+    "suggested_tools": [{"tool_id": "health_checker", "description": "System health checker", "required": true}],
+    "suggested_artifacts": [
+      {"artifact_id": "status_report", "artifact_type": "report", "description": "System status report", "format": "json", "producer_agent": "monitor_agent"}
+    ],
+    "suggested_constraints": [],
+    "suggested_success_criteria": ["Status report generated for all target systems"],
+    "default_execution_mode": "sequential"
+  },
+  {
+    "class_id": "generic_job",
+    "description": "Fallback for unclassified intent",
+    "default_job_type": "generic",
+    "routing_keywords": [],
+    "suggested_inputs": [{"input_id": "objective", "description": "What to accomplish", "type": "string", "required": true}],
+    "suggested_agents": [
+      {"agent_id": "general_agent", "role": "task execution", "model": "claude", "responsibilities": ["Execute the requested task"]}
+    ],
+    "suggested_tools": [],
+    "suggested_artifacts": [
+      {"artifact_id": "output", "artifact_type": "document", "description": "Task output", "format": "markdown", "producer_agent": "general_agent"}
+    ],
+    "suggested_constraints": [],
+    "suggested_success_criteria": ["Task completed successfully"],
+    "default_execution_mode": "sequential"
+  }
+]

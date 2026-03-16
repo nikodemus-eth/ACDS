@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/execution_plan.schema.json",
+  "title": "ExecutionPlan",
+  "description": "A compiled plan of discrete steps to execute a validated behavior proposal within defined scope constraints.",
+  "type": "object",
+  "required": [
+    "plan_id",
+    "proposal_id",
+    "validation_id",
+    "steps",
+    "required_capabilities",
+    "scope_constraints",
+    "compiled_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "description": "Unique identifier for this execution plan."
+    },
+    "proposal_id": {
+      "type": "string",
+      "description": "The identifier of the originating behavior proposal."
+    },
+    "validation_id": {
+      "type": "string",
+      "description": "The identifier of the validation result that approved this plan."
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_id", "operation", "path", "required_capability"],
+        "additionalProperties": false,
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "description": "Unique identifier for this step within the plan."
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["create", "modify", "delete", "run_test"],
+            "description": "The type of operation this step performs."
+          },
+          "path": {
+            "type": "string",
+            "description": "The filesystem path this step operates on."
+          },
+          "required_capability": {
+            "type": "string",
+            "description": "The capability that must be granted to execute this step."
+          },
+          "content": {
+            "type": "string",
+            "description": "Optional content payload for create or modify operations."
+          }
+        }
+      },
+      "minItems": 1,
+      "description": "The ordered list of steps to execute."
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The full set of capabilities required to execute all steps in this plan."
+    },
+    "scope_constraints": {
+      "type": "object",
+      "required": ["allowed_paths"],
+      "additionalProperties": false,
+      "properties": {
+        "allowed_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths within which plan execution is permitted."
+        }
+      },
+      "description": "Constraints that bound the scope of this execution plan."
+    },
+    "compiled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this plan was compiled."
+    },
+    "compiler_signer_fingerprint": {
+      "type": "string",
+      "description": "Optional fingerprint of the key used by the compiler to sign this plan."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this execution plan."
+    }
+  }
+}

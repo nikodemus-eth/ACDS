@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://process-swarm.local/schemas/process_swarm_job.schema.json",
+  "title": "Process Swarm Job",
+  "description": "Schema for a Process Swarm job artifact",
+  "type": "object",
+  "required": [
+    "job_id",
+    "job_type",
+    "objective",
+    "inputs",
+    "constraints",
+    "agents",
+    "tools",
+    "artifacts",
+    "execution_policy",
+    "success_criteria",
+    "failure_handling",
+    "lineage_tracking"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "description": "Unique job identifier"
+    },
+    "job_type": {
+      "type": "string",
+      "description": "The type of job"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Plain-English description of what this job accomplishes"
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Input" },
+      "description": "Job inputs"
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Constraint" },
+      "description": "Job constraints"
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Agent" },
+      "description": "Agents assigned to this job"
+    },
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Tool" },
+      "description": "Tools available to agents"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Artifact" },
+      "description": "Expected output artifacts"
+    },
+    "execution_policy": {
+      "$ref": "#/$defs/ExecutionPolicy",
+      "description": "How this job should be executed"
+    },
+    "success_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Conditions that must be met for the job to succeed"
+    },
+    "failure_handling": {
+      "$ref": "#/$defs/FailureHandling",
+      "description": "How to handle failures"
+    },
+    "lineage_tracking": {
+      "$ref": "#/$defs/LineageTracking",
+      "description": "Lineage and provenance tracking configuration"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Assumptions made during job authoring"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary metadata"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Input": {
+      "type": "object",
+      "required": ["input_id", "description", "type", "required"],
+      "properties": {
+        "input_id": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "required": { "type": "boolean" },
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+    "Constraint": {
+      "type": "object",
+      "required": ["constraint_id", "description", "severity"],
+      "properties": {
+        "constraint_id": { "type": "string" },
+        "description": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Agent": {
+      "type": "object",
+      "required": ["agent_id", "role", "model", "responsibilities"],
+      "properties": {
+        "agent_id": { "type": "string" },
+        "role": { "type": "string" },
+        "model": { "type": "string" },
+        "responsibilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Tool": {
+      "type": "object",
+      "required": ["tool_id", "description", "required"],
+      "properties": {
+        "tool_id": { "type": "string" },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "Artifact": {
+      "type": "object",
+      "required": ["artifact_id", "artifact_type", "description", "format", "producer_agent"],
+      "properties": {
+        "artifact_id": { "type": "string" },
+        "artifact_type": {
+          "type": "string",
+          "enum": ["document", "audio", "report", "dataset", "analysis"]
+        },
+        "description": { "type": "string" },
+        "format": { "type": "string" },
+        "producer_agent": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionPolicy": {
+      "type": "object",
+      "required": ["mode", "retry_policy"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["sequential", "parallel", "conditional"]
+        },
+        "retry_policy": {
+          "type": "object",
+          "required": ["max_retries", "retry_on_failure"],
+          "properties": {
+            "max_retries": { "type": "integer", "minimum": 0 },
+            "retry_on_failure": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "FailureHandling": {
+      "type": "object",
+      "required": ["on_validation_failure", "on_execution_failure"],
+      "properties": {
+        "on_validation_failure": {
+          "type": "string",
+          "enum": ["reject", "repair", "flag_for_review"]
+        },
+        "on_execution_failure": {
+          "type": "string",
+          "enum": ["stop", "retry", "partial_complete", "flag_for_review"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LineageTracking": {
+      "type": "object",
+      "required": ["enabled", "record_inputs", "record_outputs", "record_agent_lineage"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "record_inputs": { "type": "boolean" },
+        "record_outputs": { "type": "boolean" },
+        "record_agent_lineage": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

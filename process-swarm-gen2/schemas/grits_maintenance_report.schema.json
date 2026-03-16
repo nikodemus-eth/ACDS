@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GRITS Maintenance Report",
+  "description": "Final maintenance report from a GRITS integrity evaluation run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_id",
+    "run_id",
+    "target_id",
+    "overall_status",
+    "summary",
+    "counts",
+    "findings",
+    "recommendations",
+    "limitations",
+    "generated_at"
+  ],
+  "properties": {
+    "report_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": ["green", "yellow", "red"]
+    },
+    "summary": {
+      "type": "object",
+      "required": ["tests_executed", "tests_passed", "tests_failed"],
+      "properties": {
+        "tests_executed": { "type": "integer", "minimum": 0 },
+        "tests_passed": { "type": "integer", "minimum": 0 },
+        "tests_failed": { "type": "integer", "minimum": 0 },
+        "suites_run": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["by_severity", "regressions", "drift_alerts"],
+      "properties": {
+        "by_severity": {
+          "type": "object",
+          "properties": {
+            "critical": { "type": "integer", "minimum": 0 },
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "regressions": { "type": "integer", "minimum": 0 },
+        "drift_alerts": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "grits_finding.schema.json" }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

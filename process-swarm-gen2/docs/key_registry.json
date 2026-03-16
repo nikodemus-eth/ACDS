@@ -1,0 +1,64 @@
+{
+  "$schema": "process-swarm-gen2://key-registry/v2.0",
+  "_comment": "Template for tracking known keys and their trust status. Used by load_verify_key_from_registry() to resolve signing roles.",
+  "registry_id": "<generated-uuid>",
+  "active_keys": [
+    {
+      "role": "validator_signer",
+      "key_id": "validator-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "trust_level": "trusted",
+      "status": "active",
+      "added_at": "2026-03-15T00:00:00Z",
+      "added_by": "node-bootstrap"
+    },
+    {
+      "role": "compiler_signer",
+      "key_id": "compiler-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "trust_level": "trusted",
+      "status": "active",
+      "added_at": "2026-03-15T00:00:00Z",
+      "added_by": "node-bootstrap"
+    },
+    {
+      "role": "approval_signer",
+      "key_id": "approval-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "trust_level": "trusted",
+      "status": "active",
+      "added_at": "2026-03-15T00:00:00Z",
+      "added_by": "node-bootstrap"
+    },
+    {
+      "role": "node_attestation_signer",
+      "key_id": "node-attestation-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "trust_level": "trusted",
+      "status": "active",
+      "added_at": "2026-03-15T00:00:00Z",
+      "added_by": "node-bootstrap"
+    },
+    {
+      "role": "lease_issuer_signer",
+      "key_id": "lease-issuer-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "trust_level": "trusted",
+      "status": "active",
+      "added_at": "2026-03-15T00:00:00Z",
+      "added_by": "node-bootstrap"
+    }
+  ],
+  "revoked_keys": [],
+  "trust_levels": {
+    "trusted": "Key is verified and authorized for its assigned role",
+    "untrusted": "Key is known but not yet verified or authorized",
+    "revoked": "Key has been explicitly revoked and must not be accepted"
+  },
+  "version": "2.0"
+}

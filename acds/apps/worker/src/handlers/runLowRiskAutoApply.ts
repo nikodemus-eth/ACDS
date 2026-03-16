@@ -1,0 +1,267 @@
+/**
+ * runLowRiskAutoApply - Iterates families with pending recommendations
+ * in auto_apply mode and applies them via LowRiskAutoApplyService when
+ * the family qualifies as low-risk.
+ *
+ * In a full implementation, the repository instances would be injected
+ * via a DI container.
+ */
+
+import type {
+  AdaptiveMode,
+  AdaptationRecommendation,
+  AutoApplyDecisionRecord,
+} from '@acds/adaptive-optimizer';
+import {
+  LowRiskAutoApplyService,
+  type FamilyRiskProvider,
+  type FamilyPostureProvider,
+  type RecentFailureCounter,
+  type AutoApplyDecisionWriter,
+  type AutoApplyStateApplier,
+  type FamilyRiskLevel,
+} from '@acds/adaptive-optimizer';
+import { rankCandidates } from '@acds/adaptive-optimizer';
+import { getSharedOptimizerStateRepository } from '../repositories/InMemoryOptimizerStateRepository.js';
+import { getAdaptationRecommendationRepository, getAdaptiveModeProvider as getSharedModeProvider } from './runAdaptationRecommendations.js';
+
+// ── Abstract reader interfaces ─────────────────────────────────────────────
+
+export interface PendingRecommendationReader {
+  /** Lists recommendations in 'pending' status for auto-apply eligible families. */
+  listPendingForAutoApply(): Promise<AdaptationRecommendation[]>;
+}
+
+export interface AdaptiveModeProvider {
+  /** Returns the current adaptive mode for a family. */
+  getModeForFamily(familyKey: string): Promise<AdaptiveMode>;
+}
+
+// ── Handler ────────────────────────────────────────────────────────────────
+
+export async function runLowRiskAutoApply(): Promise<void> {
+  const optimizerRepo = getOptimizerStateRepository();
+  const recommendationReader = getPendingRecommendationReader();
+  const modeProvider = getAdaptiveModeProvider();
+  const riskProvider = getFamilyRiskProvider();
+  const postureProvider = getFamilyPostureProvider();
+  const failureCounter = getRecentFailureCounter();
+  const decisionWriter = getAutoApplyDecisionWriter();
+
+  const service = new LowRiskAutoApplyService(
+    riskProvider,
+    postureProvider,
+    failureCounter,
+    decisionWriter,
+    undefined,
+    getAutoApplyStateApplier(),
+  );
+
+  const pending = await recommendationReader.listPendingForAutoApply();
+
+  if (pending.length === 0) {
+    console.log('[low-risk-auto-apply] No pending recommendations for auto-apply.');
+    return;
+  }
+
+  console.log(
+    `[low-risk-auto-apply] Evaluating ${pending.length} pending recommendation(s)...`,
+  );
+
+  let applied = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const recommendation of pending) {
+    try {
+      const familyKey = recommendation.familyKey;
+      const familyState = await optimizerRepo.getFamilyState(familyKey);
+      if (!familyState) {
+        skipped++;
+        continue;
+      }
+
+      const candidateStates = await optimizerRepo.getCandidateStates(familyKey);
+      if (candidateStates.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const mode = await modeProvider.getModeForFamily(familyKey);
+      const currentRanking = rankCandidates(candidateStates, familyState);
+
+      const decision = await service.inspectAndApply(
+        familyKey,
+        recommendation,
+        familyState,
+        currentRanking,
+        mode,
+      );
+
+      if (decision) {
+        applied++;
+        console.log(
+          `[low-risk-auto-apply] Applied recommendation for ${familyKey}: ${decision.reason}`,
+        );
+      } else {
+        skipped++;
+      }
+    } catch (error) {
+      errors++;
+      console.error(
+        `[low-risk-auto-apply] Failed for family ${recommendation.familyKey}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  console.log(
+    `[low-risk-auto-apply] Completed: ${applied} applied, ${skipped} skipped, ${errors} errors.`,
+  );
+
+  if (errors > 0 && applied === 0 && skipped === 0) {
+    throw new Error(
+      `[low-risk-auto-apply] All ${errors} attempt(s) failed. This indicates a systemic issue.`,
+    );
+  }
+}
+
+// ── Working implementations ────────────────────────────────────────────────
+
+function getOptimizerStateRepository() {
+  return getSharedOptimizerStateRepository();
+}
+
+class InMemoryPendingRecommendationReader implements PendingRecommendationReader {
+  async listPendingForAutoApply(): Promise<AdaptationRecommendation[]> {
+    return getAdaptationRecommendationRepository().getPending();
+  }
+}
+
+function getPendingRecommendationReader(): PendingRecommendationReader {
+  return new InMemoryPendingRecommendationReader();
+}
+
+function getAdaptiveModeProvider(): AdaptiveModeProvider {
+  return getSharedModeProvider();
+}
+
+/**
+ * Default risk provider — classifies all families as low-risk.
+ * In a database-backed setup, this would read from a risk classification table.
+ */
+class DefaultFamilyRiskProvider implements FamilyRiskProvider {
+  async getRiskLevel(_familyKey: string): Promise<FamilyRiskLevel> {
+    return 'low';
+  }
+}
+
+/**
+ * Default posture provider — returns 'advisory' for all families.
+ * In a database-backed setup, this would read the family's configured posture.
+ */
+class DefaultFamilyPostureProvider implements FamilyPostureProvider {
+  async getPosture(_familyKey: string): Promise<string> {
+    return 'advisory';
+  }
+}
+
+class PgRecentFailureCounter implements RecentFailureCounter {
+  async countRecentFailures(familyKey: string): Promise<number> {
+    const { createPool } = await import('@acds/persistence-pg');
+    const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
+    const pool = createPool({
+      host: databaseUrl.hostname,
+      port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
+      database: databaseUrl.pathname.replace(/^\//, ''),
+      user: decodeURIComponent(databaseUrl.username),
+      password: decodeURIComponent(databaseUrl.password),
+      ssl: databaseUrl.searchParams.get('sslmode') === 'require',
+    });
+    const result = await pool.query(
+      `SELECT COUNT(*) AS count FROM execution_records
+       WHERE status = 'failed'
+         AND routing_request->>'application' = $1
+         AND created_at > NOW() - INTERVAL '1 hour'`,
+      [familyKey.split(':')[0]],
+    );
+    return parseInt(result.rows[0]?.count ?? '0', 10);
+  }
+}
+
+class PgAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
+  async save(record: AutoApplyDecisionRecord): Promise<void> {
+    const { createPool } = await import('@acds/persistence-pg');
+    const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
+    const pool = createPool({
+      host: databaseUrl.hostname,
+      port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
+      database: databaseUrl.pathname.replace(/^\//, ''),
+      user: decodeURIComponent(databaseUrl.username),
+      password: decodeURIComponent(databaseUrl.password),
+      ssl: databaseUrl.searchParams.get('sslmode') === 'require',
+    });
+    await pool.query(
+      `INSERT INTO auto_apply_decision_records (id, family_key, previous_ranking, new_ranking, reason, mode, risk_basis, applied_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        record.id,
+        record.familyKey,
+        JSON.stringify(record.previousRanking),
+        JSON.stringify(record.newRanking),
+        record.reason,
+        record.mode,
+        record.riskBasis,
+        record.appliedAt,
+      ],
+    );
+  }
+}
+
+class OptimizerStateAutoApplyApplier implements AutoApplyStateApplier {
+  constructor(private readonly optimizerRepo: ReturnType<typeof getSharedOptimizerStateRepository>) {}
+
+  async apply(record: AutoApplyDecisionRecord): Promise<void> {
+    const current = await this.optimizerRepo.getFamilyState(record.familyKey);
+    if (!current) {
+      throw new Error(`Family state not found for auto-apply: ${record.familyKey}`);
+    }
+
+    const nextCandidate = record.newRanking[0]?.candidate.candidateId;
+    if (!nextCandidate) {
+      throw new Error(`Auto-apply record for ${record.familyKey} has no ranked candidates`);
+    }
+
+    await this.optimizerRepo.saveFamilyState({
+      ...current,
+      currentCandidateId: nextCandidate,
+      lastAdaptationAt: record.appliedAt,
+    });
+  }
+}
+
+const riskProvider = new DefaultFamilyRiskProvider();
+const postureProvider = new DefaultFamilyPostureProvider();
+const failureCounter = new PgRecentFailureCounter();
+const decisionWriter = new PgAutoApplyDecisionWriter();
+const autoApplyStateApplier = new OptimizerStateAutoApplyApplier(getSharedOptimizerStateRepository());
+
+function getFamilyRiskProvider(): FamilyRiskProvider {
+  return riskProvider;
+}
+
+function getFamilyPostureProvider(): FamilyPostureProvider {
+  return postureProvider;
+}
+
+function getRecentFailureCounter(): RecentFailureCounter {
+  return failureCounter;
+}
+
+function getAutoApplyDecisionWriter(): AutoApplyDecisionWriter {
+  return decisionWriter;
+}
+
+function getAutoApplyStateApplier(): AutoApplyStateApplier {
+  return autoApplyStateApplier;
+}

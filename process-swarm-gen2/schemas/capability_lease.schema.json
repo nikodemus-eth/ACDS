@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/capability_lease.schema.json",
+  "title": "CapabilityLease",
+  "description": "A time-bounded lease granting specific capabilities to a node for executing a plan, with explicit scope constraints and revocation tracking.",
+  "type": "object",
+  "required": [
+    "lease_id",
+    "issued_by",
+    "node_id",
+    "execution_plan_id",
+    "granted_capabilities",
+    "denied_capabilities",
+    "scope_constraints",
+    "valid_from",
+    "expires_at",
+    "revocation_status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "lease_id": {
+      "type": "string",
+      "description": "Unique identifier for this capability lease."
+    },
+    "issued_by": {
+      "type": "string",
+      "description": "The identifier of the entity that issued this lease."
+    },
+    "node_id": {
+      "type": "string",
+      "description": "The identifier of the node to which capabilities are granted."
+    },
+    "execution_plan_id": {
+      "type": "string",
+      "description": "The identifier of the execution plan this lease authorizes."
+    },
+    "granted_capabilities": {
+      "type": "object",
+      "description": "A map of capabilities that are explicitly granted by this lease."
+    },
+    "denied_capabilities": {
+      "type": "object",
+      "description": "A map of capabilities that are explicitly denied by this lease."
+    },
+    "scope_constraints": {
+      "type": "object",
+      "required": ["max_files_modified", "allowed_paths"],
+      "additionalProperties": false,
+      "properties": {
+        "max_files_modified": {
+          "type": "integer",
+          "description": "The maximum number of files that may be modified under this lease."
+        },
+        "allowed_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths within which modifications are permitted."
+        }
+      },
+      "description": "Constraints that limit the scope of operations under this lease."
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp from which this lease is valid."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp at which this lease expires."
+    },
+    "revocation_status": {
+      "type": "string",
+      "enum": ["active", "revoked", "expired"],
+      "description": "The current revocation status of this lease."
+    },
+    "signature": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the signer that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this capability lease."
+    }
+  }
+}

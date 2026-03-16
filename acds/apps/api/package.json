@@ -1,0 +1,32 @@
+{
+  "name": "@acds/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @acds/api^... run build && tsc",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "fastify": "^5.2.1",
+    "@fastify/cors": "^10.0.2",
+    "@acds/adaptive-optimizer": "workspace:*",
+    "@acds/evaluation": "workspace:*",
+    "@acds/core-types": "workspace:*",
+    "@acds/security": "workspace:*",
+    "@acds/audit-ledger": "workspace:*",
+    "@acds/persistence-pg": "workspace:*",
+    "@acds/policy-engine": "workspace:*",
+    "@acds/provider-adapters": "workspace:*",
+    "@acds/provider-broker": "workspace:*",
+    "@acds/routing-engine": "workspace:*",
+    "@acds/execution-orchestrator": "workspace:*"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.2"
+  }
+}

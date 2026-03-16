@@ -1,0 +1,15 @@
+{
+    "baseline_id": "local_baseline_v1",
+    "expected_results": {
+        "smoke_schemas_exist": {"status": "passed", "metrics": {"count": 18}},
+        "smoke_schemas_valid_json": {"status": "passed"},
+        "smoke_adapters_importable": {"status": "passed"},
+        "smoke_adapter_count": {"status": "passed", "metrics": {"count": 15}},
+        "smoke_key_files_exist": {"status": "passed"},
+        "smoke_database_accessible": {"status": "passed"}
+    },
+    "thresholds": {
+        "adapter_count": {"expected": 15, "tolerance": 2},
+        "schema_count": {"expected": 18, "tolerance": 2}
+    }
+}

@@ -1,0 +1,46 @@
+{
+  "cadence": [
+    {"normalized": "nightly", "patterns": ["nightly", "every night", "each night"]},
+    {"normalized": "daily", "patterns": ["daily", "every day", "each day"]},
+    {"normalized": "weekly", "patterns": ["weekly", "every week", "each week"]},
+    {"normalized": "monthly", "patterns": ["monthly", "every month", "each month"]},
+    {"normalized": "hourly", "patterns": ["hourly", "every hour", "each hour"]}
+  ],
+  "time_horizon": [
+    {"normalized": "last_24_hours", "patterns": ["last 24 hours", "past day", "today"]},
+    {"normalized": "last_7_days", "patterns": ["last 7 days", "past week", "this week"]},
+    {"normalized": "last_30_days", "patterns": ["last 30 days", "past month", "this month"]},
+    {"normalized": "current_week", "patterns": ["current week"]}
+  ],
+  "artifact_formats": [
+    {"normalized": "json", "patterns": ["json"]},
+    {"normalized": "markdown", "patterns": ["markdown", "md"]},
+    {"normalized": "mp3", "patterns": ["mp3", "audio file"]},
+    {"normalized": "csv", "patterns": ["csv"]},
+    {"normalized": "pdf", "patterns": ["pdf"]}
+  ],
+  "artifact_types": [
+    {"normalized": "document", "patterns": ["document", "doc"]},
+    {"normalized": "audio", "patterns": ["audio", "narration", "voice"]},
+    {"normalized": "report", "patterns": ["report"]},
+    {"normalized": "dataset", "patterns": ["dataset", "data set"]},
+    {"normalized": "analysis", "patterns": ["analysis"]}
+  ],
+  "source_scope": [
+    {"normalized": "curated_sources", "patterns": ["curated sources", "approved sources"]},
+    {"normalized": "runtime_logs", "patterns": ["runtime logs", "system logs", "log files"]},
+    {"normalized": "web_research", "patterns": ["web research", "internet", "online"]},
+    {"normalized": "news_feeds", "patterns": ["news feeds", "rss", "news sources"]}
+  ],
+  "analysis_focus": [
+    {"normalized": "drift", "patterns": ["drift", "configuration drift"]},
+    {"normalized": "integrity", "patterns": ["integrity"]},
+    {"normalized": "regression", "patterns": ["regression"]},
+    {"normalized": "red_team", "patterns": ["red team", "adversarial"]}
+  ],
+  "execution_mode": [
+    {"normalized": "sequential", "patterns": ["sequential", "in order", "step by step"]},
+    {"normalized": "parallel", "patterns": ["parallel", "concurrent", "simultaneously"]},
+    {"normalized": "conditional", "patterns": ["conditional", "if then", "branching"]}
+  ]
+}

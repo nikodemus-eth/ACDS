@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/action_table.schema.json",
+  "title": "ActionTable",
+  "description": "The canonical structured interpretation of user intent after completion of the Intent Action Extraction and Clarification Loop. Bridges intent capture and behavior sequence compilation.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "intent_ref",
+    "actions",
+    "lifecycle_state",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "action_table",
+      "description": "Artifact class identifier."
+    },
+    "intent_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to the accepted intent artifact (UUID)."
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/action_entry"
+      },
+      "minItems": 1,
+      "description": "Ordered list of operational actions extracted from the accepted intent."
+    },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "validated",
+        "accepted",
+        "compiled"
+      ],
+      "description": "Current lifecycle state of the action table."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this action table was created."
+    },
+    "validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this action table passed validation."
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the user accepted this action table."
+    },
+    "compiled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this action table was compiled into a behavior sequence."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this artifact.",
+      "required": [
+        "algorithm",
+        "signer_role",
+        "signature_value"
+      ]
+    }
+  },
+  "$defs": {
+    "action_entry": {
+      "type": "object",
+      "required": [
+        "step",
+        "verb",
+        "object",
+        "dependencies"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Sequential action identifier (1-indexed)."
+        },
+        "verb": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Operational action verb (e.g., run, generate, send, collect)."
+        },
+        "object": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Entity acted upon (e.g., query, report, notification)."
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Target location for the action result (e.g., database.monthly_quota, email)."
+        },
+        "qualifiers": {
+          "type": "object",
+          "description": "Format, parameters, or other action modifiers.",
+          "additionalProperties": true
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "description": "Step numbers of prior actions this action depends on."
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Execution constraints or preconditions."
+        },
+        "source_text": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Trace back to the original natural language input fragment."
+        }
+      }
+    }
+  }
+}

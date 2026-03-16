@@ -1,0 +1,33 @@
+{
+  "proposal_id": "test-proposal-undeclared",
+  "source": "operator",
+  "intent": "Proposal with modifications to paths not declared in target_paths",
+  "target_paths": [
+    "workspace/declared.txt"
+  ],
+  "modifications": [
+    {
+      "path": "workspace/declared.txt",
+      "operation": "create",
+      "content": "This path is declared"
+    },
+    {
+      "path": "workspace/undeclared.txt",
+      "operation": "create",
+      "content": "This path is NOT declared in target_paths"
+    }
+  ],
+  "acceptance_tests": [
+    {
+      "test_id": "verify-files",
+      "command": "test -f workspace/declared.txt",
+      "expected_exit_code": 0
+    }
+  ],
+  "scope_boundary": {
+    "allowed_paths": [
+      "workspace"
+    ]
+  },
+  "created_at": "2026-03-10T00:00:00Z"
+}

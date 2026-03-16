@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GRITS Finding",
+  "description": "A classified finding from a GRITS integrity evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "finding_id",
+    "run_id",
+    "target_id",
+    "category",
+    "severity",
+    "confidence",
+    "reproducibility",
+    "affected_component",
+    "evidence_refs",
+    "summary",
+    "recommended_action"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": ["regression", "stability", "performance", "policy"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "reproducibility": {
+      "type": "string",
+      "enum": ["always", "intermittent", "unknown"]
+    },
+    "affected_component": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recommended_action": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "artifact_type": "behavior_proposal",
+  "version": "0.1",
+  "proposal_id": "behavior.docs-clarify-001",
+  "created_at": "2026-03-09T05:43:18.365Z",
+  "author_agent": "behavior_author.main",
+  "operation_class": "docs_edit",
+  "namespace": {
+    "workspace": "openclaw",
+    "branch": "main",
+    "run_id": "run-behavior-001",
+    "target_object": "docs/architecture.md"
+  },
+  "target": {
+    "kind": "docs",
+    "path": "docs/architecture.md"
+  },
+  "change_spec": {
+    "mode": "append_text",
+    "text": "\nClarification: only compiled plans are eligible for execution, not raw behavior proposals.\n"
+  },
+  "intent_summary": "Propose a bounded clarification update to docs/architecture.md and verify it with deterministic checks.",
+  "scope": {
+    "allowed_paths": ["docs/architecture.md"],
+    "max_files_modified": 1,
+    "allow_network": false,
+    "allow_package_install": false,
+    "allow_external_apis": false,
+    "required_tools": ["read", "apply_patch", "test"]
+  },
+  "constraints": {
+    "acceptance_tests": ["pnpm format:docs:check", "pnpm check:docs"],
+    "side_effect_flags": ["filesystem_write"],
+    "requires_human_review": false,
+    "disallowed_paths": ["src/", "extensions/"],
+    "risk_notes": ["Docs-only proposal", "No network or package installation allowed"]
+  },
+  "rationale": "The requested change is confined to a single documentation file and can be validated with deterministic documentation checks."
+}

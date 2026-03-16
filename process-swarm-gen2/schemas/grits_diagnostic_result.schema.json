@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GRITS Diagnostic Result",
+  "description": "Result from a single diagnostic test execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "test_id",
+    "suite_id",
+    "status",
+    "measured_at",
+    "metrics",
+    "evidence"
+  ],
+  "properties": {
+    "test_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "error"]
+    },
+    "measured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "error": {
+      "type": ["string", "null"],
+      "default": null
+    }
+  }
+}

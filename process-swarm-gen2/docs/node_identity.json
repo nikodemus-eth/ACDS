@@ -1,0 +1,56 @@
+{
+  "$schema": "process-swarm-gen2://node-identity/v2.0",
+  "_comment": "Template/reference for node identity configuration. Generate actual keys using runtime.identity.key_manager.generate_keypair().",
+  "node_id": "<generated-uuid>",
+  "node_name": "process-swarm-node-01",
+  "signer_roles": {
+    "validator_signer": {
+      "role": "validator_signer",
+      "key_id": "validator-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "status": "active",
+      "public_key_path": "validator_signer.pub",
+      "description": "Signs schema and proposal validation results"
+    },
+    "compiler_signer": {
+      "role": "compiler_signer",
+      "key_id": "compiler-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "status": "active",
+      "public_key_path": "compiler_signer.pub",
+      "description": "Signs compiled capability bundles"
+    },
+    "approval_signer": {
+      "role": "approval_signer",
+      "key_id": "approval-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "status": "active",
+      "public_key_path": "approval_signer.pub",
+      "description": "Signs approval decisions on proposals"
+    },
+    "node_attestation_signer": {
+      "role": "node_attestation_signer",
+      "key_id": "node-attestation-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "status": "active",
+      "public_key_path": "node_attestation_signer.pub",
+      "description": "Signs node identity attestations and peer trust assertions"
+    },
+    "lease_issuer_signer": {
+      "role": "lease_issuer_signer",
+      "key_id": "lease-issuer-signer-001",
+      "algorithm": "ed25519",
+      "fingerprint": "<sha256-first-32-hex-chars>",
+      "status": "active",
+      "public_key_path": "lease_issuer_signer.pub",
+      "description": "Signs capability leases issued by the runtime gate"
+    }
+  },
+  "keys_directory": ".keys/",
+  "created_at": "2026-03-15T00:00:00Z",
+  "version": "2.0"
+}

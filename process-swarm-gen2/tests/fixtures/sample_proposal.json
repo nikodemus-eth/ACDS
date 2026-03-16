@@ -1,0 +1,29 @@
+{
+  "proposal_id": "test-proposal-001",
+  "source": "operator",
+  "intent": "Create a test file in workspace to verify pipeline execution",
+  "target_paths": [
+    "workspace/test_output.txt"
+  ],
+  "modifications": [
+    {
+      "path": "workspace/test_output.txt",
+      "operation": "create",
+      "content": "Hello from OpenClaw sovereign runtime.\nPipeline execution verified.\n"
+    }
+  ],
+  "acceptance_tests": [
+    {
+      "test_id": "verify-file-exists",
+      "command": "test -f workspace/test_output.txt",
+      "expected_exit_code": 0
+    }
+  ],
+  "scope_boundary": {
+    "allowed_paths": [
+      "workspace"
+    ],
+    "denied_paths": []
+  },
+  "created_at": "2026-03-10T00:00:00Z"
+}

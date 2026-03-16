@@ -1,0 +1,25 @@
+{
+  "name": "adaptive-cognitive-dispatch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Governed Adaptive Cognitive Dispatch System — centralized AI provider management with policy-based routing, adaptive optimization, and full auditability",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r --parallel run dev",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "test:integration": "pnpm --filter ./tests run test",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

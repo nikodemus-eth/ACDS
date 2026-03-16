@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://process-swarm.local/schemas/execution_plan.schema.json",
+  "title": "Execution Plan",
+  "description": "Schema for a deterministic execution plan derived from a compiled job",
+  "type": "object",
+  "required": ["plan_id", "job_id", "execution_mode", "steps", "artifact_dependencies", "failure_policy"],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "description": "Unique plan identifier"
+    },
+    "job_id": {
+      "type": "string",
+      "description": "The job this plan executes"
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": ["sequential", "parallel", "conditional"]
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_id", "agent_id", "artifact_id", "depends_on"],
+        "properties": {
+          "step_id": { "type": "string" },
+          "agent_id": { "type": "string" },
+          "artifact_id": { "type": "string" },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "artifact_dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "failure_policy": {
+      "type": "object",
+      "properties": {
+        "on_validation_failure": { "type": "string" },
+        "on_execution_failure": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

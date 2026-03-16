@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/constraint_set.schema.json",
+  "title": "ConstraintSet",
+  "description": "Structured constraints extracted from accepted intent. Parameterizes archetype templates without inventing new actions.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "intent_ref",
+    "action_table_ref",
+    "archetype_ref",
+    "constraints",
+    "missing_required",
+    "ambiguous_fields",
+    "clarification_questions",
+    "extraction_method",
+    "resolution_state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "constraint_set",
+      "description": "Artifact class identifier."
+    },
+    "intent_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to the accepted intent artifact."
+    },
+    "action_table_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to the action table artifact."
+    },
+    "archetype_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to the archetype classification artifact."
+    },
+    "constraints": {
+      "$ref": "#/$defs/constraint_fields",
+      "description": "Extracted constraint values organized by family."
+    },
+    "missing_required": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Constraint families that are required by the archetype but absent from the intent."
+    },
+    "ambiguous_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Constraint families where the extracted value is too vague for governed use."
+    },
+    "clarification_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Human-readable questions to resolve missing or ambiguous constraints."
+    },
+    "extraction_method": {
+      "type": "string",
+      "enum": [
+        "rule_based",
+        "llm_assisted",
+        "hybrid"
+      ],
+      "description": "How constraints were extracted."
+    },
+    "resolution_state": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "partially_resolved",
+        "clarification_required",
+        "unsupported"
+      ],
+      "description": "Overall resolution state of the constraint set."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this artifact.",
+      "required": [
+        "algorithm",
+        "signer_role",
+        "signature_value"
+      ]
+    }
+  },
+  "$defs": {
+    "schedule_constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "frequency"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "once",
+            "recurring"
+          ],
+          "description": "Whether the schedule fires once or repeats."
+        },
+        "frequency": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Schedule frequency: daily, weekly, monthly, or a cron expression."
+        }
+      }
+    },
+    "constraint_fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schedule": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/schedule_constraint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Timing schedule for recurring or deferred execution."
+        },
+        "time_window": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Data freshness or temporal scope (e.g. 'last 30 days', 'previous quarter')."
+        },
+        "format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Output format: pdf, markdown, json, csv, html, mp3, etc."
+        },
+        "channel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Delivery channel: email, telegram, webhook, internal queue, etc."
+        },
+        "sections": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Section names (array) or section count (integer)."
+        },
+        "count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Item count constraint (e.g. top 10 items)."
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Target location for output (e.g. database.monthly_quota, finance)."
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Execution preconditions or fail-closed rules."
+        },
+        "naming": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Output file naming pattern (e.g. monthly_quota_report_YYYY_MM.pdf)."
+        },
+        "retention_window": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How long output artifacts should be retained."
+        }
+      }
+    }
+  }
+}

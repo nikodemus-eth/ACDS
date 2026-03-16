@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/exchange_receipt.schema.json",
+  "title": "ExchangeReceipt",
+  "description": "A receipt acknowledging the reception and validation of an artifact exchanged between nodes in the OpenClaw runtime.",
+  "type": "object",
+  "required": [
+    "receipt_id",
+    "artifact_id",
+    "origin_node",
+    "received_at",
+    "validation_status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "receipt_id": {
+      "type": "string",
+      "description": "Unique identifier for this exchange receipt."
+    },
+    "artifact_id": {
+      "type": "string",
+      "description": "The identifier of the artifact that was received."
+    },
+    "origin_node": {
+      "type": "string",
+      "description": "The identifier of the node that sent the artifact."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the artifact was received."
+    },
+    "validation_status": {
+      "type": "string",
+      "enum": ["accepted", "rejected", "escalated"],
+      "description": "The outcome of validating the received artifact."
+    },
+    "validator_signer_fingerprint": {
+      "type": "string",
+      "description": "Optional fingerprint of the key used by the validator."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional human-readable notes about this exchange."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this exchange receipt."
+    }
+  }
+}

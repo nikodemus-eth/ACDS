@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/behavior_proposal.schema.json",
+  "title": "BehaviorProposal",
+  "description": "A proposal describing an intended behavioral change to the OpenClaw sovereign runtime, including modifications, acceptance tests, and scope boundaries.",
+  "type": "object",
+  "required": [
+    "proposal_id",
+    "source",
+    "intent",
+    "target_paths",
+    "modifications",
+    "acceptance_tests",
+    "scope_boundary",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "description": "Unique identifier for this behavior proposal."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["m2", "operator", "internal"],
+      "description": "The origin of this proposal: m2 (cognition layer), operator (human), or internal (system-generated)."
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "A human-readable statement of what this proposal intends to accomplish."
+    },
+    "target_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Filesystem paths that this proposal targets for modification."
+    },
+    "modifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "operation", "content"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The filesystem path to be modified."
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["create", "modify", "delete", "append"],
+            "description": "The type of filesystem operation to perform."
+          },
+          "content": {
+            "type": "string",
+            "description": "The content to be written, appended, or used in the modification."
+          }
+        }
+      },
+      "description": "The set of modifications this proposal will apply."
+    },
+    "acceptance_tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["test_id", "command", "expected_exit_code"],
+        "additionalProperties": false,
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "description": "Unique identifier for this acceptance test."
+          },
+          "command": {
+            "type": "string",
+            "description": "The shell command to execute for this test."
+          },
+          "expected_exit_code": {
+            "type": "integer",
+            "description": "The exit code that indicates test success."
+          }
+        }
+      },
+      "minItems": 1,
+      "description": "Tests that must pass for this proposal to be considered successful."
+    },
+    "scope_boundary": {
+      "type": "object",
+      "required": ["allowed_paths"],
+      "additionalProperties": false,
+      "properties": {
+        "allowed_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths that this proposal is permitted to touch."
+        },
+        "denied_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths that this proposal is explicitly forbidden from touching."
+        }
+      },
+      "description": "Defines the boundary within which this proposal may operate."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this proposal was created."
+    },
+    "declared_side_effects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional list of known side effects this proposal may cause."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this proposal."
+    }
+  }
+}

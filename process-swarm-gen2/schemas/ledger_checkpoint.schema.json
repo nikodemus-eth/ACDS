@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/ledger_checkpoint.schema.json",
+  "title": "LedgerCheckpoint",
+  "description": "A checkpoint snapshot of the append-only ledger, capturing record count, integrity hash, and trust chain version for auditability.",
+  "type": "object",
+  "required": [
+    "checkpoint_id",
+    "record_count",
+    "last_record_id",
+    "integrity_hash",
+    "trust_chain_version",
+    "node_id",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "checkpoint_id": {
+      "type": "string",
+      "description": "Unique identifier for this ledger checkpoint."
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The total number of records in the ledger at this checkpoint."
+    },
+    "last_record_id": {
+      "type": "string",
+      "description": "The identifier of the most recent record included in this checkpoint."
+    },
+    "integrity_hash": {
+      "type": "string",
+      "description": "A cryptographic hash verifying the integrity of all records up to this checkpoint."
+    },
+    "trust_chain_version": {
+      "type": "integer",
+      "description": "The trust chain version in effect at the time of this checkpoint."
+    },
+    "node_id": {
+      "type": "string",
+      "description": "The identifier of the node that created this checkpoint."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this checkpoint was created."
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The cryptographic algorithm used for signing."
+        },
+        "signer_role": {
+          "type": "string",
+          "description": "The role of the entity that produced this signature."
+        },
+        "signature_value": {
+          "type": "string",
+          "description": "The base64-encoded signature value."
+        }
+      },
+      "description": "Optional cryptographic signature over this ledger checkpoint."
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclaw.dev/schemas/key_registry.schema.json",
+  "title": "KeyRegistry",
+  "description": "A versioned registry of cryptographic keys for a node, tracking active, revoked, and superseded keys.",
+  "type": "object",
+  "required": [
+    "registry_version",
+    "node_id",
+    "active_keys",
+    "revoked_keys",
+    "superseded_keys"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "registry_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The version number of this key registry, incremented on each update."
+    },
+    "node_id": {
+      "type": "string",
+      "description": "The identifier of the node this key registry belongs to."
+    },
+    "active_keys": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/key_entry"
+      },
+      "description": "Keys currently in active use by this node."
+    },
+    "revoked_keys": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/key_entry"
+      },
+      "description": "Keys that have been explicitly revoked."
+    },
+    "superseded_keys": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/key_entry"
+      },
+      "description": "Keys that have been replaced by newer keys."
+    }
+  },
+  "$defs": {
+    "key_entry": {
+      "type": "object",
+      "required": ["role", "key_id", "algorithm", "fingerprint", "status", "created_at"],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "The functional role this key serves (e.g., signing, attestation)."
+        },
+        "key_id": {
+          "type": "string",
+          "description": "Unique identifier for this key."
+        },
+        "algorithm": {
+          "type": "string",
+          "const": "ed25519",
+          "description": "The cryptographic algorithm for this key. Must be ed25519."
+        },
+        "fingerprint": {
+          "type": "string",
+          "description": "The cryptographic fingerprint of this key."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "revoked", "superseded"],
+          "description": "The current status of this key."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of when this key was created."
+        }
+      }
+    }
+  }
+}

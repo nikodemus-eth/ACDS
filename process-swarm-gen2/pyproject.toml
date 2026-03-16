@@ -1,0 +1,29 @@
+[project]
+name = "process-swarm-gen2"
+version = "0.1.0"
+description = "Process Swarm — Governed automation platform for scheduled, auditable execution"
+requires-python = ">=3.9"
+dependencies = [
+    "pynacl>=1.6.0",
+    "jsonschema>=4.25.0",
+    "pydantic>=2.0",
+    "watchdog>=4.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["runtime*", "swarm*", "process_swarm*", "grits*", "proof_ui*", "security*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "redteam: ARGUS-9 red-team security boundary tests",
+]

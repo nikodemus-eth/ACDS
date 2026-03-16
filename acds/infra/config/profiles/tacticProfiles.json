@@ -1,0 +1,26 @@
+[
+  {
+    "name": "single_pass_fast",
+    "executionMethod": "single_pass",
+    "multiStage": false,
+    "requiresStructuredOutput": false
+  },
+  {
+    "name": "draft_then_critique",
+    "executionMethod": "draft_critique",
+    "multiStage": true,
+    "requiresStructuredOutput": false
+  },
+  {
+    "name": "extract_then_reason",
+    "executionMethod": "extract_reason",
+    "multiStage": true,
+    "requiresStructuredOutput": true
+  },
+  {
+    "name": "reason_then_structure",
+    "executionMethod": "reason_structure",
+    "multiStage": true,
+    "requiresStructuredOutput": true
+  }
+]

@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://process-swarm.local/schemas/governance_warning_record.schema.json",
+  "title": "GovernanceWarningRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "warning_id",
+    "warning_family",
+    "severity",
+    "trigger_stage",
+    "message",
+    "boundary_at_risk",
+    "affected_artifact_refs",
+    "operator_decision",
+    "actor_id",
+    "created_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "governance_warning_record"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+(\\.[0-9]+)*$"
+    },
+    "warning_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "warning_family": {
+      "type": "string",
+      "enum": [
+        "authority_boundary",
+        "semantic_ambiguity",
+        "scope_expansion",
+        "reduced_assurance_governance",
+        "secondary_truth",
+        "replay_determinism",
+        "extension_risk",
+        "policy_misconfiguration",
+        "other"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "notice",
+        "warn",
+        "block"
+      ]
+    },
+    "trigger_stage": {
+      "type": "string",
+      "enum": [
+        "intent_review",
+        "acceptance_review",
+        "bridge_compilation",
+        "governance_transition",
+        "lease_review",
+        "scheduler_configuration",
+        "delivery_resolution",
+        "extension_review",
+        "override_submission",
+        "runtime_gate",
+        "other"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "details": {
+      "type": "string"
+    },
+    "boundary_at_risk": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assurance_posture_before": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "reduced",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "assurance_posture_after": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "reduced",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "impact_summary": {
+      "type": "string"
+    },
+    "safer_alternative": {
+      "type": "string"
+    },
+    "proceeding_means": {
+      "type": "string"
+    },
+    "affected_artifact_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "affected_run_ref": {
+      "type": "string"
+    },
+    "affected_swarm_ref": {
+      "type": "string"
+    },
+    "policy_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "operator_decision": {
+      "type": "string",
+      "enum": [
+        "acknowledged_and_proceeded",
+        "cancelled",
+        "blocked_by_system",
+        "clarification_requested",
+        "deferred",
+        "other"
+      ]
+    },
+    "override_required": {
+      "type": "boolean"
+    },
+    "override_reason_category": {
+      "type": "string",
+      "enum": [
+        "operational_necessity",
+        "time_sensitive_recovery",
+        "limited_resource_staffing",
+        "external_dependency_constraint",
+        "development_or_experimental_exception",
+        "other"
+      ]
+    },
+    "override_reason": {
+      "type": "string"
+    },
+    "decision_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actor_role": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "acknowledged_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "record_signature_ref": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "severity": {
+            "const": "warn"
+          }
+        },
+        "required": [
+          "severity"
+        ]
+      },
+      "then": {
+        "required": [
+          "assurance_posture_before",
+          "assurance_posture_after",
+          "impact_summary",
+          "proceeding_means",
+          "decision_fingerprint"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "severity": {
+            "const": "block"
+          }
+        },
+        "required": [
+          "severity"
+        ]
+      },
+      "then": {
+        "required": [
+          "assurance_posture_after",
+          "impact_summary",
+          "decision_fingerprint"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "override_required": {
+            "const": true
+          }
+        },
+        "required": [
+          "override_required"
+        ]
+      },
+      "then": {
+        "required": [
+          "override_reason_category",
+          "override_reason"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operator_decision": {
+            "const": "acknowledged_and_proceeded"
+          }
+        },
+        "required": [
+          "operator_decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "acknowledged_at"
+        ]
+      }
+    }
+  ]
+}
