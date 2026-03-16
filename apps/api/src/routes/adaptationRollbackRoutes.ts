@@ -18,9 +18,8 @@ export async function adaptationRollbackRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder - replace with real DI) ──────────
   const controller = new AdaptationRollbackController(
-    app.diContainer!.adaptationRollbackService as any,
+    app.diContainer!.adaptationRollbackService,
   );
 
   // Apply auth to all routes in this plugin scope

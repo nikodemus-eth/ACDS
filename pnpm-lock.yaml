@@ -115,6 +115,9 @@ importers:
       '@acds/grits':
         specifier: workspace:*
         version: link:../../packages/grits
+      '@acds/persistence-pg':
+        specifier: workspace:*
+        version: link:../../packages/persistence-pg
       '@acds/policy-engine':
         specifier: workspace:*
         version: link:../../packages/policy-engine
@@ -139,6 +142,9 @@ importers:
       '@acds/execution-orchestrator':
         specifier: workspace:*
         version: link:../../packages/execution-orchestrator
+      '@acds/persistence-pg':
+        specifier: workspace:*
+        version: link:../../packages/persistence-pg
       '@acds/provider-broker':
         specifier: workspace:*
         version: link:../../packages/provider-broker
@@ -207,9 +213,15 @@ importers:
       '@acds/adaptive-optimizer':
         specifier: workspace:*
         version: link:../adaptive-optimizer
+      '@acds/audit-ledger':
+        specifier: workspace:*
+        version: link:../audit-ledger
       '@acds/core-types':
         specifier: workspace:*
         version: link:../core-types
+      '@acds/evaluation':
+        specifier: workspace:*
+        version: link:../evaluation
       '@acds/execution-orchestrator':
         specifier: workspace:*
         version: link:../execution-orchestrator

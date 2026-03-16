@@ -18,6 +18,7 @@
     "@acds/policy-engine": "workspace:*",
     "@acds/provider-broker": "workspace:*",
     "@acds/audit-ledger": "workspace:*",
-    "@acds/execution-orchestrator": "workspace:*"
+    "@acds/execution-orchestrator": "workspace:*",
+    "@acds/persistence-pg": "workspace:*"
   }
 }

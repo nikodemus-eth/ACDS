@@ -1,16 +1,21 @@
 import type { ExecutionRecord } from '@acds/core-types';
-import {
-  ExecutionRecordService,
-  type ExecutionRecordFilters,
-  type ExecutionRecordRepository,
-} from '@acds/execution-orchestrator';
+import { ExecutionRecordService } from '@acds/execution-orchestrator';
+import { createPool, PgExecutionRecordRepository } from '@acds/persistence-pg';
 
 const DEFAULT_STALE_THRESHOLD_MS = 600_000; // 10 minutes
 
-/**
- * Finds executions stuck in 'running' for longer than the configured threshold
- * and marks them as failed.
- */
+function createWorkerPool() {
+  const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
+  return createPool({
+    host: databaseUrl.hostname,
+    port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
+    database: databaseUrl.pathname.replace(/^\//, ''),
+    user: decodeURIComponent(databaseUrl.username),
+    password: decodeURIComponent(databaseUrl.password),
+    ssl: databaseUrl.searchParams.get('sslmode') === 'require',
+  });
+}
+
 export async function cleanupStaleExecutions(): Promise<void> {
   const parsed = parseInt(
     process.env.STALE_EXECUTION_THRESHOLD_MS ??
@@ -19,8 +24,8 @@ export async function cleanupStaleExecutions(): Promise<void> {
   );
   const thresholdMs = Number.isNaN(parsed) ? DEFAULT_STALE_THRESHOLD_MS : parsed;
 
-  // TODO: Replace with DI-resolved instances once container is wired
-  const executionRepository = getExecutionRecordRepository();
+  const pool = createWorkerPool();
+  const executionRepository = new PgExecutionRecordRepository(pool);
   const executionService = new ExecutionRecordService(executionRepository);
 
   const recentExecutions = await executionService.getRecent(500);
@@ -63,67 +68,4 @@ export async function cleanupStaleExecutions(): Promise<void> {
   console.log(
     `[stale-cleanup] Cleanup complete. Processed ${staleExecutions.length} stale execution(s).`
   );
-}
-
-/**
- * In-memory ExecutionRecordRepository.
- * Stores execution records in memory for the worker process lifetime.
- */
-class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
-  private readonly records = new Map<string, ExecutionRecord>();
-  private nextId = 1;
-
-  async create(record: Omit<ExecutionRecord, 'id'>): Promise<ExecutionRecord> {
-    const id = `exec-${String(this.nextId++).padStart(6, '0')}`;
-    const full: ExecutionRecord = { ...record, id } as ExecutionRecord;
-    this.records.set(id, full);
-    return full;
-  }
-
-  async findById(id: string): Promise<ExecutionRecord | null> {
-    return this.records.get(id) ?? null;
-  }
-
-  async findByFamily(familyKey: string, limit = 100): Promise<ExecutionRecord[]> {
-    return [...this.records.values()]
-      .filter((r) => {
-        const fam = r.executionFamily;
-        const key = `${fam.application}:${fam.process}:${fam.step}`;
-        return key === familyKey;
-      })
-      .slice(-limit);
-  }
-
-  async findRecent(limit = 100): Promise<ExecutionRecord[]> {
-    return [...this.records.values()].slice(-limit);
-  }
-
-  async findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]> {
-    return [...this.records.values()]
-      .filter((record) => (filters.status ? record.status === filters.status : true))
-      .filter((record) =>
-        filters.application ? record.executionFamily.application === filters.application : true,
-      )
-      .filter((record) =>
-        filters.from ? record.createdAt >= new Date(filters.from) : true,
-      )
-      .filter((record) =>
-        filters.to ? record.createdAt <= new Date(filters.to) : true,
-      )
-      .slice(-(filters.limit ?? 100));
-  }
-
-  async update(id: string, updates: Partial<ExecutionRecord>): Promise<ExecutionRecord> {
-    const existing = this.records.get(id);
-    if (!existing) throw new Error(`Execution record ${id} not found`);
-    const updated = { ...existing, ...updates };
-    this.records.set(id, updated);
-    return updated;
-  }
-}
-
-const executionRecordRepo = new InMemoryExecutionRecordRepository();
-
-function getExecutionRecordRepository(): ExecutionRecordRepository {
-  return executionRecordRepo;
 }

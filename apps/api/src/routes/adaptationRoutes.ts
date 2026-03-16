@@ -21,12 +21,11 @@ export async function adaptationRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder - replace with real DI) ──────────
   const controller = new AdaptationController(
-    app.diContainer!.familyPerformanceReader as any,
-    app.diContainer!.candidateRankingReader as any,
-    app.diContainer!.adaptationEventReader as any,
-    app.diContainer!.adaptationRecommendationReader as any,
+    app.diContainer!.familyPerformanceReader,
+    app.diContainer!.candidateRankingReader,
+    app.diContainer!.adaptationEventReader,
+    app.diContainer!.adaptationRecommendationReader,
   );
 
   // Apply auth to all routes in this plugin scope

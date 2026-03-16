@@ -166,28 +166,55 @@ class DefaultFamilyPostureProvider implements FamilyPostureProvider {
   }
 }
 
-/**
- * Default failure counter — returns 0 recent failures.
- * In a database-backed setup, this would count recent failed executions.
- */
-class DefaultRecentFailureCounter implements RecentFailureCounter {
-  async countRecentFailures(_familyKey: string): Promise<number> {
-    return 0;
+class PgRecentFailureCounter implements RecentFailureCounter {
+  async countRecentFailures(familyKey: string): Promise<number> {
+    const { createPool } = await import('@acds/persistence-pg');
+    const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
+    const pool = createPool({
+      host: databaseUrl.hostname,
+      port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
+      database: databaseUrl.pathname.replace(/^\//, ''),
+      user: decodeURIComponent(databaseUrl.username),
+      password: decodeURIComponent(databaseUrl.password),
+      ssl: databaseUrl.searchParams.get('sslmode') === 'require',
+    });
+    const result = await pool.query(
+      `SELECT COUNT(*) AS count FROM execution_records
+       WHERE status = 'failed'
+         AND routing_request->>'application' = $1
+         AND created_at > NOW() - INTERVAL '1 hour'`,
+      [familyKey.split(':')[0]],
+    );
+    return parseInt(result.rows[0]?.count ?? '0', 10);
   }
 }
 
-/**
- * In-memory auto-apply decision writer.
- */
-class InMemoryAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
-  private readonly decisions: AutoApplyDecisionRecord[] = [];
-
+class PgAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
   async save(record: AutoApplyDecisionRecord): Promise<void> {
-    this.decisions.push(record);
-  }
-
-  getAll(): AutoApplyDecisionRecord[] {
-    return [...this.decisions];
+    const { createPool } = await import('@acds/persistence-pg');
+    const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
+    const pool = createPool({
+      host: databaseUrl.hostname,
+      port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
+      database: databaseUrl.pathname.replace(/^\//, ''),
+      user: decodeURIComponent(databaseUrl.username),
+      password: decodeURIComponent(databaseUrl.password),
+      ssl: databaseUrl.searchParams.get('sslmode') === 'require',
+    });
+    await pool.query(
+      `INSERT INTO auto_apply_decision_records (id, family_key, previous_ranking, new_ranking, reason, mode, risk_basis, applied_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        record.id,
+        record.familyKey,
+        JSON.stringify(record.previousRanking),
+        JSON.stringify(record.newRanking),
+        record.reason,
+        record.mode,
+        record.riskBasis,
+        record.appliedAt,
+      ],
+    );
   }
 }
 
@@ -215,8 +242,8 @@ class OptimizerStateAutoApplyApplier implements AutoApplyStateApplier {
 
 const riskProvider = new DefaultFamilyRiskProvider();
 const postureProvider = new DefaultFamilyPostureProvider();
-const failureCounter = new DefaultRecentFailureCounter();
-const decisionWriter = new InMemoryAutoApplyDecisionWriter();
+const failureCounter = new PgRecentFailureCounter();
+const decisionWriter = new PgAutoApplyDecisionWriter();
 const autoApplyStateApplier = new OptimizerStateAutoApplyApplier(getSharedOptimizerStateRepository());
 
 function getFamilyRiskProvider(): FamilyRiskProvider {

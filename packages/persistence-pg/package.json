@@ -14,7 +14,9 @@
     "@acds/provider-broker": "workspace:*",
     "@acds/execution-orchestrator": "workspace:*",
     "@acds/adaptive-optimizer": "workspace:*",
-    "@acds/policy-engine": "workspace:*"
+    "@acds/policy-engine": "workspace:*",
+    "@acds/audit-ledger": "workspace:*",
+    "@acds/evaluation": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.11.0",

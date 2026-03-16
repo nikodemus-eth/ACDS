@@ -18,10 +18,10 @@ export async function providersRoutes(
   _opts: FastifyPluginOptions,
 ): Promise<void> {
   const controller = new ProvidersController(
-    app.diContainer!.registryService as any,
+    app.diContainer!.registryService,
     app.diContainer!.connectionTester as any,
-    app.diContainer!.secretRotationService as any,
-    app.diContainer!.providerHealthService as any,
+    app.diContainer!.secretRotationService,
+    app.diContainer!.providerHealthService,
   );
 
   // Apply auth to all routes in this plugin scope

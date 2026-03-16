@@ -2,22 +2,26 @@ import type { Provider } from '@acds/core-types';
 import {
   ProviderHealthService,
   ProviderConnectionTester,
-  type ProviderRepository,
-  type ProviderHealthRepository,
   AdapterResolver,
 } from '@acds/provider-broker';
+import { createPool, PgProviderRepository, PgProviderHealthRepository } from '@acds/persistence-pg';
 
-/**
- * Calls ProviderHealthService to check all enabled providers.
- *
- * In a full implementation, the repository and adapter instances would be
- * injected via a DI container. For the MVP, they are constructed inline
- * using environment-driven configuration.
- */
+function createWorkerPool() {
+  const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
+  return createPool({
+    host: databaseUrl.hostname,
+    port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
+    database: databaseUrl.pathname.replace(/^\//, ''),
+    user: decodeURIComponent(databaseUrl.username),
+    password: decodeURIComponent(databaseUrl.password),
+    ssl: databaseUrl.searchParams.get('sslmode') === 'require',
+  });
+}
+
 export async function runProviderHealthChecks(): Promise<void> {
-  // TODO: Replace with DI-resolved instances once container is wired
-  const providerRepository = getProviderRepository();
-  const healthRepository = getHealthRepository();
+  const pool = createWorkerPool();
+  const providerRepository = new PgProviderRepository(pool);
+  const healthRepository = new PgProviderHealthRepository(pool);
   const adapterResolver = new AdapterResolver();
   const connectionTester = new ProviderConnectionTester(adapterResolver);
   const healthService = new ProviderHealthService(healthRepository);
@@ -55,26 +59,4 @@ export async function runProviderHealthChecks(): Promise<void> {
       );
     }
   }
-}
-
-/**
- * Placeholder factory for ProviderRepository.
- * Will be replaced by DI container resolution.
- */
-function getProviderRepository(): ProviderRepository {
-  // TODO: Wire to actual database-backed repository
-  throw new Error(
-    'ProviderRepository not yet wired. Configure DI container or set DATABASE_URL.'
-  );
-}
-
-/**
- * Placeholder factory for ProviderHealthRepository.
- * Will be replaced by DI container resolution.
- */
-function getHealthRepository(): ProviderHealthRepository {
-  // TODO: Wire to actual database-backed repository
-  throw new Error(
-    'ProviderHealthRepository not yet wired. Configure DI container or set DATABASE_URL.'
-  );
 }

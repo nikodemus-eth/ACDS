@@ -6,7 +6,7 @@ export async function profilesRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  const controller = new ProfilesController(app.diContainer!.profileCatalogService as any);
+  const controller = new ProfilesController(app.diContainer!.profileCatalogService);
 
   app.addHook('preHandler', authPreHandler);
 

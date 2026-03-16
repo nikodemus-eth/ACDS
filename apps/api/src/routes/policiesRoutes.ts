@@ -6,7 +6,7 @@ export async function policiesRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  const controller = new PoliciesController(app.diContainer!.policyRepository as any);
+  const controller = new PoliciesController(app.diContainer!.policyRepository);
 
   app.addHook('preHandler', authPreHandler);
 

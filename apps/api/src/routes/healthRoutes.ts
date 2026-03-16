@@ -12,9 +12,8 @@ export async function healthRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder – replace with real DI) ──────────
   const controller = new HealthController(
-    app.diContainer!.providerHealthService as any,
+    app.diContainer!.providerHealthService,
   );
 
   // ── Routes ──────────────────────────────────────────────────────────

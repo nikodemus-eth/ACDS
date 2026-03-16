@@ -611,3 +611,51 @@ Added Apple Intelligence as a fifth provider vendor in ACDS, backed by a Swift b
 
 **7. Documentation**
 - Created `docs/integrations/apple-intelligence.md` covering architecture, security model, GRITS invariants, and model profiles
+
+## 2026-03-16 — Apple Intelligence Bridge UI Dashboard
+
+### Admin Web Integration
+- Created dedicated Apple Intelligence section in admin web UI under `features/apple-intelligence/`
+- Three specialized panels: BridgeHealthPanel (bridge status and connectivity), CapabilitiesPanel (model capabilities display), TestExecutionPanel (live inference testing)
+- Direct bridge communication via `localhost:11435`, bypassing the mock API layer for real-time bridge interaction
+- Added sidebar navigation entry and client-side route at `/apple-intelligence`
+- Mock API handlers added for development without the bridge running
+
+### Foundation Models Integration (Swift Bridge)
+- Rewrote `FoundationModelsWrapper.swift` to use real Foundation Models API (`LanguageModelSession`)
+- Solved async-to-sync bridging with `DispatchSemaphore` + `Task` + `ResultBox` pattern for NIO compatibility
+- Added CORS support to NIO server for cross-origin UI requests from the admin dashboard
+- Verified real Apple Intelligence inference working: classification task returned "Positive" with 615ms latency
+
+## 2026-03-16 — Stub Elimination Campaign
+
+Systematic replacement of in-memory stubs and empty placeholder implementations with Postgres-backed repositories across the API, worker, and grits-worker applications.
+
+### DI Container Typing
+- Properly typed `DiContainer` interface in `fastify.d.ts`, eliminating ~30 `as any` casts across 10 route files
+
+### API and Worker Repository Replacements
+- Replaced `EmptyAuditEventReader`, `EmptyFamilyPerformanceReader`, `EmptyRecommendationReader` in the DI container with Pg-backed repositories
+- Created `PgAuditEventRepository`, `PgFamilyPerformanceRepository`, `PgAdaptationEventRepository`, `PgAdaptationRecommendationRepository`
+- Replaced `InMemoryOptimizerStateRepository` singleton with `PgOptimizerStateRepository` in both worker and grits-worker
+- Wired `runProviderHealthChecks` and `cleanupStaleExecutions` to use Pg repositories via `DATABASE_URL`
+- Replaced `InMemoryAutoApplyDecisionWriter` with `PgAutoApplyDecisionWriter`
+- Replaced `InMemoryRecentFailureCounter` with `PgRecentFailureCounter`
+
+### GRITS Worker Repository Replacements
+- Replaced all grits-worker shared InMemory repositories (optimizer, approval, ledger, provider, policy) with Pg versions
+- Added `@acds/persistence-pg`, `@acds/audit-ledger`, `@acds/evaluation` as dependencies where needed
+
+### Key Architectural Decisions
+- Worker pipeline handlers (scoring, aggregation, plateau, recommendations) retain InMemory repos for pipeline-internal state — data flows within a single worker invocation making persistence unnecessary
+- Only persistent state (optimizer state, decisions, execution records) was migrated to Pg
+- `connectionTester` retains one `as any` cast because `EnvAwareConnectionTester` wrapper doesn't structurally match the concrete `ProviderConnectionTester` class (nominal typing of private fields)
+- GRITS worker read repositories (`InMemoryExecutionRecordReadRepository`, etc.) keep dual exports: InMemory class for test use, Pg class for production — tests must not depend on database connectivity
+
+### Type Compatibility Fixes
+- Aligned `PgPolicyRepository` return types (`saveGlobalPolicy` → `Promise<GlobalPolicy>`, deletes → `Promise<boolean>`) to match the canonical `PolicyRepository` interface from `@acds/policy-engine`
+- Added `getApplicationPolicy` and `getProcessPolicy` alias methods to `PgPolicyRepository` for compatibility with the canonical interface's method names
+
+### Test Suite Verification
+- All 568 tests pass across 54 test files (unit, integration, chaos, red-team, scenario tests)
+- Zero regressions from the stub elimination campaign

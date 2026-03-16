@@ -21,7 +21,7 @@ export async function dispatchRoutes(
   _opts: FastifyPluginOptions,
 ): Promise<void> {
   const controller = new DispatchController(
-    app.diContainer!.dispatchRunService as any,
+    app.diContainer!.dispatchRunService,
   );
 
   // Apply auth to all routes in this plugin scope

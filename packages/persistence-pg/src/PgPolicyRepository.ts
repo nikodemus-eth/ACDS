@@ -10,25 +10,23 @@ import type { ProcessPolicy } from '@acds/policy-engine';
 export interface PolicyRepository {
   // --- GlobalPolicy ---
   getGlobalPolicy(): Promise<GlobalPolicy | null>;
-  saveGlobalPolicy(policy: GlobalPolicy): Promise<void>;
+  saveGlobalPolicy(policy: GlobalPolicy): Promise<GlobalPolicy>;
 
   // --- ApplicationPolicy ---
+  getApplicationPolicy(application: string): Promise<ApplicationPolicy | null>;
   findApplicationPolicy(application: string): Promise<ApplicationPolicy | null>;
   findApplicationPolicyById(id: string): Promise<ApplicationPolicy | null>;
   listApplicationPolicies(): Promise<ApplicationPolicy[]>;
-  saveApplicationPolicy(policy: ApplicationPolicy): Promise<void>;
-  deleteApplicationPolicy(id: string): Promise<void>;
+  saveApplicationPolicy(policy: ApplicationPolicy): Promise<ApplicationPolicy>;
+  deleteApplicationPolicy(id: string): Promise<boolean>;
 
   // --- ProcessPolicy ---
-  findProcessPolicy(
-    application: string,
-    process: string,
-    step?: string,
-  ): Promise<ProcessPolicy | null>;
+  getProcessPolicy(application: string, process: string, step: string | null): Promise<ProcessPolicy | null>;
+  findProcessPolicy(application: string, process: string, step?: string): Promise<ProcessPolicy | null>;
   findProcessPolicyById(id: string): Promise<ProcessPolicy | null>;
   listProcessPolicies(application?: string): Promise<ProcessPolicy[]>;
-  saveProcessPolicy(policy: ProcessPolicy): Promise<void>;
-  deleteProcessPolicy(id: string): Promise<void>;
+  saveProcessPolicy(policy: ProcessPolicy): Promise<ProcessPolicy>;
+  deleteProcessPolicy(id: string): Promise<boolean>;
 }
 
 export class PgPolicyRepository implements PolicyRepository {
@@ -43,7 +41,7 @@ export class PgPolicyRepository implements PolicyRepository {
     return result.rows.length > 0 ? this.mapGlobalRow(result.rows[0]) : null;
   }
 
-  async saveGlobalPolicy(policy: GlobalPolicy): Promise<void> {
+  async saveGlobalPolicy(policy: GlobalPolicy): Promise<GlobalPolicy> {
     await this.pool.query(
       `INSERT INTO global_policies (
          id, allowed_vendors, blocked_vendors, default_privacy,
@@ -80,9 +78,15 @@ export class PgPolicyRepository implements PolicyRepository {
         policy.updatedAt,
       ],
     );
+    return policy;
   }
 
   // ─── ApplicationPolicy ────────────────────────────────────────────────
+
+  /** Alias for findApplicationPolicy — satisfies the policy-engine PolicyRepository interface. */
+  getApplicationPolicy(application: string): Promise<ApplicationPolicy | null> {
+    return this.findApplicationPolicy(application);
+  }
 
   async findApplicationPolicy(application: string): Promise<ApplicationPolicy | null> {
     const result = await this.pool.query(
@@ -107,7 +111,7 @@ export class PgPolicyRepository implements PolicyRepository {
     return result.rows.map(this.mapAppRow);
   }
 
-  async saveApplicationPolicy(policy: ApplicationPolicy): Promise<void> {
+  async saveApplicationPolicy(policy: ApplicationPolicy): Promise<ApplicationPolicy> {
     await this.pool.query(
       `INSERT INTO application_policies (
          id, application, allowed_vendors, blocked_vendors,
@@ -146,13 +150,24 @@ export class PgPolicyRepository implements PolicyRepository {
         policy.updatedAt,
       ],
     );
+    return policy;
   }
 
-  async deleteApplicationPolicy(id: string): Promise<void> {
-    await this.pool.query('DELETE FROM application_policies WHERE id = $1', [id]);
+  async deleteApplicationPolicy(id: string): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM application_policies WHERE id = $1', [id]);
+    return (result.rowCount ?? 0) > 0;
   }
 
   // ─── ProcessPolicy ────────────────────────────────────────────────────
+
+  /** Alias for findProcessPolicy — satisfies the policy-engine PolicyRepository interface. */
+  getProcessPolicy(
+    application: string,
+    process: string,
+    step: string | null,
+  ): Promise<ProcessPolicy | null> {
+    return this.findProcessPolicy(application, process, step ?? undefined);
+  }
 
   async findProcessPolicy(
     application: string,
@@ -194,7 +209,7 @@ export class PgPolicyRepository implements PolicyRepository {
     return result.rows.map(this.mapProcessRow);
   }
 
-  async saveProcessPolicy(policy: ProcessPolicy): Promise<void> {
+  async saveProcessPolicy(policy: ProcessPolicy): Promise<ProcessPolicy> {
     await this.pool.query(
       `INSERT INTO process_policies (
          id, application, process, step,
@@ -236,10 +251,12 @@ export class PgPolicyRepository implements PolicyRepository {
         policy.updatedAt,
       ],
     );
+    return policy;
   }
 
-  async deleteProcessPolicy(id: string): Promise<void> {
-    await this.pool.query('DELETE FROM process_policies WHERE id = $1', [id]);
+  async deleteProcessPolicy(id: string): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM process_policies WHERE id = $1', [id]);
+    return (result.rowCount ?? 0) > 0;
   }
 
   // ─── Row Mappers ──────────────────────────────────────────────────────

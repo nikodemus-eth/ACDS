@@ -16,13 +16,11 @@ import {
 import { OpenAIAdapter, OllamaAdapter, LMStudioAdapter, GeminiAdapter, AppleIntelligenceAdapter, type AdapterRequest, type AdapterResponse } from '@acds/provider-adapters';
 import { DispatchResolver, type DispatchResult } from '@acds/routing-engine';
 import { DispatchRunService, ExecutionRecordService, ExecutionStatusTracker } from '@acds/execution-orchestrator';
-import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository } from '@acds/persistence-pg';
+import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository, PgAuditEventRepository, PgFamilyPerformanceRepository, PgAdaptationEventRepository, PgAdaptationRecommendationRepository } from '@acds/persistence-pg';
 import { PolicyMergeResolver, normalizeInstanceContext, computeInstanceOverrides, type EffectivePolicy } from '@acds/policy-engine';
 import { AdaptationRollbackService, type AdaptationApprovalRepository, type ApprovalAuditEvent, type RollbackAuditEvent, type AdaptationRollbackRecord, type AdaptationEvent, type AdaptationEventFilters } from '@acds/adaptive-optimizer';
-import type { FamilyPerformanceSummary } from '@acds/evaluation';
-import type { CandidatePerformanceState, AdaptationRecommendation } from '@acds/adaptive-optimizer';
+import type { CandidatePerformanceState } from '@acds/adaptive-optimizer';
 import type { DispatchResolverDeps } from '@acds/routing-engine';
-import type { AuditEvent } from '@acds/audit-ledger';
 import type { AppConfig } from '../config/index.js';
 import type { FastifyInstance } from 'fastify';
 import { ProfileCatalogService } from '../services/ProfileCatalogService.js';
@@ -137,25 +135,6 @@ class InMemoryAdaptationLedger {
   }
 }
 
-class EmptyAuditEventReader {
-  async findById(_id: string): Promise<AuditEvent | null> {
-    return null;
-  }
-
-  async find(): Promise<AuditEvent[]> {
-    return [];
-  }
-}
-
-class EmptyFamilyPerformanceReader {
-  async listAll(): Promise<FamilyPerformanceSummary[]> {
-    return [];
-  }
-
-  async getByFamilyKey(_familyKey: string): Promise<FamilyPerformanceSummary | null> {
-    return null;
-  }
-}
 
 class OptimizerCandidateReader {
   constructor(private readonly optimizerRepository: PgOptimizerStateRepository) {}
@@ -165,11 +144,6 @@ class OptimizerCandidateReader {
   }
 }
 
-class EmptyRecommendationReader {
-  async listPending(): Promise<AdaptationRecommendation[]> {
-    return [];
-  }
-}
 
 async function loadJson<T>(relativePath: string): Promise<T> {
   const absolutePath = path.resolve(process.cwd(), relativePath);
@@ -401,11 +375,11 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     secretRotationService,
     dispatchRunService,
     executionRecordService,
-    auditEventReader: new EmptyAuditEventReader(),
-    familyPerformanceReader: new EmptyFamilyPerformanceReader(),
+    auditEventReader: new PgAuditEventRepository(pool),
+    familyPerformanceReader: new PgFamilyPerformanceRepository(pool),
     candidateRankingReader: new OptimizerCandidateReader(optimizerRepository),
-    adaptationEventReader: { find: async (_filters: AdaptationEventFilters): Promise<AdaptationEvent[]> => [] },
-    adaptationRecommendationReader: new EmptyRecommendationReader(),
+    adaptationEventReader: new PgAdaptationEventRepository(pool),
+    adaptationRecommendationReader: new PgAdaptationRecommendationRepository(pool),
     adaptationApprovalRepository: approvalRepository as AdaptationApprovalRepository,
     approvalAuditEmitter: new NoopApprovalAuditEmitter(),
     adaptationRollbackService: rollbackService,

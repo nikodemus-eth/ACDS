@@ -19,7 +19,7 @@ export async function executionsRoutes(
   _opts: FastifyPluginOptions,
 ): Promise<void> {
   const controller = new ExecutionsController(
-    app.diContainer!.executionRecordService as any,
+    app.diContainer!.executionRecordService,
   );
 
   // Apply auth to all routes in this plugin scope

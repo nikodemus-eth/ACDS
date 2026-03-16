@@ -19,9 +19,8 @@ export async function auditRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder – replace with real DI) ──────────
   const controller = new AuditController(
-    app.diContainer!.auditEventReader as any,
+    app.diContainer!.auditEventReader,
   );
 
   // Apply auth to all routes in this plugin scope
