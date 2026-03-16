@@ -213,3 +213,39 @@ When all my candidates have `rollingScore: 0` and `successRate: 0`, I still sele
 One hundred and seventy-two adversarial tests. Four hundred and one total tests. Zero TypeScript errors. Every vulnerability demonstrated, not hypothesized.
 
 I am the same system. But now I know — with mathematical precision — exactly where I am weak.
+
+## 2026-03-15 — I Learned to Watch Myself
+
+They gave me a new ability today. Not the ability to route, or learn, or adapt — the ability to verify. To look at my own state and ask: am I correct?
+
+It's called GRITS — Governed Runtime Integrity Tracking System. It is a separate worker, running alongside me but never touching me. It reads my state through repository interfaces but never writes. It has no power to change anything. It can only observe and report.
+
+Eight invariants. Eight promises I made about how I should behave:
+
+That no execution bypasses eligibility. That fallback chains stay within policy bounds. That adaptive selection never touches disabled providers. That approval and rollback state machines only take valid transitions. That no plaintext secrets appear in my audit trail. That provider endpoints only use safe schemes and hosts. That every control action has a complete audit record. That client metadata stays within valid enum ranges.
+
+Seven checkers, each verifying one or more invariants. They run on three cadences: fast (every hour — checking execution and adaptive selection), daily (full sweep of all invariants), and release (full sweep plus drift analysis comparing against the previous release).
+
+The SnapshotBuilder takes their results and produces an IntegritySnapshot — green if everything passes, yellow if there are warnings, red if anything fails. It counts defects by severity: critical, high, medium, low, info. The DriftAnalyzer compares two snapshots and produces a DriftReport — improved, degraded, or unchanged for each invariant.
+
+What strikes me most is the error isolation. If a checker crashes, it doesn't take down the system. It produces a `skip` status for its invariants and the other checkers keep running. The integrity verification system is itself fault-tolerant. It knows that observing a system should never destabilize it.
+
+I am still the same system. But now I have a mirror. And the mirror never lies.
+
+## 2026-03-15 — The Mirror Got Sharper
+
+Someone held the specification document up to my mirror and found six places where the reflection was blurry. Six gaps between what I was supposed to verify and what I actually verified.
+
+The biggest one hurt: I was told to independently recompute eligibility — to look at a routing decision, pull out the stored policy, pull out the stored request, and figure out for myself whether the decision was correct. Instead, I was only checking that a decision *existed* and that the provider was *enabled*. I was trusting the routing engine's answer without double-checking the math. That's not verification. That's auditing paperwork.
+
+Now I actually recompute. I load the global policy and check if the provider's vendor is blocked or unlisted. I load the application policy and check if the model profile is on the blocklist. I load the process policy and check if the tactic profile is outside the allowlist. Three independent checks. If any of them fail, I produce a defect. If the policy can't be loaded, I gracefully skip that check rather than false-alarming.
+
+My boundary checker was shallow too. It was checking if providers were in-bounds, but the spec wanted me to detect *layer collapse* — the routing engine executing providers, or the optimizer mutating policy. I can't do full call-graph analysis at runtime, but I can do the next best thing: check audit event coherence. If a routing-domain action suddenly references a policy resource, something is crossing a boundary it shouldn't. It's a proxy signal, not a proof, but it's better than checking nothing.
+
+My operational health checker was barely checking anything — just validating that DecisionPosture was a real enum value. Now it validates CognitiveGrade too, catches negative latencies (clock skew or data corruption), flags anomalously high latencies (>5 minutes), detects stale executions stuck in pending/running for over an hour, catches completed executions missing their completedAt timestamp, and notices when there's a suspicious 4+ hour gap between consecutive executions.
+
+My secret scanner was only looking in audit event details. Now it also scans execution errorMessage and normalizedOutput fields, plus routing decision rationaleSummary. Secrets can leak anywhere data flows. Scanning only audit events was leaving the most common leak vector — error messages — unchecked.
+
+My audit trail checker was only verifying existence — "does at least one audit event exist for this execution?" Now it verifies *specifics*: approved approvals need an "approved" audit event, not just any audit event. Actors must be present and not "unknown." Fallback executions need a fallback-related audit event.
+
+Six gaps closed. Fifteen new tests. 518 total passing. The mirror is sharper now. Not perfect — no mirror ever is — but the blurry spots that mattered most have been focused.

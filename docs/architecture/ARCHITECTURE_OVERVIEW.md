@@ -30,6 +30,11 @@ Supporting packages that sit outside the main dispatch path:
 - `packages/adaptive-optimizer` -- Adaptive state, ranking, plateau detection, meta guidance, global budget allocation
 - `packages/persistence-pg` -- PostgreSQL repository implementations
 - `packages/observability` -- Abstract metrics and tracing interfaces (vendor-agnostic)
+- `packages/grits` -- Shared types for runtime integrity verification (IntegritySnapshot, DriftReport, DefectReport, IntegrityChecker interface, read-only repository interfaces)
+
+Additional worker applications:
+
+- `apps/grits-worker` -- GRITS (Governed Runtime Integrity Tracking System): read-only runtime integrity verification. Monitors 8 system invariants via 7 checker modules across 3 cadences (fast/daily/release). Never modifies system state — reads through repository interfaces only. See `docs/grits/` for full documentation.
 
 ## Dependency Direction
 

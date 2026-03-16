@@ -26,7 +26,9 @@
       "@acds/adaptive-optimizer": ["packages/adaptive-optimizer/src/index.ts"],
       "@acds/adaptive-optimizer/*": ["packages/adaptive-optimizer/src/*"],
       "@acds/shared-utils": ["packages/shared-utils/src/index.ts"],
-      "@acds/shared-utils/*": ["packages/shared-utils/src/*"]
+      "@acds/shared-utils/*": ["packages/shared-utils/src/*"],
+      "@acds/grits": ["packages/grits/src/index.ts"],
+      "@acds/grits/*": ["packages/grits/src/*"]
     },
     "rootDir": ".",
     "jsx": "react-jsx",

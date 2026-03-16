@@ -20,6 +20,7 @@ export default defineConfig({
       '@acds/adaptive-optimizer': resolve('adaptive-optimizer'),
       '@acds/shared-utils': resolve('shared-utils'),
       '@acds/persistence-pg': resolve('persistence-pg'),
+      '@acds/grits': resolve('grits'),
     },
   },
   test: {

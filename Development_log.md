@@ -297,3 +297,121 @@ Three additional test files targeting previously uncovered vulnerability surface
 ### Final Verification
 - TypeScript: 0 errors
 - Tests: 440 passing across 46 test files (229 original + 211 red team)
+
+## 2026-03-15 — GRITS: Governed Runtime Integrity Tracking System
+
+Implemented GRITS — a read-only runtime integrity verification system that monitors system invariants without modifying state. Deployed as a separate worker app (`apps/grits-worker`) with shared types in `packages/grits`.
+
+### packages/grits (Shared Types Package)
+- 7 type definitions: InvariantId (INV-001 through INV-008), Severity, Cadence, DefectReport, CheckerResult/InvariantCheckResult, IntegritySnapshot, DriftReport
+- IntegrityChecker interface: `{ name, invariantIds, supportedCadences, check(cadence) }`
+- 5 read-only repository interfaces: IntegritySnapshotRepository, ExecutionRecordReadRepository, RoutingDecisionReadRepository, AuditEventReadRepository, AdaptationRollbackReadRepository
+- Barrel exports via index.ts, path aliases in root tsconfig.json and vitest.config.ts
+
+### apps/grits-worker (Runtime Application)
+- **Engine layer**: IntegrityEngine (cadence filtering, error isolation), SnapshotBuilder (overallStatus derivation, defect count rollup), DriftAnalyzer (per-invariant direction comparison, new/resolved defect detection)
+- **7 checker modules**:
+  - ExecutionIntegrityChecker (INV-001, INV-002) — routing decision existence, fallback chain eligibility
+  - AdaptiveIntegrityChecker (INV-003, INV-004) — candidate-provider linkage, approval state machine validation
+  - SecurityIntegrityChecker (INV-005, INV-006) — secret pattern scanning in audit events, provider endpoint safety
+  - AuditIntegrityChecker (INV-007) — audit trail completeness for executions and approvals
+  - BoundaryIntegrityChecker (INV-001 deep) — full provider eligibility sweep
+  - PolicyIntegrityChecker — vendor conflict detection, empty eligibility sets
+  - OperationalIntegrityChecker (INV-008) — DecisionPosture enum validation
+- **5 in-memory repositories**: IntegritySnapshot, ExecutionRecord, RoutingDecision, AuditEvent, AdaptationRollback
+- **Shared repository singletons**: OptimizerState, ApprovalRepository, LedgerWriter, ProviderRepository, PolicyRepository
+- **3 jobs + 3 handlers**: fast (hourly), daily (24h), release (on-demand with drift analysis)
+- **Job/handler pattern**: matches apps/worker (JobDefinition: name, intervalMs, handler)
+
+### Key Design Decisions
+- Read-only contract: GRITS never calls mutation methods, only reads through repository interfaces
+- Constructor injection for all checker dependencies (testable, no hidden coupling)
+- Error isolation: checker failure → skip status, not system crash
+- OverallStatus derivation: green (all pass/skip), yellow (warns only), red (any fail)
+- DriftAnalyzer compares STATUS_RANK (pass=3, warn=2, skip=1, fail=0) for direction computation
+
+### Tests (63 new tests)
+- **Engine unit tests** (20): SnapshotBuilder status/rollup, DriftAnalyzer direction/defects, IntegrityEngine filtering/isolation
+- **Checker unit tests** (29): All 7 checkers with in-memory stubs for repository dependencies
+- **Integration tests** (14): Full cadence flows, drift detection, security scanning, error isolation
+
+### Documentation
+- `docs/grits/GRITS_EXPLANATION.md` — Purpose and philosophy
+- `docs/grits/GRITS_IMPLEMENTATION_SPEC.md` — Modules, invariants, cadences, schemas
+- `docs/grits/GRITS_ARCHITECTURE.md` — Dependency diagram, read-only contract
+- `docs/grits/INVARIANT_CATALOG.md` — 8 invariants with checker mapping
+- `docs/grits/CHECKER_GUIDE.md` — How to implement a new checker
+- `docs/grits/REPORT_FORMAT.md` — Schema docs with JSON examples
+- `docs/grits/OPERATIONS_RUNBOOK.md` — How to run, configure, interpret output
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 503 passing across 49 test files (440 previous + 63 GRITS)
+
+## 2026-03-15 — GRITS Gap Analysis and Closure
+
+Performed comprehensive gap analysis comparing the GRITS Explanation Document specification against the delivered implementation. Identified 6 gaps and closed all of them.
+
+### Gap Analysis Summary
+1. **Gap 1 (HIGH)**: No independent eligibility recomputation — spec required GRITS to independently verify routing decisions against stored policy, not just check structural completeness
+2. **Gap 2 (MEDIUM)**: Boundary integrity only checked provider eligibility, not architectural layer separation
+3. **Gap 3 (MEDIUM)**: Operational integrity reduced to DecisionPosture enum validation only
+4. **Gap 4 (MEDIUM)**: Secret scanning limited to audit event details only
+5. **Gap 5 (LOW)**: Audit trail verification only checked existence of ≥1 event
+6. **Gap 6 (LOW)**: Rollback state validity not verified — only checked event reference
+
+### Gap Closures Implemented
+
+**Gap 1 — Independent Eligibility Recomputation** (ExecutionIntegrityChecker)
+- Added PolicyRepository dependency (optional 4th constructor parameter)
+- New `recomputeEligibility()` method performs 3 independent policy checks:
+  - Provider vendor vs. global policy allowedVendors/blockedVendors
+  - Selected model profile vs. application policy blockedModelProfileIds
+  - Selected tactic profile vs. process policy allowedTacticProfileIds
+- Graceful degradation: policy lookups use `.catch(() => null)` for missing policies
+
+**Gap 2 — Audit Event Coherence** (BoundaryIntegrityChecker)
+- Added optional AuditEventReadRepository dependency
+- New `checkAuditCoherence()` method validates action-to-resource-type mappings
+- Maps action prefixes (routing, execution, provider, approval, etc.) to expected resource types
+- Detects potential layer collapse when audit events reference resources outside their domain
+
+**Gap 3 — Operational Health Expansion** (OperationalIntegrityChecker)
+- Added CognitiveGrade enum validation alongside existing DecisionPosture validation
+- Negative latency detection (HIGH severity)
+- Anomalously high latency >5min threshold (MEDIUM severity)
+- Completed-but-missing-completedAt detection (HIGH severity)
+- Stale execution detection — pending/running >1hr (MEDIUM severity)
+- Execution gap detection — >4hr gap between consecutive executions (LOW severity)
+
+**Gap 4 — Expanded Secret Scanning** (SecurityIntegrityChecker)
+- Added optional ExecutionRecordReadRepository and RoutingDecisionReadRepository dependencies
+- Scans execution `errorMessage` and `normalizedOutput` fields for secret patterns
+- Scans routing decision `rationaleSummary` for secret patterns
+- All existing SECRET_PATTERNS applied consistently across all data sources
+
+**Gap 5 — Deeper Audit Trail Verification** (AuditIntegrityChecker)
+- Terminal approval state verification: approved/rejected/expired statuses require corresponding audit events
+- Actor field presence verification: all audit events must have non-empty, non-"unknown" actors
+- Fallback execution audit verification: executions with fallback_succeeded/fallback_failed must have a fallback-related audit event
+
+**Gap 6 — Rollback State Validation** (AdaptiveIntegrityChecker)
+- Added restored snapshot candidate validation in INV-004
+- Parses each candidateId from the restored snapshot's candidateRankings
+- Verifies all restored candidates reference currently-enabled providers
+- Uses existing `parseCandidateId()` utility with graceful error handling
+
+### Handler Updates
+- `runDailyIntegrityCheck.ts`: SecurityIntegrityChecker now receives execRepo + routingRepo; BoundaryIntegrityChecker receives auditRepo
+- `runReleaseIntegrityCheck.ts`: Same handler updates as daily
+- `runFastIntegrityCheck.ts`: Already updated for Gap 1 (policyRepo)
+
+### Tests (15 new tests, 518 total)
+- **OperationalIntegrityChecker**: CognitiveGrade validation, negative latency, high latency, missing completedAt, stale execution, execution gap
+- **BoundaryIntegrityChecker**: Audit coherence violation detection, coherent event passing
+- **SecurityIntegrityChecker**: Secret in errorMessage, normalizedOutput, rationaleSummary
+- **AuditIntegrityChecker**: Missing actor, unknown actor, terminal approval without audit event, fallback execution without fallback audit
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 518 passing across 49 test files (503 previous + 15 gap closure)
