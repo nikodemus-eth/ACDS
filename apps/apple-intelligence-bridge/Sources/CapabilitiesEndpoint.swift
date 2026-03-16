@@ -1,4 +1,5 @@
 import Foundation
+import NIOHTTP1
 
 /// GET /capabilities — Returns available models and supported task types.
 enum CapabilitiesEndpoint {

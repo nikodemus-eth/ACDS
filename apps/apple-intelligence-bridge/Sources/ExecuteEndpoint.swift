@@ -1,4 +1,5 @@
 import Foundation
+import NIOHTTP1
 
 /// POST /execute — Accepts a prompt request and returns generated text via Foundation Models.
 enum ExecuteEndpoint {

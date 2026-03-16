@@ -19,7 +19,8 @@ let package = Package(
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "Logging", package: "swift-log"),
             ],
-            path: "Sources"
+            path: "Sources",
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
     ]
 )

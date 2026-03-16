@@ -1,4 +1,5 @@
 import Foundation
+import NIOHTTP1
 
 /// GET /health — Returns bridge health status.
 enum HealthEndpoint {

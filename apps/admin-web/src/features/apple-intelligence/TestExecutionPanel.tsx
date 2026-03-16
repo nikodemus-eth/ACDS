@@ -1,31 +1,51 @@
 import { useState } from 'react';
 import type { BridgeCapabilities, ExecuteResponse } from './appleIntelligenceApi';
-import { useExecuteBridgePrompt } from '../../hooks/useAppleIntelligence';
+
+const BRIDGE_URL = 'http://localhost:11435';
 
 interface TestExecutionPanelProps {
   capabilities: BridgeCapabilities | undefined;
 }
 
 export function TestExecutionPanel({ capabilities }: TestExecutionPanelProps) {
-  const executeMutation = useExecuteBridgePrompt();
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<ExecuteResponse | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const models = capabilities?.models ?? [];
   const selectedModel = model || models[0] || '';
 
-  function handleExecute() {
+  async function handleExecute() {
     if (!prompt.trim()) return;
-    executeMutation.mutate(
-      { model: selectedModel, prompt: prompt.trim() },
-      { onSuccess: (data) => setResult(data) },
-    );
+    setIsPending(true);
+    setError(null);
+    try {
+      const response = await fetch(`${BRIDGE_URL}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: selectedModel, prompt: prompt.trim() }),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || `Bridge returned ${response.status}`);
+      }
+      const data: ExecuteResponse = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Execution failed');
+    } finally {
+      setIsPending(false);
+    }
   }
 
   return (
     <div className="panel">
       <h3 className="panel__title">Test Execution</h3>
+      <div className="panel__note" style={{ marginBottom: '0.75rem' }}>
+        Calls the bridge directly at {BRIDGE_URL}
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <div>
@@ -57,17 +77,17 @@ export function TestExecutionPanel({ capabilities }: TestExecutionPanelProps) {
         </div>
 
         <button
-          onClick={handleExecute}
-          disabled={executeMutation.isPending || !prompt.trim()}
+          onClick={() => void handleExecute()}
+          disabled={isPending || !prompt.trim()}
           className="button button--primary"
         >
-          {executeMutation.isPending ? 'Executing...' : 'Execute'}
+          {isPending ? 'Executing...' : 'Execute'}
         </button>
       </div>
 
-      {executeMutation.isError && (
+      {error && (
         <div className="panel__note" style={{ color: 'var(--color-danger)', marginTop: '0.75rem' }}>
-          Error: {executeMutation.error instanceof Error ? executeMutation.error.message : 'Execution failed'}
+          Error: {error}
         </div>
       )}
 

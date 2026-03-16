@@ -1,4 +1,4 @@
-import { apiClient } from '../../lib/apiClient';
+const BRIDGE_URL = 'http://localhost:11435';
 
 export interface BridgeHealth {
   status: string;
@@ -31,14 +31,24 @@ export interface ExecuteResponse {
   capabilities: string[];
 }
 
-export function getBridgeHealth(): Promise<BridgeHealth> {
-  return apiClient.get<BridgeHealth>('/apple-intelligence/health');
+export async function getBridgeHealth(): Promise<BridgeHealth> {
+  const response = await fetch(`${BRIDGE_URL}/health`);
+  if (!response.ok) throw new Error(`Bridge health check failed: ${response.status}`);
+  return response.json();
 }
 
-export function getBridgeCapabilities(): Promise<BridgeCapabilities> {
-  return apiClient.get<BridgeCapabilities>('/apple-intelligence/capabilities');
+export async function getBridgeCapabilities(): Promise<BridgeCapabilities> {
+  const response = await fetch(`${BRIDGE_URL}/capabilities`);
+  if (!response.ok) throw new Error(`Bridge capabilities fetch failed: ${response.status}`);
+  return response.json();
 }
 
-export function executeBridgePrompt(request: ExecuteRequest): Promise<ExecuteResponse> {
-  return apiClient.post<ExecuteResponse>('/apple-intelligence/execute', request);
+export async function executeBridgePrompt(request: ExecuteRequest): Promise<ExecuteResponse> {
+  const response = await fetch(`${BRIDGE_URL}/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw new Error(`Bridge execution failed: ${response.status}`);
+  return response.json();
 }
