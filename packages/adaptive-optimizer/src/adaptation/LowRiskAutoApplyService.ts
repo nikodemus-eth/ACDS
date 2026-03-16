@@ -66,6 +66,11 @@ export interface AutoApplyDecisionWriter {
   save(record: AutoApplyDecisionRecord): Promise<void>;
 }
 
+export interface AutoApplyStateApplier {
+  /** Applies the approved ranking to the underlying optimizer state. */
+  apply(record: AutoApplyDecisionRecord): Promise<void>;
+}
+
 // ── Service ────────────────────────────────────────────────────────────────
 
 export class LowRiskAutoApplyService {
@@ -77,8 +82,10 @@ export class LowRiskAutoApplyService {
     private readonly failureCounter: RecentFailureCounter,
     private readonly decisionWriter: AutoApplyDecisionWriter,
     config?: Partial<LowRiskAutoApplyConfig>,
+    private readonly stateApplier?: AutoApplyStateApplier,
   ) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.validateConfig();
   }
 
   /**
@@ -141,7 +148,17 @@ export class LowRiskAutoApplyService {
     };
 
     await this.decisionWriter.save(record);
+    await this.stateApplier?.apply(record);
 
     return record;
+  }
+
+  private validateConfig(): void {
+    if (this.config.rollingScoreThreshold < 0 || this.config.rollingScoreThreshold > 1) {
+      throw new Error('rollingScoreThreshold must be between 0 and 1');
+    }
+    if (!Number.isInteger(this.config.maxRecentFailures) || this.config.maxRecentFailures < 0) {
+      throw new Error('maxRecentFailures must be a non-negative integer');
+    }
   }
 }

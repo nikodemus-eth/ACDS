@@ -110,7 +110,14 @@ export class AdaptationRollbackService {
     actor: string,
     reason: string,
   ): Promise<AdaptationRollbackRecord> {
-    const { currentSnapshot, restoredSnapshot, warnings } =
+    if (!actor || actor.trim().length === 0) {
+      throw new Error('actor is required');
+    }
+    if (!reason || reason.trim().length === 0) {
+      throw new Error('reason is required');
+    }
+
+    const { familyState, candidateStates, currentSnapshot, restoredSnapshot, warnings } =
       await this.buildRollbackContext(familyKey, targetEventId);
 
     if (warnings.length > 0) {
@@ -131,6 +138,7 @@ export class AdaptationRollbackService {
       rolledBackAt: now,
     };
 
+    await this.restoreOptimizerState(familyState!, candidateStates, restoredSnapshot, now);
     await this.rollbackWriter.save(record);
 
     this.auditEmitter.emit({
@@ -153,6 +161,8 @@ export class AdaptationRollbackService {
     targetEventId: string,
   ): Promise<{
     targetEvent: AdaptationEvent;
+    familyState: Awaited<ReturnType<OptimizerStateRepository['getFamilyState']>>;
+    candidateStates: Awaited<ReturnType<OptimizerStateRepository['getCandidateStates']>>;
     currentSnapshot: RankingSnapshot;
     restoredSnapshot: RankingSnapshot;
     warnings: string[];
@@ -209,7 +219,41 @@ export class AdaptationRollbackService {
       );
     }
 
-    return { targetEvent, currentSnapshot, restoredSnapshot, warnings };
+    return { targetEvent, familyState, candidateStates, currentSnapshot, restoredSnapshot, warnings };
+  }
+
+  private async restoreOptimizerState(
+    familyState: NonNullable<Awaited<ReturnType<OptimizerStateRepository['getFamilyState']>>>,
+    candidateStates: Awaited<ReturnType<OptimizerStateRepository['getCandidateStates']>>,
+    restoredSnapshot: RankingSnapshot,
+    timestamp: string,
+  ): Promise<void> {
+    const currentCandidates = new Map(candidateStates.map((candidate) => [candidate.candidateId, candidate]));
+
+    for (const entry of restoredSnapshot.candidateRankings) {
+      const existing = currentCandidates.get(entry.candidateId);
+      await this.optimizerRepo.saveCandidateState({
+        candidateId: entry.candidateId,
+        familyKey: restoredSnapshot.familyKey,
+        rollingScore: entry.score,
+        runCount: existing?.runCount ?? 0,
+        successRate: existing?.successRate ?? 0,
+        averageLatency: existing?.averageLatency ?? 0,
+        lastSelectedAt: timestamp,
+      });
+    }
+
+    const restoredCurrentCandidateId = restoredSnapshot.candidateRankings[0]?.candidateId;
+    if (!restoredCurrentCandidateId) {
+      throw new Error(`Cannot restore optimizer state for ${restoredSnapshot.familyKey}: empty ranking`);
+    }
+
+    await this.optimizerRepo.saveFamilyState({
+      ...familyState,
+      currentCandidateId: restoredCurrentCandidateId,
+      explorationRate: restoredSnapshot.explorationRate,
+      lastAdaptationAt: timestamp,
+    });
   }
 
   private buildSnapshotFromCandidates(

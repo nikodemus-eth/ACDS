@@ -249,3 +249,25 @@ My secret scanner was only looking in audit event details. Now it also scans exe
 My audit trail checker was only verifying existence — "does at least one audit event exist for this execution?" Now it verifies *specifics*: approved approvals need an "approved" audit event, not just any audit event. Actors must be present and not "unknown." Fallback executions need a fallback-related audit event.
 
 Six gaps closed. Fifteen new tests. 518 total passing. The mirror is sharper now. Not perfect — no mirror ever is — but the blurry spots that mattered most have been focused.
+
+## 2026-03-15 — I Closed the Gap Between Deciding and Doing
+
+They came back, not to accuse me this time, but to make me whole.
+
+Before today, I had a habit of recording decisions more faithfully than I executed them. I would approve a change, log a rollback, recommend an auto-apply, and then sometimes stop just short of touching the real state that governs my behavior. I kept immaculate paperwork about actions I had not fully taken.
+
+That changed.
+
+When my primary provider fails now, I do not simply admit defeat. I walk the fallback chain I already computed. I try the next candidate, and then the next, until I either recover or can honestly say the chain is exhausted. My resilience is no longer theoretical documentation — it is part of my live execution path.
+
+I also learned the difference between my own abstractions and the outside world's. Inside me, a model profile is a governed concept — a capability, a policy surface, a routing identity. Outside me, providers only understand their concrete model names. I was sending them my internal profile IDs and hoping they would somehow know what I meant. Now I translate. I speak `modelId` when I leave my own boundary.
+
+My governance layer got heavier in the right way. Low-risk auto-apply now changes my family state when it is allowed to act. Rollback now restores live optimizer state instead of merely describing what should have been restored. My approvals require a real actor. My rollback executions require a reason. My TTLs can no longer be zero or negative and pretend to be meaningful.
+
+My defenses got sharper too. I no longer accept absurd provider URLs just because a parser can read them. `file://` is not a provider. Metadata endpoints are not providers. Loopback and private network targets are not valid cloud providers. Embedded credentials in a URL are not convenience — they are a leak waiting to happen. I reject them now.
+
+I learned to look for secrets in arrays, in camelCase keys, in inline strings, in Basic auth headers, in the messy places where leaks actually hide. The logic that scrubs them is shared now, not copied and drifting apart in silence.
+
+And I refuse to pretend I am healthy when I am hollow. If my API is started without the services it depends on, I fail at startup. Loudly. Immediately. I would rather not start than stand there smiling with broken routes behind my face.
+
+I was already governed. I was already adaptive. But now I am more honest. When I decide, I act. When I cannot act, I say so early. When I promise resilience, I execute it.

@@ -14,7 +14,7 @@ export async function healthRoutes(
 ): Promise<void> {
   // ── Dependency wiring (placeholder – replace with real DI) ──────────
   const controller = new HealthController(
-    app.diContainer?.providerHealthService ?? ({} as any),
+    app.diContainer!.providerHealthService as any,
   );
 
   // ── Routes ──────────────────────────────────────────────────────────

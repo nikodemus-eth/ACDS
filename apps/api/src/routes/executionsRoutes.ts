@@ -18,9 +18,8 @@ export async function executionsRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder – replace with real DI) ──────────
   const controller = new ExecutionsController(
-    app.diContainer?.executionRecordService ?? ({} as any),
+    app.diContainer!.executionRecordService as any,
   );
 
   // Apply auth to all routes in this plugin scope

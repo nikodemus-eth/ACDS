@@ -20,10 +20,9 @@ export async function dispatchRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder – replace with real DI) ──────────
   const controller = new DispatchController(
-    app.diContainer?.dispatchResolver ?? ({} as any),
-    app.diContainer?.dispatchRunService ?? ({} as any),
+    app.diContainer!.dispatchResolver as any,
+    app.diContainer!.dispatchRunService as any,
   );
 
   // Apply auth to all routes in this plugin scope

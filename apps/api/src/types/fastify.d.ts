@@ -2,7 +2,7 @@ import 'fastify';
 
 declare module 'fastify' {
   interface FastifyInstance {
-    diContainer: {
+    diContainer?: {
       resolve<T>(name: string): T;
       [key: string]: any;
     };

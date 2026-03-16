@@ -70,6 +70,7 @@ describe('Fallback Execution – Chain Invocation', () => {
         return successResponse('Fallback analysis result');
       },
       resolveApiKey: async () => undefined,
+      resolveModelId: async (modelProfileId: string) => `resolved-${modelProfileId}`,
     };
 
     const service = new FallbackExecutionService(statusTracker, fallbackTracker, deps);
@@ -99,6 +100,7 @@ describe('Fallback Execution – Chain Invocation', () => {
     const deps: FallbackExecutionDeps = {
       executeProvider: async () => successResponse('Recovery content'),
       resolveApiKey: async () => undefined,
+      resolveModelId: async (modelProfileId: string) => `resolved-${modelProfileId}`,
     };
 
     const service = new FallbackExecutionService(statusTracker, fallbackTracker, deps);
@@ -124,6 +126,7 @@ describe('Fallback Execution – Chain Invocation', () => {
         throw new Error('All providers are down');
       },
       resolveApiKey: async () => undefined,
+      resolveModelId: async (modelProfileId: string) => `resolved-${modelProfileId}`,
     };
 
     const service = new FallbackExecutionService(statusTracker, fallbackTracker, deps);
@@ -151,6 +154,7 @@ describe('Fallback Execution – Chain Invocation', () => {
         throw new Error('Should not be called');
       },
       resolveApiKey: async () => undefined,
+      resolveModelId: async (modelProfileId: string) => `resolved-${modelProfileId}`,
     };
 
     const service = new FallbackExecutionService(statusTracker, fallbackTracker, deps);
@@ -181,6 +185,7 @@ describe('Fallback Execution – Chain Invocation', () => {
         return successResponse('Second fallback succeeded');
       },
       resolveApiKey: async () => undefined,
+      resolveModelId: async (modelProfileId: string) => `resolved-${modelProfileId}`,
     };
 
     const service = new FallbackExecutionService(statusTracker, fallbackTracker, deps);

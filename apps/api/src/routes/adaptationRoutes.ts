@@ -23,10 +23,10 @@ export async function adaptationRoutes(
 ): Promise<void> {
   // ── Dependency wiring (placeholder - replace with real DI) ──────────
   const controller = new AdaptationController(
-    app.diContainer?.familyPerformanceReader ?? ({} as any),
-    app.diContainer?.candidateRankingReader ?? ({} as any),
-    app.diContainer?.adaptationEventReader ?? ({} as any),
-    app.diContainer?.adaptationRecommendationReader ?? ({} as any),
+    app.diContainer!.familyPerformanceReader as any,
+    app.diContainer!.candidateRankingReader as any,
+    app.diContainer!.adaptationEventReader as any,
+    app.diContainer!.adaptationRecommendationReader as any,
   );
 
   // Apply auth to all routes in this plugin scope

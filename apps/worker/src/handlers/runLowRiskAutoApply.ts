@@ -18,6 +18,7 @@ import {
   type FamilyPostureProvider,
   type RecentFailureCounter,
   type AutoApplyDecisionWriter,
+  type AutoApplyStateApplier,
   type FamilyRiskLevel,
 } from '@acds/adaptive-optimizer';
 import { rankCandidates } from '@acds/adaptive-optimizer';
@@ -52,6 +53,8 @@ export async function runLowRiskAutoApply(): Promise<void> {
     postureProvider,
     failureCounter,
     decisionWriter,
+    undefined,
+    getAutoApplyStateApplier(),
   );
 
   const pending = await recommendationReader.listPendingForAutoApply();
@@ -188,10 +191,33 @@ class InMemoryAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
   }
 }
 
+class OptimizerStateAutoApplyApplier implements AutoApplyStateApplier {
+  constructor(private readonly optimizerRepo: ReturnType<typeof getSharedOptimizerStateRepository>) {}
+
+  async apply(record: AutoApplyDecisionRecord): Promise<void> {
+    const current = await this.optimizerRepo.getFamilyState(record.familyKey);
+    if (!current) {
+      throw new Error(`Family state not found for auto-apply: ${record.familyKey}`);
+    }
+
+    const nextCandidate = record.newRanking[0]?.candidate.candidateId;
+    if (!nextCandidate) {
+      throw new Error(`Auto-apply record for ${record.familyKey} has no ranked candidates`);
+    }
+
+    await this.optimizerRepo.saveFamilyState({
+      ...current,
+      currentCandidateId: nextCandidate,
+      lastAdaptationAt: record.appliedAt,
+    });
+  }
+}
+
 const riskProvider = new DefaultFamilyRiskProvider();
 const postureProvider = new DefaultFamilyPostureProvider();
 const failureCounter = new DefaultRecentFailureCounter();
 const decisionWriter = new InMemoryAutoApplyDecisionWriter();
+const autoApplyStateApplier = new OptimizerStateAutoApplyApplier(getSharedOptimizerStateRepository());
 
 function getFamilyRiskProvider(): FamilyRiskProvider {
   return riskProvider;
@@ -207,4 +233,8 @@ function getRecentFailureCounter(): RecentFailureCounter {
 
 function getAutoApplyDecisionWriter(): AutoApplyDecisionWriter {
   return decisionWriter;
+}
+
+function getAutoApplyStateApplier(): AutoApplyStateApplier {
+  return autoApplyStateApplier;
 }

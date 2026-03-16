@@ -31,6 +31,10 @@ export interface ApprovalAuditEmitter {
   emit(event: ApprovalAuditEvent): void;
 }
 
+export interface ApprovalActionApplier {
+  applyApprovedRecommendation(approval: AdaptationApproval): Promise<void>;
+}
+
 // ── Default expiry ─────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -41,6 +45,7 @@ export class AdaptationApprovalService {
   constructor(
     private readonly repository: AdaptationApprovalRepository,
     private readonly auditEmitter: ApprovalAuditEmitter,
+    private readonly actionApplier?: ApprovalActionApplier,
   ) {}
 
   /**
@@ -54,6 +59,18 @@ export class AdaptationApprovalService {
     recommendation: AdaptationRecommendation,
     maxAgeMs: number = DEFAULT_MAX_AGE_MS,
   ): Promise<AdaptationApproval> {
+    if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+      throw new Error('maxAgeMs must be a positive number');
+    }
+
+    const pendingForFamily = await this.repository.findByFamily(recommendation.familyKey);
+    if (pendingForFamily.some((approval) =>
+      approval.status === 'pending' && approval.recommendationId === recommendation.id)) {
+      throw new Error(
+        `Recommendation ${recommendation.id} already has a pending approval for family ${recommendation.familyKey}`,
+      );
+    }
+
     const now = new Date();
 
     const approval: AdaptationApproval = {
@@ -83,6 +100,7 @@ export class AdaptationApprovalService {
    * @throws If the approval is not found or is not in 'pending' status.
    */
   async approve(id: string, actor: string, reason?: string): Promise<AdaptationApproval> {
+    this.assertActor(actor);
     const approval = await this.requirePending(id);
     const now = new Date().toISOString();
 
@@ -99,6 +117,8 @@ export class AdaptationApprovalService {
       decidedBy: actor,
       reason,
     };
+
+    await this.actionApplier?.applyApprovedRecommendation(updated);
 
     this.auditEmitter.emit({
       type: 'approval_approved',
@@ -118,6 +138,7 @@ export class AdaptationApprovalService {
    * @throws If the approval is not found or is not in 'pending' status.
    */
   async reject(id: string, actor: string, reason?: string): Promise<AdaptationApproval> {
+    this.assertActor(actor);
     const approval = await this.requirePending(id);
     const now = new Date().toISOString();
 
@@ -160,7 +181,7 @@ export class AdaptationApprovalService {
     let expiredCount = 0;
 
     for (const approval of pending) {
-      const cutoff = maxAge
+      const cutoff = maxAge !== undefined
         ? new Date(approval.submittedAt).getTime() + maxAge
         : new Date(approval.expiresAt).getTime();
 
@@ -197,5 +218,11 @@ export class AdaptationApprovalService {
       );
     }
     return approval;
+  }
+
+  private assertActor(actor: string): void {
+    if (!actor || actor.trim().length === 0) {
+      throw new Error('actor is required');
+    }
   }
 }

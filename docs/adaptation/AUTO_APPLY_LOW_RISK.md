@@ -37,7 +37,8 @@ When all criteria are met, the `LowRiskAutoApplyService.inspectAndApply()` metho
 
 1. Creates an `AutoApplyDecisionRecord` capturing the previous ranking, new ranking, reason, mode, risk basis, and timestamp.
 2. Persists the record via the `AutoApplyDecisionWriter`.
-3. Returns the record so the caller can update the optimizer state with the new ranking.
+3. Applies the new top-ranked candidate to optimizer state through an `AutoApplyStateApplier`.
+4. Returns the record for downstream audit and UI surfaces.
 
 The auto-apply operation only mutates the candidate ranking for the family. It does not:
 - Execute any provider calls.
@@ -86,16 +87,8 @@ If auto-applied changes cause performance degradation, the operator should:
 2. Downgrade the family to `recommend_only` mode.
 3. Investigate the root cause before re-enabling `auto_apply_low_risk`.
 
-## Known Issues (ARGUS-9 Red Team Findings)
+## Hardening Notes
 
-The following issues were identified during adversarial testing and should be addressed before production deployment:
-
-1. **Auto-apply does NOT mutate `FamilySelectionState`.** `inspectAndApply()` creates an `AutoApplyDecisionRecord` and persists it, but does not update the family's `currentCandidateId` or ranking. The caller must apply the new ranking — but no caller currently does so. This is the same decision-to-application gap found in the approval and rollback services.
-
-2. **Provider trust is blind.** The `FamilyRiskProvider`, `FamilyPostureProvider`, and `RecentFailureCounter` are trusted without independent verification. A misconfigured or compromised provider can return `'low'` risk for a high-consequence family, `'advisory'` posture for a `final` family, or `0` failures when failures exist. The service has no cross-validation against observable family state.
-
-3. **`rollingScoreThreshold` accepts negative values.** Setting `rollingScoreThreshold: -1` in the config means any `rollingScore` (including 0.0) qualifies for auto-apply, effectively disabling the score threshold check. Config values should be validated at construction time.
-
-4. **`isAutoApplyPermitted('fully_applied', 'medium')` returns `true`.** Medium-risk families are eligible for auto-apply in `fully_applied` mode. This is documented behavior but may be surprising — operators should understand that `fully_applied` mode permits medium-risk auto-apply without human review.
-
-5. **No config validation at construction time.** The `LowRiskAutoApplyConfig` is spread over defaults without validation. Negative thresholds, zero maxRecentFailures with `>` comparison (allowing exactly 0 failures), and other edge cases are accepted silently.
+- `LowRiskAutoApplyConfig` is now validated at construction time. Invalid thresholds fail fast.
+- Auto-apply now mutates `FamilySelectionState` when a recommendation is accepted for automatic application.
+- The remaining trust boundary is the external classification providers (`FamilyRiskProvider`, `FamilyPostureProvider`, `RecentFailureCounter`). Their outputs are still authoritative, so production deployments should back them with audited data sources rather than permissive defaults.

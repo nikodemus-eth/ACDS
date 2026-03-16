@@ -20,7 +20,7 @@ export async function adaptationRollbackRoutes(
 ): Promise<void> {
   // ── Dependency wiring (placeholder - replace with real DI) ──────────
   const controller = new AdaptationRollbackController(
-    app.diContainer?.adaptationRollbackService ?? ({} as any),
+    app.diContainer!.adaptationRollbackService as any,
   );
 
   // Apply auth to all routes in this plugin scope

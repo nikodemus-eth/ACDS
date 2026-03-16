@@ -258,6 +258,18 @@ Phase 4 covers plateau detection manipulation, candidate ID injection, advanced 
 - **tier4-evaluationManipulation.test.ts** (11 tests) — `evaluateAcceptance`/`evaluateLatency`/`calculateExecutionScore`: silent fallthrough for unknowns, negative latency accepted, weight manipulation (NaN/Infinity/negative), unclamped scores
 - **tier4-operationalResilience.test.ts** (13 tests) — No quality floor in selection, empty/single candidate edge cases, fallback chain gaps, handler error isolation, duplicate registration, stress tests
 
+## 2026-03-15 — Post-Review Hardening, Refactor, and Documentation Pass
+
+- Refactored secret redaction into shared helpers so inline credential scrubbing logic is defined once and reused across object, record, and error redaction
+- Hardened provider registration validation: rejected unsafe schemes, embedded credentials, overlong URLs, and cloud endpoints targeting loopback/link-local/private-network hosts
+- Execution path now resolves provider-native `modelId` values from model profiles before adapter execution
+- Dispatch run path now invokes fallback execution when the primary provider fails instead of terminating immediately
+- Adaptive controls now mutate optimizer state: low-risk auto-apply updates `FamilySelectionState`, and rollback restores live family state plus candidate snapshots
+- Approval workflow now validates positive TTLs, rejects duplicate pending approvals for the same recommendation, and requires non-empty actor identity
+- API bootstrap now fails fast when the DI container is incomplete; route modules no longer fall back to empty placeholder dependencies
+- Documentation updated across README, provider setup, troubleshooting, low-risk auto-apply, and rollback operations
+- Verification rerun: `pnpm exec tsc -b` and targeted integration suite for fallback, auto-apply, rollback, and approval workflow all passing
+
 ### Key Vulnerabilities Confirmed
 15. **Plateau config is a first-class attack surface**: mildThreshold=0 detects plateau in healthy families; reversed thresholds cause wrong severity
 16. **Candidate ID injection via colons**: round-trip integrity broken by components containing the separator character

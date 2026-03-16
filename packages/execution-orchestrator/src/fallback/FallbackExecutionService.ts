@@ -6,6 +6,7 @@ import type { FallbackDecisionTracker } from './FallbackDecisionTracker.js';
 export interface FallbackExecutionDeps {
   executeProvider(providerId: string, request: AdapterRequest, apiKey?: string): Promise<AdapterResponse>;
   resolveApiKey(providerId: string): Promise<string | undefined>;
+  resolveModelId(modelProfileId: string): Promise<string>;
 }
 
 export class FallbackExecutionService {
@@ -29,7 +30,8 @@ export class FallbackExecutionService {
 
       try {
         const apiKey = await this.deps.resolveApiKey(entry.providerId);
-        const request = { ...adapterRequest, model: entry.modelProfileId };
+        const model = await this.deps.resolveModelId(entry.modelProfileId);
+        const request = { ...adapterRequest, model };
         const response = await this.deps.executeProvider(entry.providerId, request, apiKey);
 
         this.fallbackTracker.recordSuccess(executionId, entry);

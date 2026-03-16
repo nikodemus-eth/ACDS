@@ -11,7 +11,28 @@ import { registerRoutes } from './bootstrap/registerRoutes.js';
 export interface BuildAppOptions {
   /** Override the default logger (useful in tests) */
   logger?: boolean | object;
+  /** Fully wired service container for route controllers. */
+  diContainer?: Record<string, unknown>;
 }
+
+const REQUIRED_CONTAINER_KEYS = [
+  'providerHealthService',
+  'registryService',
+  'connectionTester',
+  'secretRotationService',
+  'dispatchResolver',
+  'dispatchRunService',
+  'executionRecordService',
+  'auditEventReader',
+  'familyPerformanceReader',
+  'candidateRankingReader',
+  'adaptationEventReader',
+  'adaptationRecommendationReader',
+  'adaptationApprovalRepository',
+  'approvalAuditEmitter',
+  'adaptationRollbackService',
+  'resolverDeps',
+] as const;
 
 /**
  * Creates, configures and returns a ready-to-listen Fastify instance.
@@ -23,6 +44,13 @@ export interface BuildAppOptions {
  */
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   const config = getAppConfig();
+  const missingDeps = REQUIRED_CONTAINER_KEYS.filter((key) => opts.diContainer?.[key] === undefined);
+
+  if (missingDeps.length > 0) {
+    throw new Error(
+      `ACDS API DI container is incomplete. Missing dependencies: ${missingDeps.join(', ')}`,
+    );
+  }
 
   const app = Fastify({
     logger: opts.logger ?? {
@@ -38,6 +66,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
 
   // Decorate the instance so routes/hooks can access config
   app.decorate('config', config);
+  app.decorate('diContainer', opts.diContainer as FastifyInstance['diContainer']);
 
   await registerPlugins(app);
   await registerMiddleware(app);

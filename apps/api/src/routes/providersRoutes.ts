@@ -17,13 +17,10 @@ export async function providersRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder – replace with real DI) ──────────
-  // The controller expects ProviderRegistryService and ProviderConnectionTester.
-  // For now we cast to satisfy the type until proper DI is in place.
   const controller = new ProvidersController(
-    app.diContainer?.registryService ?? ({} as any),
-    app.diContainer?.connectionTester ?? ({} as any),
-    app.diContainer?.secretRotationService ?? ({} as any),
+    app.diContainer!.registryService as any,
+    app.diContainer!.connectionTester as any,
+    app.diContainer!.secretRotationService as any,
   );
 
   // Apply auth to all routes in this plugin scope

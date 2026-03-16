@@ -38,6 +38,16 @@ This guide covers common operational issues and how to diagnose them.
 - For API key issues, update the key via the provider form (the old key will be re-encrypted).
 - Trigger a manual connection test after making changes.
 
+### Registration Validation Rules
+
+Provider registration is now stricter than simple URL parsing:
+
+- Cloud providers must use `https://`
+- Cloud providers cannot target loopback, link-local, or RFC1918/private-network hosts
+- Embedded credentials in provider URLs are rejected
+- Non-HTTP schemes such as `file://` and `ftp://` are rejected
+- Excessively long provider URLs are rejected
+
 ---
 
 ## Fallback Behavior
@@ -64,6 +74,8 @@ Fallback is a normal and healthy mechanism. It occurs when:
 - The primary provider is temporarily unavailable
 - The primary provider returns a transient error
 - The primary provider times out
+
+The primary run path now performs fallback directly. A failed first attempt should no longer terminate execution immediately when valid fallback candidates exist.
 
 ### When Fallback Indicates a Problem
 
@@ -134,6 +146,15 @@ All providers in the fallback chain failed. The execution is marked `failed`. Ch
 - Network connectivity to cloud providers.
 - Whether local provider processes are running.
 - The specific error for each fallback attempt in the execution detail.
+
+### "ACDS API DI container is incomplete"
+
+The API startup path now validates that all required services are wired before the server starts.
+
+Check:
+- Your `buildApp()` call supplies a populated `diContainer`
+- The container includes dispatch, provider, execution, audit, adaptation, and rollback services
+- Startup wiring was updated after any route/controller changes
 
 ### Database Connection Errors
 

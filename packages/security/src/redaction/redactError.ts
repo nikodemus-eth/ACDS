@@ -1,13 +1,11 @@
+import { redactInlineSecrets } from './sharedRedaction.js';
+
 export function redactError(error: unknown): { message: string; code?: string } {
   if (error instanceof Error) {
-    const message = error.message
-      .replace(/key[=:]\s*\S+/gi, 'key=[REDACTED]')
-      .replace(/secret[=:]\s*\S+/gi, 'secret=[REDACTED]')
-      .replace(/token[=:]\s*\S+/gi, 'token=[REDACTED]')
-      .replace(/password[=:]\s*\S+/gi, 'password=[REDACTED]')
-      .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+    const message = redactInlineSecrets(error.message)
       .replace(/https?:\/\/[^:]+:[^@]+@/gi, 'https://[REDACTED]:[REDACTED]@')
-      .replace(/["'](?:key|secret|token|password|apiKey|api_key)["']\s*:\s*["'][^"']*["']/gi, '"[FIELD]": "[REDACTED]"');
+      .replace(/["'](?:key|secret|token|password|apiKey|api_key)["']\s*:\s*["'][^"']*["']/gi, '"[FIELD]": "[REDACTED]"')
+      .replace(/\bsk-[A-Za-z0-9_-]+\b/g, '[REDACTED]');
 
     return {
       message,

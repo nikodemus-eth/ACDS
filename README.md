@@ -118,6 +118,12 @@ pnpm --filter ./infra/db run migrate
 pnpm dev
 ```
 
+### Current Bootstrap Note
+
+The API layer now validates its dependency-injection container at startup and fails fast if required services are missing. This prevents the previous failure mode where the process started successfully but most routes crashed on first use.
+
+If you are running `apps/api` standalone, make sure your bootstrap path provides a fully wired `diContainer` to `buildApp()`. The route layer no longer falls back to placeholder `{}` dependencies.
+
 ### Register a Provider
 
 After starting, open the admin UI and register at least one provider:
@@ -136,6 +142,14 @@ See [Provider Setup](docs/operator/PROVIDER_SETUP.md) for detailed instructions.
 - **Execution Families**: Identity for adaptive learning (`application.process.step.posture.grade`)
 - **Policy Layers**: Global -> Application -> Process -> Instance policy cascade
 - **Adaptive Optimization**: Policy-bounded learning from execution outcomes
+
+## Recent Hardening
+
+- **Provider-native execution**: dispatch execution now resolves a model profile to its provider `modelId` before calling the adapter.
+- **Real fallback behavior**: the main run path now walks the computed fallback chain instead of failing immediately on the primary provider error.
+- **Safer provider registration**: cloud provider URLs must use `https://` and cannot target loopback, link-local, or private-network hosts.
+- **Recursive secret redaction**: redaction now traverses arrays and common key variants such as camelCase and snake_case credential fields.
+- **Stateful adaptive controls**: low-risk auto-apply and rollback now mutate optimizer state rather than only writing audit-style records.
 
 ## Documentation
 

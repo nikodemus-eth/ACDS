@@ -20,10 +20,9 @@ export async function adaptationApprovalRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
-  // ── Dependency wiring (placeholder - replace with real DI) ──────────
   const controller = new AdaptationApprovalController(
-    app.diContainer?.adaptationApprovalRepository ?? ({} as any),
-    app.diContainer?.approvalAuditEmitter ?? ({} as any),
+    app.diContainer!.adaptationApprovalRepository as any,
+    app.diContainer!.approvalAuditEmitter as any,
   );
 
   // Apply auth to all routes in this plugin scope

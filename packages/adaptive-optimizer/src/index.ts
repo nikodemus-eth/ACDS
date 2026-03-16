@@ -72,6 +72,7 @@ export {
   type FamilyPostureProvider,
   type RecentFailureCounter,
   type AutoApplyDecisionWriter,
+  type AutoApplyStateApplier,
 } from './adaptation/LowRiskAutoApplyService.js';
 
 // Adaptation Rollback Tooling (Prompt 63)

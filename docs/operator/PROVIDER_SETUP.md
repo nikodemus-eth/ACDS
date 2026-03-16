@@ -164,6 +164,16 @@ OPENAI_TIMEOUT_MS=30000
 
 ## General Notes
 
+### URL Validation Rules
+
+Provider registration now enforces endpoint safety rules:
+
+- Local providers may use loopback or private-network hosts
+- Cloud providers must use `https://`
+- Cloud providers cannot use loopback, link-local, metadata, or RFC1918/private-network hosts
+- URLs with embedded credentials are rejected
+- Only `http://` and `https://` are accepted schemes
+
 ### Health Checks
 
 All providers are subject to periodic health checks via the `ProviderHealthScheduler` (interval configured by `HEALTH_CHECK_INTERVAL_MS`, default 60 seconds). Health status is tracked as `healthy`, `degraded`, or `offline`.
