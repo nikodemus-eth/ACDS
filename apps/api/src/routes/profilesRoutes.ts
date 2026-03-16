@@ -14,9 +14,11 @@ export async function profilesRoutes(
   app.get('/model/:id', (req, reply) => controller.getModelProfile(req as any, reply));
   app.post('/model', (req, reply) => controller.createModelProfile(req as any, reply));
   app.patch('/model/:id', (req, reply) => controller.updateModelProfile(req as any, reply));
+  app.delete('/model/:id', (req, reply) => controller.deleteModelProfile(req as any, reply));
 
   app.get('/tactic', (req, reply) => controller.listTacticProfiles(req, reply));
   app.get('/tactic/:id', (req, reply) => controller.getTacticProfile(req as any, reply));
   app.post('/tactic', (req, reply) => controller.createTacticProfile(req as any, reply));
   app.patch('/tactic/:id', (req, reply) => controller.updateTacticProfile(req as any, reply));
+  app.delete('/tactic/:id', (req, reply) => controller.deleteTacticProfile(req as any, reply));
 }

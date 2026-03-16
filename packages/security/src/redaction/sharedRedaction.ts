@@ -31,6 +31,7 @@ export function redactInlineSecrets(value: string): string {
     .replace(/\b(?:api[_-]?key|key|secret|token|password)\b\s*[=:]\s*([^\s,&]+)/gi, (_match, captured: string) =>
       _match.replace(captured, REDACTED),
     )
+    .replace(/["'](?:key|secret|token|password|apiKey|api_key)["']\s*:\s*["'][^"']*["']/gi, `"[FIELD]": "${REDACTED}"`)
     .replace(/\bsk-[A-Za-z0-9_-]+\b/g, REDACTED)
     .replace(/https?:\/\/[^:\s]+:[^@\s]+@/gi, 'https://[REDACTED]:[REDACTED]@');
 }

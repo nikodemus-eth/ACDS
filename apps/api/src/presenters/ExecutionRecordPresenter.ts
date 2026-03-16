@@ -83,9 +83,27 @@ export class ExecutionRecordPresenter {
   static toDetailView(record: ExecutionRecord): ExecutionRecordDetailView {
     return {
       ...ExecutionRecordPresenter.toView(record),
-      rationaleSummary: '',
+      rationaleSummary: ExecutionRecordPresenter.buildRationaleSummary(record),
       fallbackHistory: [],
     };
+  }
+
+  private static buildRationaleSummary(record: ExecutionRecord): string {
+    const family = record.executionFamily;
+    const parts: string[] = [
+      `Routed ${family.application}/${family.process}/${family.step}`,
+      `to provider ${record.selectedProviderId}`,
+      `with model profile ${record.selectedModelProfileId}`,
+      `and tactic ${record.selectedTacticProfileId}.`,
+    ];
+
+    if (record.fallbackAttempts > 0) {
+      parts.push(`${record.fallbackAttempts} fallback attempt(s) recorded.`);
+    }
+
+    parts.push(`Posture: ${family.decisionPosture}, grade: ${family.cognitiveGrade}.`);
+
+    return parts.join(' ');
   }
 
   // ── Private helpers ────────────────────────────────────────────────────

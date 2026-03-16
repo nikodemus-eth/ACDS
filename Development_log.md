@@ -528,3 +528,45 @@ This is purely a test-assertion reconciliation. No production code was modified.
 ### Verification
 - TypeScript: 0 errors
 - Tests: 526 passing across 51 test files, 0 failures
+
+---
+
+## Post-Hardening Codebase Remediation
+
+### Context
+Re-evaluation of the codebase after the hardening pass, admin UI, and admin API test commits revealed 8 issues ranging from missing CRUD operations to code duplication and incomplete test coverage.
+
+### Changes
+
+**1. Profile Deletion (Critical Gap Closure)**
+- `ProfileCatalogService`: Added `deleteModelProfile()` and `deleteTacticProfile()` methods
+- `ProfilesController`: Added `deleteModelProfile()` and `deleteTacticProfile()` handlers returning 204/404
+- `profilesRoutes.ts`: Registered `DELETE /model/:id` and `DELETE /tactic/:id` routes
+- `profilesApi.ts` (admin-web): Added `deleteProfile()` API client function
+- `useProfiles.ts` (admin-web): Added `useDeleteProfile()` React Query mutation hook
+- `mockApi.ts` (admin-web): Added DELETE mock handlers for both profile types
+- `ModelProfilesPanel.tsx` / `TacticProfilesPanel.tsx`: Added Delete action buttons
+
+**2. ExecutionRecordPresenter Fallback Data**
+- `toDetailView()` now synthesizes a `rationaleSummary` from ExecutionRecord fields (family, provider, profiles, posture, grade, fallback count) instead of returning an empty string
+- `fallbackHistory` remains `[]` — structured fallback chain data requires a data model extension not in scope here
+
+**3. Redaction Consolidation**
+- Moved JSON field redaction pattern (`"key": "value"` → `"[FIELD]": "[REDACTED]"`) from `redactError.ts` into `sharedRedaction.ts`'s `redactInlineSecrets()`
+- Simplified `redactError.ts` to a single call to `redactInlineSecrets()`, eliminating three duplicate regex patterns (URL credentials, `sk-` tokens, JSON fields)
+
+**4. Profile Form Enhancement**
+- Added Vendor dropdown (OpenAI, Anthropic, Google, Ollama) to `ProfileForm.tsx`
+- Added Model ID text input with placeholder examples
+- `localOnly`/`cloudAllowed` now derived from vendor selection instead of hardcoded
+
+**5. Integration Test Expansion (6 new tests)**
+- Profile CRUD lifecycle: create → retrieve → delete → confirm 404 (model and tactic)
+- Profile deletion 404: DELETE on non-existent profile returns 404
+- Global policy deletion rejection: DELETE on global policy returns 405
+- Application policy deletion: DELETE removes policy and confirms absence from list
+- Tactic profile validation: POST without executionMethod returns 400
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 532 passing across 51 test files, 0 failures (6 new tests added)

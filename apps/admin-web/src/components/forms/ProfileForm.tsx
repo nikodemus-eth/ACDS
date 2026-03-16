@@ -31,6 +31,8 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
   const [description, setDescription] = useState('');
   const [taskTypes, setTaskTypes] = useState('');
   const [loadTiers, setLoadTiers] = useState('');
+  const [vendor, setVendor] = useState('openai');
+  const [modelId, setModelId] = useState('');
   const [cognitiveGrade, setCognitiveGrade] = useState('standard');
   const [executionMethod, setExecutionMethod] = useState('');
   const [multiStage, setMultiStage] = useState(false);
@@ -41,11 +43,13 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
 
     if (type === 'model') {
       Object.assign(base, {
+        vendor,
+        modelId: modelId || name,
         supportedTaskTypes: taskTypes.split(',').map((s) => s.trim()).filter(Boolean),
         supportedLoadTiers: loadTiers.split(',').map((s) => s.trim()).filter(Boolean),
         minimumCognitiveGrade: cognitiveGrade,
-        localOnly: false,
-        cloudAllowed: true,
+        localOnly: vendor === 'ollama',
+        cloudAllowed: vendor !== 'ollama',
         enabled: true,
       });
     } else {
@@ -133,7 +137,32 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
       </div>
 
       {type === 'model' && (
-        <div style={fieldStyle}>
+        <>
+          <div style={fieldStyle}>
+            <label htmlFor="profile-vendor" style={labelElStyle}>Vendor</label>
+            <select
+              id="profile-vendor"
+              style={inputStyle}
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="google">Google</option>
+              <option value="ollama">Ollama (local)</option>
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label htmlFor="profile-model-id" style={labelElStyle}>Model ID</label>
+            <input
+              id="profile-model-id"
+              style={inputStyle}
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+              placeholder="e.g. gpt-4.1, claude-sonnet-4-6"
+            />
+          </div>
+          <div style={fieldStyle}>
           <label htmlFor="profile-cognitive-grade" style={labelElStyle}>Minimum Cognitive Grade</label>
           <select
             id="profile-cognitive-grade"
@@ -147,7 +176,8 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
             <option value="frontier">frontier</option>
             <option value="specialized">specialized</option>
           </select>
-        </div>
+          </div>
+        </>
       )}
 
       {type === 'tactic' && (

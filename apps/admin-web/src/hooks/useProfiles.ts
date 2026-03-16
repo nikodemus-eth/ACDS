@@ -6,6 +6,7 @@ import {
   getTacticProfile,
   createProfile,
   updateProfile,
+  deleteProfile,
   type CreateProfilePayload,
 } from '../features/profiles/profilesApi';
 
@@ -65,6 +66,18 @@ export function useUpdateProfile() {
       id: string;
       payload: Record<string, unknown>;
     }) => updateProfile(type, id, payload),
+    onSuccess: (_data, variables) => {
+      const key = variables.type === 'model' ? MODEL_PROFILES_KEY : TACTIC_PROFILES_KEY;
+      void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+export function useDeleteProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ type, id }: { type: 'model' | 'tactic'; id: string }) =>
+      deleteProfile(type, id),
     onSuccess: (_data, variables) => {
       const key = variables.type === 'model' ? MODEL_PROFILES_KEY : TACTIC_PROFILES_KEY;
       void qc.invalidateQueries({ queryKey: key });

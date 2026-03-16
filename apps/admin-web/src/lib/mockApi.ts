@@ -447,6 +447,18 @@ export async function mockRequest<T>(
     Object.assign(profile, body as Partial<TacticProfile>, { updatedAt: new Date() });
     return asJson(profile as T);
   }
+  if (method === 'DELETE' && path.startsWith('/profiles/model/')) {
+    const id = path.split('/')[3];
+    const index = modelProfiles.findIndex((entry) => entry.id === id);
+    if (index >= 0) modelProfiles.splice(index, 1);
+    return asJson(undefined as T);
+  }
+  if (method === 'DELETE' && path.startsWith('/profiles/tactic/')) {
+    const id = path.split('/')[3];
+    const index = tacticProfiles.findIndex((entry) => entry.id === id);
+    if (index >= 0) tacticProfiles.splice(index, 1);
+    return asJson(undefined as T);
+  }
 
   if (method === 'GET' && path === '/policies') {
     const level = params?.level;

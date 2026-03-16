@@ -58,6 +58,18 @@ export class ProfilesController {
     reply.send(ProfilePresenter.toModelView(profile));
   }
 
+  async deleteModelProfile(
+    request: FastifyRequest<{ Params: ProfileIdParams }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const deleted = await this.catalog.deleteModelProfile(request.params.id);
+    if (!deleted) {
+      reply.status(404).send({ error: 'Not Found', message: `Model profile ${request.params.id} not found`, statusCode: 404 });
+      return;
+    }
+    reply.status(204).send();
+  }
+
   async listTacticProfiles(_request: FastifyRequest, reply: FastifyReply): Promise<void> {
     reply.send(ProfilePresenter.toTacticViewList(await this.catalog.listTacticProfiles()));
   }
@@ -95,6 +107,18 @@ export class ProfilesController {
       enabled: request.body.enabled,
     });
     reply.status(201).send(ProfilePresenter.toTacticView(profile));
+  }
+
+  async deleteTacticProfile(
+    request: FastifyRequest<{ Params: ProfileIdParams }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const deleted = await this.catalog.deleteTacticProfile(request.params.id);
+    if (!deleted) {
+      reply.status(404).send({ error: 'Not Found', message: `Tactic profile ${request.params.id} not found`, statusCode: 404 });
+      return;
+    }
+    reply.status(204).send();
   }
 
   async updateTacticProfile(

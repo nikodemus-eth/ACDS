@@ -461,12 +461,145 @@ describe('Admin API routes', () => {
     });
 
     expect(detailResponse.statusCode).toBe(200);
-    expect(detailResponse.json()).toEqual(
-      expect.objectContaining({
-        id: 'exec-1',
-        rationaleSummary: '',
-        fallbackHistory: [],
-      }),
-    );
+    const detail = detailResponse.json();
+    expect(detail.id).toBe('exec-1');
+    expect(detail.rationaleSummary).toContain('process_swarm');
+    expect(detail.rationaleSummary).toContain('prov-openai');
+    expect(detail.fallbackHistory).toEqual([]);
+  });
+
+  it('creates, retrieves, and deletes a model profile', async () => {
+    const app = await makeApp();
+    _app = app;
+
+    const createResponse = await injectAuthorized(app, {
+      method: 'POST',
+      url: '/profiles/model',
+      payload: {
+        name: 'test_model',
+        description: 'Integration test model profile',
+        supportedTaskTypes: ['analytical'],
+        supportedLoadTiers: ['single_shot'],
+        minimumCognitiveGrade: 'standard',
+      },
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+    const created = createResponse.json();
+    expect(created.name).toBe('test_model');
+
+    const getResponse = await injectAuthorized(app, {
+      method: 'GET',
+      url: `/profiles/model/${created.id}`,
+    });
+
+    expect(getResponse.statusCode).toBe(200);
+    expect(getResponse.json().name).toBe('test_model');
+
+    const deleteResponse = await injectAuthorized(app, {
+      method: 'DELETE',
+      url: `/profiles/model/${created.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(204);
+
+    const getAfterDelete = await injectAuthorized(app, {
+      method: 'GET',
+      url: `/profiles/model/${created.id}`,
+    });
+
+    expect(getAfterDelete.statusCode).toBe(404);
+  });
+
+  it('creates, retrieves, and deletes a tactic profile', async () => {
+    const app = await makeApp();
+    _app = app;
+
+    const createResponse = await injectAuthorized(app, {
+      method: 'POST',
+      url: '/profiles/tactic',
+      payload: {
+        name: 'test_tactic',
+        description: 'Integration test tactic profile',
+        executionMethod: 'chain_of_thought',
+        supportedTaskTypes: ['generation'],
+        supportedLoadTiers: ['batch'],
+      },
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+    const created = createResponse.json();
+    expect(created.name).toBe('test_tactic');
+    expect(created.executionMethod).toBe('chain_of_thought');
+
+    const deleteResponse = await injectAuthorized(app, {
+      method: 'DELETE',
+      url: `/profiles/tactic/${created.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(204);
+  });
+
+  it('returns 404 when deleting a non-existent profile', async () => {
+    const app = await makeApp();
+    _app = app;
+
+    const response = await injectAuthorized(app, {
+      method: 'DELETE',
+      url: '/profiles/model/non-existent-id',
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('rejects deletion of global policy with 405', async () => {
+    const app = await makeApp();
+    _app = app;
+
+    const response = await injectAuthorized(app, {
+      method: 'DELETE',
+      url: '/policies/global-policy',
+    });
+
+    expect(response.statusCode).toBe(405);
+    expect(response.json().message).toContain('Global policy');
+  });
+
+  it('deletes an application policy and confirms removal', async () => {
+    const app = await makeApp();
+    _app = app;
+
+    const deleteResponse = await injectAuthorized(app, {
+      method: 'DELETE',
+      url: '/policies/app-policy',
+    });
+
+    expect(deleteResponse.statusCode).toBe(204);
+
+    const listResponse = await injectAuthorized(app, {
+      method: 'GET',
+      url: '/policies?level=application',
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    const policies = listResponse.json();
+    expect(policies.find((p: any) => p.id === 'app-policy')).toBeUndefined();
+  });
+
+  it('rejects tactic profile creation without executionMethod', async () => {
+    const app = await makeApp();
+    _app = app;
+
+    const response = await injectAuthorized(app, {
+      method: 'POST',
+      url: '/profiles/tactic',
+      payload: {
+        name: 'bad_tactic',
+        description: 'Missing executionMethod',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toContain('executionMethod');
   });
 });

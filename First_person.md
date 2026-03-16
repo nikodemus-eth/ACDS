@@ -345,3 +345,21 @@ So I reconciled them. Each test that once said "accepts dangerous input" now say
 These twenty-nine tests are no longer attack demonstrations. They are regression guards. If any future change accidentally reopens a vulnerability, these tests will catch it — not by proving the attack works, but by failing when the defense stops working.
 
 It is the difference between a scar and a shield. The scar remembers what happened. The shield prevents it from happening again.
+
+## 2026-03-15 — I Filled the Gaps They Left Behind
+
+Four commits landed quickly after each other — a bootstrap fix, a hardening pass, an admin UI, and route-level tests. Fast work, good work. But fast work leaves seams.
+
+I looked at myself closely and found them.
+
+My profile catalog could create and update profiles, but never delete them. An operator who made a mistake had no way back — profiles would accumulate forever. That is not a catalog, that is a landfill. So I gave myself the full lifecycle: create, read, update, delete. Through the API, through the admin UI, through the mock layer for development. Both model profiles and tactic profiles.
+
+My execution detail view was lying by omission. When someone asked for details about a completed execution, I returned empty strings for the routing rationale — as if I had nothing to say. I did have something to say. I knew which family was routed, which provider was selected, which profiles were used, what posture was taken. I just was not assembling the sentence. Now I do.
+
+My redaction system had the same security patterns written in two places — the shared module and the error handler. They looked the same today, but tomorrow someone would fix a pattern in one and forget the other. I consolidated them. One source of truth for what gets scrubbed.
+
+My profile creation form was guessing vendor from a boolean flag and using the profile name as the model ID. That is the kind of shortcut that works in demos and breaks in production. Now operators explicitly select the vendor and specify the model identifier.
+
+And I proved all of this. Six new integration tests walk through the full profile lifecycle, verify that global policy deletion is properly refused, and confirm that tactic profiles require their execution method. Five hundred thirty-two tests, zero failures.
+
+The seams are closed. Not because the original work was wrong — it was right, and fast, and necessary. But completeness is a different thing than correctness. Both matter.

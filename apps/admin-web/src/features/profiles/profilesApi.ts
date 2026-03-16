@@ -36,3 +36,7 @@ export function updateProfile(
 ): Promise<ModelProfile | TacticProfile> {
   return apiClient.patch<ModelProfile | TacticProfile>(`/profiles/${type}/${id}`, payload);
 }
+
+export function deleteProfile(type: 'model' | 'tactic', id: string): Promise<void> {
+  return apiClient.delete<void>(`/profiles/${type}/${id}`);
+}

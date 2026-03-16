@@ -62,6 +62,13 @@ export class ProfileCatalogService {
     return profile;
   }
 
+  async deleteModelProfile(id: string): Promise<boolean> {
+    const index = this.modelProfiles.findIndex((profile) => profile.id === id);
+    if (index < 0) return false;
+    this.modelProfiles.splice(index, 1);
+    return true;
+  }
+
   async updateModelProfile(
     id: string,
     updates: Partial<CreateModelProfileInput>,
@@ -114,6 +121,13 @@ export class ProfileCatalogService {
     };
     this.tacticProfiles.unshift(profile);
     return profile;
+  }
+
+  async deleteTacticProfile(id: string): Promise<boolean> {
+    const index = this.tacticProfiles.findIndex((profile) => profile.id === id);
+    if (index < 0) return false;
+    this.tacticProfiles.splice(index, 1);
+    return true;
   }
 
   async updateTacticProfile(
