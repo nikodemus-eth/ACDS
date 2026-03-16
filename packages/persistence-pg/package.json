@@ -15,6 +15,7 @@
     "@acds/execution-orchestrator": "workspace:*",
     "@acds/adaptive-optimizer": "workspace:*",
     "@acds/policy-engine": "workspace:*",
+    "@acds/security": "workspace:*",
     "@acds/audit-ledger": "workspace:*",
     "@acds/evaluation": "workspace:*"
   },

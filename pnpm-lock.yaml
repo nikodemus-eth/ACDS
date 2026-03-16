@@ -231,6 +231,9 @@ importers:
       '@acds/provider-broker':
         specifier: workspace:*
         version: link:../provider-broker
+      '@acds/security':
+        specifier: workspace:*
+        version: link:../security
       pg:
         specifier: ^8.13.0
         version: 8.20.0

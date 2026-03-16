@@ -1,10 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import type { Provider, ModelProfile, TacticProfile, RoutingRequest } from '@acds/core-types';
 import { ProviderVendor } from '@acds/core-types';
 import { TaskType, LoadTier } from '@acds/core-types';
-import { FileKeyResolver, SecretRotationService, type SecretCipherStore, type StoredSecret } from '@acds/security';
+import { FileKeyResolver, SecretRotationService } from '@acds/security';
 import {
   ProviderRegistryService,
   ProviderValidationService,
@@ -16,9 +15,9 @@ import {
 import { OpenAIAdapter, OllamaAdapter, LMStudioAdapter, GeminiAdapter, AppleIntelligenceAdapter, type AdapterRequest, type AdapterResponse } from '@acds/provider-adapters';
 import { DispatchResolver, type DispatchResult } from '@acds/routing-engine';
 import { DispatchRunService, ExecutionRecordService, ExecutionStatusTracker } from '@acds/execution-orchestrator';
-import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository, PgAuditEventRepository, PgFamilyPerformanceRepository, PgAdaptationEventRepository, PgAdaptationRecommendationRepository } from '@acds/persistence-pg';
+import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository, PgAuditEventRepository, PgFamilyPerformanceRepository, PgAdaptationEventRepository, PgAdaptationRecommendationRepository, PgSecretCipherStore, PgRollbackRecordWriter, PgApprovalAuditEmitter, PgRollbackAuditEmitter } from '@acds/persistence-pg';
 import { PolicyMergeResolver, normalizeInstanceContext, computeInstanceOverrides, type EffectivePolicy } from '@acds/policy-engine';
-import { AdaptationRollbackService, type AdaptationApprovalRepository, type ApprovalAuditEvent, type RollbackAuditEvent, type AdaptationRollbackRecord, type AdaptationEvent, type AdaptationEventFilters } from '@acds/adaptive-optimizer';
+import { AdaptationRollbackService, type AdaptationApprovalRepository } from '@acds/adaptive-optimizer';
 import type { CandidatePerformanceState } from '@acds/adaptive-optimizer';
 import type { DispatchResolverDeps } from '@acds/routing-engine';
 import type { AppConfig } from '../config/index.js';
@@ -33,48 +32,6 @@ type TacticProfileSeed = Omit<TacticProfile, 'id' | 'description' | 'enabled' | 
   name: string;
 };
 
-class InMemorySecretStore implements SecretCipherStore {
-  private readonly secrets = new Map<string, StoredSecret>();
-
-  async store(providerId: string, envelope: StoredSecret['envelope']): Promise<StoredSecret> {
-    const record: StoredSecret = {
-      id: randomUUID(),
-      providerId,
-      envelope,
-      createdAt: new Date(),
-      rotatedAt: null,
-      expiresAt: null,
-    };
-    this.secrets.set(providerId, record);
-    return record;
-  }
-
-  async retrieve(providerId: string): Promise<StoredSecret | null> {
-    return this.secrets.get(providerId) ?? null;
-  }
-
-  async rotate(providerId: string, newEnvelope: StoredSecret['envelope']): Promise<StoredSecret> {
-    const existing = this.secrets.get(providerId);
-    const record: StoredSecret = {
-      id: existing?.id ?? randomUUID(),
-      providerId,
-      envelope: newEnvelope,
-      createdAt: existing?.createdAt ?? new Date(),
-      rotatedAt: new Date(),
-      expiresAt: existing?.expiresAt ?? null,
-    };
-    this.secrets.set(providerId, record);
-    return record;
-  }
-
-  async revoke(providerId: string): Promise<void> {
-    this.secrets.delete(providerId);
-  }
-
-  async exists(providerId: string): Promise<boolean> {
-    return this.secrets.has(providerId);
-  }
-}
 
 class EnvAwareConnectionTester {
   constructor(
@@ -88,52 +45,6 @@ class EnvAwareConnectionTester {
   }
 }
 
-class NoopApprovalAuditEmitter {
-  emit(event: ApprovalAuditEvent): void {
-    console.info('[approval-audit]', event.type, event.approvalId, event.familyKey);
-  }
-}
-
-class NoopRollbackAuditEmitter {
-  emit(event: RollbackAuditEvent): void {
-    console.info('[rollback-audit]', event.type, event.rollbackId, event.familyKey);
-  }
-}
-
-class InMemoryRollbackRecordWriter {
-  private readonly records: AdaptationRollbackRecord[] = [];
-
-  async save(record: AdaptationRollbackRecord): Promise<void> {
-    this.records.push(record);
-  }
-}
-
-class InMemoryAdaptationLedger {
-  private readonly events: AdaptationEvent[] = [];
-
-  async writeEvent(event: AdaptationEvent): Promise<void> {
-    this.events.push(event);
-  }
-
-  async listEvents(familyKey: string, filters?: AdaptationEventFilters): Promise<AdaptationEvent[]> {
-    let results = this.events.filter((event) => event.familyKey === familyKey);
-    if (filters?.trigger) results = results.filter((event) => event.trigger === filters.trigger);
-    if (filters?.since) {
-      const since = filters.since;
-      results = results.filter((event) => event.createdAt >= since);
-    }
-    if (filters?.until) {
-      const until = filters.until;
-      results = results.filter((event) => event.createdAt <= until);
-    }
-    if (filters?.limit) results = results.slice(0, filters.limit);
-    return results;
-  }
-
-  async getEvent(id: string): Promise<AdaptationEvent | undefined> {
-    return this.events.find((event) => event.id === id);
-  }
-}
 
 
 class OptimizerCandidateReader {
@@ -312,7 +223,7 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     providerRepository,
     new ProviderConnectionTester(adapterResolver),
   );
-  const secretStore = new InMemorySecretStore();
+  const secretStore = new PgSecretCipherStore(pool);
   const secretRotationService = new SecretRotationService(
     secretStore,
     new FileKeyResolver(config.masterKeyPath),
@@ -330,12 +241,12 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
   const dispatchResolver = new DispatchResolver();
   const executionRecordService = new ExecutionRecordService(executionRecordRepository);
   const statusTracker = new ExecutionStatusTracker();
-  const ledger = new InMemoryAdaptationLedger();
+  const adaptationEventRepo = new PgAdaptationEventRepository(pool);
   const rollbackService = new AdaptationRollbackService(
-    ledger,
+    adaptationEventRepo,
     optimizerRepository,
-    new InMemoryRollbackRecordWriter(),
-    new NoopRollbackAuditEmitter(),
+    new PgRollbackRecordWriter(pool),
+    new PgRollbackAuditEmitter(pool),
   );
 
   const dispatchRunService = new DispatchRunService(statusTracker, {
@@ -378,10 +289,10 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     auditEventReader: new PgAuditEventRepository(pool),
     familyPerformanceReader: new PgFamilyPerformanceRepository(pool),
     candidateRankingReader: new OptimizerCandidateReader(optimizerRepository),
-    adaptationEventReader: new PgAdaptationEventRepository(pool),
+    adaptationEventReader: adaptationEventRepo,
     adaptationRecommendationReader: new PgAdaptationRecommendationRepository(pool),
     adaptationApprovalRepository: approvalRepository as AdaptationApprovalRepository,
-    approvalAuditEmitter: new NoopApprovalAuditEmitter(),
+    approvalAuditEmitter: new PgApprovalAuditEmitter(pool),
     adaptationRollbackService: rollbackService,
     resolve<T>(name: string): T {
       return this[name] as T;

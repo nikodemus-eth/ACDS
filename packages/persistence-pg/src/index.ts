@@ -20,3 +20,6 @@ export type {
   AdaptationRecommendationReader,
   AdaptationRecommendation,
 } from './PgAdaptationEventRepository.js';
+export { PgSecretCipherStore } from './PgSecretCipherStore.js';
+export { PgRollbackRecordWriter } from './PgRollbackRecordWriter.js';
+export { PgApprovalAuditEmitter, PgRollbackAuditEmitter } from './PgAuditEmitters.js';
