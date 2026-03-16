@@ -147,3 +147,10 @@ Tracking lessons learned to prevent repeating pain points.
 
 - **Controller tests are not a substitute for real route tests.** The new admin APIs looked covered at the controller layer, but only Fastify injection verifies auth hooks, URL prefixes, alias routes, and presenter wiring together.
 - **When framework overload types get in the way, cast at the boundary and keep assertions strict inside.** The Fastify inject helper was easier to keep maintainable once the overload friction was isolated to a tiny helper instead of spread across every test.
+
+## 2026-03-15 — Red-Team Test Reconciliation After Hardening
+
+- **Red-team tests that prove vulnerabilities must be flipped after fixes, not deleted.** When hardening closes a vulnerability, the red-team test that demonstrated it starts failing — it expects the vulnerable behavior that no longer exists. The correct response is to invert the assertions so the test now proves the fix works. Deleting the test loses the regression guard.
+- **Failing red-team tests after a hardening pass is good news, not bad news.** 29 failures after fixing 29 vulnerabilities means exactly 29 fixes landed correctly. The failure count should match the fix count. If some tests still pass, the corresponding vulnerability was not actually fixed.
+- **Test name and comment hygiene matters for future readers.** Renaming "accepts dangerous input" to "rejects dangerous input after hardening" and changing `// VULN:` to `// FIXED:` makes it immediately clear to future developers that these tests guard against regressions, not demonstrate active vulnerabilities. Without this, someone reading the test suite would reasonably believe the system is still vulnerable.
+- **Assertion patterns differ by fix type.** Validation fixes (URL, actor, threshold) become `rejects.toThrow()` or `expect(errors.length).toBeGreaterThan(0)`. Behavioral fixes (state restoration, deduplication) become `expect(stateAfter).not.toEqual(stateBefore)` or `expect(count).toBe(expectedValue)`. Constructor-time validation becomes synchronous `expect(() => new Service(bad)).toThrow()`. Match the assertion style to the fix mechanism.

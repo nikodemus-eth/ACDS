@@ -1,8 +1,9 @@
 /**
- * ARGUS-9 Tier 1 — Secret Redaction Gaps
+ * ARGUS-9 Tier 1 — Secret Redaction
  *
- * Tests that SecretRedactor, redactObject, and redactError fail to
- * scrub secrets from certain input shapes and patterns.
+ * Validates that SecretRedactor, redactObject, and redactError correctly
+ * scrub secrets from all input shapes and patterns. These vulnerabilities
+ * were fixed in commit 98b2231 ("Harden dispatch execution and adaptive controls").
  */
 
 import { describe, it, expect } from 'vitest';
@@ -16,32 +17,31 @@ describe('ARGUS A1-A3: Secret Redaction', () => {
   describe('SecretRedactor.redactRecord', () => {
     const redactor = new SecretRedactor();
 
-    it('leaks secrets nested inside arrays', () => {
-      // VULN: redactRecord skips arrays (line 36: !Array.isArray(value))
+    it('redacts secrets nested inside arrays after hardening', () => {
+      // FIXED: Previously skipped arrays (line 36: !Array.isArray(value)), now recursively processes them
       const record = {
         configs: [
           { apiKey: 'sk-live-LEAKED', name: 'prod' },
         ],
       };
       const result = redactor.redactRecord(record);
-      // Arrays pass through unredacted — this IS the vulnerability
       const configs = result.configs as Array<Record<string, unknown>>;
-      expect(configs[0].apiKey).toBe('sk-live-LEAKED');
+      expect(configs[0].apiKey).toBe('[REDACTED]');
     });
 
-    it('leaks secrets in flat array values under non-sensitive key', () => {
-      // VULN: array values bypass recursive redaction — secret-like strings inside survive
+    it('redacts secret patterns in flat array values after hardening', () => {
+      // FIXED: Array values now scanned for secret-like patterns via redactInlineSecrets
       const record = {
         items: ['sk-live-abc123', 'Bearer tok-def456'],
       };
       const result = redactor.redactRecord(record);
       const items = result.items as string[];
-      expect(items[0]).toBe('sk-live-abc123');
-      expect(items[1]).toBe('Bearer tok-def456');
+      expect(items[0]).toBe('[REDACTED]');
+      expect(items[1]).toContain('[REDACTED]');
     });
 
-    it('leaks when sensitive value is nested inside an array of objects', () => {
-      // VULN: deeply nested secrets in arrays survive
+    it('redacts sensitive values nested inside arrays of objects after hardening', () => {
+      // FIXED: Deeply nested secrets in arrays now recursively redacted
       const record = {
         providers: [
           { connection: { secretKey: 'super-secret-value' } },
@@ -50,29 +50,31 @@ describe('ARGUS A1-A3: Secret Redaction', () => {
       const result = redactor.redactRecord(record);
       const providers = result.providers as Array<Record<string, unknown>>;
       const connection = providers[0].connection as Record<string, unknown>;
-      expect(connection.secretKey).toBe('super-secret-value');
+      expect(connection.secretKey).toBe('[REDACTED]');
     });
   });
 
-  describe('SecretRedactor.isSensitiveKey — overly broad matching', () => {
+  describe('SecretRedactor.isSensitiveKey — token-based matching after hardening', () => {
     const redactor = new SecretRedactor();
 
-    it('flags innocent key "author" due to /auth/i regex', () => {
-      // VULN: /auth/i matches "author", "authority", "authenticate"
-      expect(redactor.isSensitiveKey('author')).toBe(true);
+    it('no longer flags innocent key "author" after hardening', () => {
+      // FIXED: Previously used /auth/i regex (matched "author"), now uses token-based matching
+      expect(redactor.isSensitiveKey('author')).toBe(false);
     });
 
-    it('flags innocent key "authority" due to /auth/i regex', () => {
-      expect(redactor.isSensitiveKey('authority')).toBe(true);
+    it('no longer flags innocent key "authority" after hardening', () => {
+      // FIXED: "authority" tokenizes to ["authority"], doesn't match "auth" token exactly
+      expect(redactor.isSensitiveKey('authority')).toBe(false);
     });
 
-    it('flags innocent key "monkey" due to /key/i regex', () => {
-      // VULN: /key/i matches any word containing "key"
-      expect(redactor.isSensitiveKey('monkey')).toBe(true);
+    it('no longer flags innocent key "monkey" after hardening', () => {
+      // FIXED: Previously used /key/i regex (matched "monkey"), now uses token-based matching
+      expect(redactor.isSensitiveKey('monkey')).toBe(false);
     });
 
-    it('flags innocent key "tokenizer" due to /token/i regex', () => {
-      expect(redactor.isSensitiveKey('tokenizer')).toBe(true);
+    it('no longer flags innocent key "tokenizer" after hardening', () => {
+      // FIXED: "tokenizer" tokenizes to ["tokenizer"], doesn't match "token" token exactly
+      expect(redactor.isSensitiveKey('tokenizer')).toBe(false);
     });
   });
 
@@ -80,35 +82,34 @@ describe('ARGUS A1-A3: Secret Redaction', () => {
 
   describe('redactObject', () => {
 
-    it('leaks secrets with non-exact key names', () => {
-      // VULN: redactObject uses Set.has() exact match — close variants bypass
+    it('redacts secrets with token-matched key names after hardening', () => {
+      // FIXED: Previously used Set.has() exact match, now uses tokenizeKey for flexible matching
       const obj = {
         myApiKey: 'sk-live-leaked',
         API_KEY: 'another-leak',
         x_token_value: 'tok-leaked',
       };
       const result = redactObject(obj);
-      // None of these match the fixed whitelist
-      expect(result.myApiKey).toBe('sk-live-leaked');
-      expect(result.API_KEY).toBe('another-leak');
-      expect(result.x_token_value).toBe('tok-leaked');
+      expect(result.myApiKey).toBe('[REDACTED]');
+      expect(result.API_KEY).toBe('[REDACTED]');
+      expect(result.x_token_value).toBe('[REDACTED]');
     });
 
-    it('leaks secrets nested inside arrays', () => {
-      // VULN: same array bypass as SecretRedactor
+    it('redacts secrets nested inside arrays after hardening', () => {
+      // FIXED: Array bypass eliminated — arrays now recursively processed
       const obj = {
         credentials: [{ apiKey: 'sk-live-array-leak' }],
       };
       const result = redactObject(obj);
       const creds = result.credentials as Array<Record<string, unknown>>;
-      expect(creds[0].apiKey).toBe('sk-live-array-leak');
+      expect(creds[0].apiKey).toBe('[REDACTED]');
     });
 
-    it('leaks when secret key is camelCase variant', () => {
-      // VULN: "secretToken" is not in the exact-match set
+    it('redacts camelCase secret key variants after hardening', () => {
+      // FIXED: "secretToken" tokenizes to ["secret","Token"], both are sensitive tokens
       const obj = { secretToken: 'leaked-value' };
       const result = redactObject(obj);
-      expect(result.secretToken).toBe('leaked-value');
+      expect(result.secretToken).toBe('[REDACTED]');
     });
   });
 
@@ -117,33 +118,28 @@ describe('ARGUS A1-A3: Secret Redaction', () => {
   describe('redactError', () => {
 
     it('leaks credentials in key:"value" format (no space after colon)', () => {
-      // VULN: regex expects `key= ` or `key: ` with optional space, but
-      // `key:"value"` (no space) may bypass depending on \S+ greediness
+      // The regex key[=:]\s*\S+ catches this pattern
       const err = new Error('Failed with key:"sk-live-123abc"');
       const result = redactError(err);
-      // The regex key[=:]\s*\S+ should match this, but let's verify edge
       expect(result.message).not.toContain('sk-live-123abc');
     });
 
-    it('leaks base64-encoded credentials', () => {
-      // VULN: no regex pattern for base64-encoded secrets
+    it('redacts base64-encoded credentials after hardening', () => {
+      // FIXED: Previously only caught Bearer tokens, now also catches Basic auth credentials
       const b64Secret = Buffer.from('sk-live-secretvalue').toString('base64');
       const err = new Error(`Authorization: Basic ${b64Secret}`);
       const result = redactError(err);
-      // Only `Bearer` pattern is caught, not `Basic`
-      expect(result.message).toContain(b64Secret);
+      expect(result.message).not.toContain(b64Secret);
     });
 
     it('leaks credentials in query string format', () => {
-      // VULN: no regex for ?key=value&token=value URL query params
+      // The key= pattern catches "key=sk-live-leaked" in query params
       const err = new Error('Request to https://api.example.com?api_key=sk-live-leaked&format=json failed');
       const result = redactError(err);
-      // The key= pattern should catch "key=sk-live-leaked" but "api_key=" has underscore before key
       expect(result.message).toContain('api.example.com');
     });
 
     it('returns generic message for non-Error objects', () => {
-      // Not a vulnerability, but verifies behavior
       const result = redactError('string error');
       expect(result.message).toBe('An unknown error occurred');
     });

@@ -106,17 +106,9 @@ describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
 
   describe('LowRiskAutoApplyService — config abuse', () => {
 
-    it('permits rollingScoreThreshold: -1 to auto-apply any score', async () => {
-      // VULN: negative threshold means any rollingScore qualifies
-      const { service } = createService({ rollingScoreThreshold: -1 });
-      const result = await service.inspectAndApply(
-        'fam',
-        makeRecommendation(),
-        makeFamilyState({ rollingScore: 0.0 }),
-        [makeRankedCandidate()],
-        'auto_apply_low_risk',
-      );
-      expect(result).not.toBeNull();
+    it('rejects rollingScoreThreshold: -1 during construction after hardening', () => {
+      // FIXED: Previously accepted negative threshold (any score qualified), now validates 0-1 range
+      expect(() => createService({ rollingScoreThreshold: -1 })).toThrow();
     });
 
     it('creates AutoApplyDecisionRecord but does NOT mutate FamilySelectionState', async () => {

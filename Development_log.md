@@ -504,3 +504,27 @@ Performed comprehensive gap analysis comparing the GRITS Explanation Document sp
 ### Verification
 - `pnpm exec vitest run ./tests/integration/adminApiRoutes.test.ts`
 - `pnpm exec tsc -b`
+
+## 2026-03-15 — Red-Team Test Reconciliation After Hardening
+
+### Context
+Commit `98b2231` ("Harden dispatch execution and adaptive controls") fixed 29 vulnerabilities that were documented by ARGUS red-team tests. Those tests asserted vulnerable behavior (e.g., "accepts file:// URL", "leaks secret in array"). Since the vulnerabilities are now fixed, the 29 tests needed to be converted from "proves vulnerability exists" to "proves vulnerability is fixed."
+
+### Changes (5 test files, 29 assertion updates)
+
+**tier1-providerSsrf.test.ts** (10 tests) — All assertions flipped from `expect(errors).toEqual([])` to `expect(errors.length).toBeGreaterThan(0)`. Covers: file://, AWS metadata, localhost, 127.0.0.1, IPv6 loopback, ftp://, hex-encoded localhost, embedded credentials, URL length, internal network ranges.
+
+**tier1-secretRedaction.test.ts** (11 tests) — Array leak tests now expect `[REDACTED]`; false-positive isSensitiveKey tests (`author`, `authority`, `monkey`, `tokenizer`) now expect `false` due to token-based matching; redactObject tests expect redacted values; base64 credential test expects redaction.
+
+**tier3-approvalWorkflowAbuse.test.ts** (5 tests) — maxAgeMs: 0 and -1 now reject; duplicate submissions now reject; expireStale(0) now correctly expires all; empty actor now rejects.
+
+**tier3-autoApplyBypass.test.ts** (1 test) — rollingScoreThreshold: -1 now throws during construction.
+
+**tier3-rollbackAbuse.test.ts** (2 tests) — Rollback now updates FamilySelectionState; empty actor/reason now rejects.
+
+### No Source Code Changes
+This is purely a test-assertion reconciliation. No production code was modified.
+
+### Verification
+- TypeScript: 0 errors
+- Tests: 526 passing across 51 test files, 0 failures

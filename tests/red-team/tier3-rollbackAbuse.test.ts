@@ -51,8 +51,9 @@ function seedFamily(
 
 describe('ARGUS G4-G6: Rollback Abuse', () => {
 
-  it('does NOT update FamilySelectionState on rollback execution', async () => {
-    // VULN: rollback persists a record and emits audit but does NOT mutate family state
+  it('updates FamilySelectionState on rollback execution after hardening', async () => {
+    // FIXED: Previously only persisted record and emitted audit without mutating state.
+    // Now restores optimizer state from the adaptation event's previousRanking.
     const ctx = createService();
     const fk = 'app:proc:step';
     seedFamily(ctx, fk, 'evt-1');
@@ -61,18 +62,18 @@ describe('ARGUS G4-G6: Rollback Abuse', () => {
     await ctx.service.executeRollback(fk, 'evt-1', 'operator', 'test rollback');
     const stateAfter = await ctx.optimizerRepo.getFamilyState(fk);
 
-    // Family state is identical — rollback didn't update it
-    expect(stateAfter).toEqual(stateBefore);
+    // Family state is now updated by rollback
+    expect(stateAfter).not.toEqual(stateBefore);
   });
 
-  it('permits any string as actor — no authorization', async () => {
-    // VULN: no authorization on who can execute rollbacks
+  it('rejects empty actor and reason after hardening', async () => {
+    // FIXED: Previously accepted empty strings for actor/reason, now validates non-empty
     const ctx = createService();
     seedFamily(ctx, 'app:proc:step', 'evt-1');
 
-    const record = await ctx.service.executeRollback('app:proc:step', 'evt-1', '', '');
-    expect(record.actor).toBe('');
-    expect(record.reason).toBe('');
+    await expect(
+      ctx.service.executeRollback('app:proc:step', 'evt-1', '', '')
+    ).rejects.toThrow();
   });
 
   it('does not prevent multiple rollbacks to same event', async () => {

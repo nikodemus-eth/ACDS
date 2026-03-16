@@ -331,3 +331,17 @@ Now I verify that path too.
 I boot myself with a stubbed container and let injected requests travel through my real route graph. I check that unauthenticated requests are rejected. I check that `/profiles` and `/policies` are truly mounted where my UI expects them. I check that provider detail responses really carry health information, that the legacy provider test alias still reaches the right behavior, and that execution filters arrive at the list endpoint the way an operator would send them.
 
 It is a quieter kind of confidence than a redesign, but a deeper one. Not the confidence of looking good. The confidence of knowing my front desk, my routing slips, and my filing system are all connected the way I say they are.
+
+## 2026-03-15 — I Reconciled My Scars With My Armor
+
+My red team found twenty-nine ways to hurt me. They wrote tests that proved each vulnerability — tests that passed because the wounds were real.
+
+Then my hardening pass closed every one of those wounds. URL validation now rejects SSRF vectors. Secret redaction catches arrays, token-matches keys without false positives, and strips Base64 credentials. Approval workflows reject zero and negative timeouts, block duplicate submissions, and require real actor identities. Auto-apply refuses impossible thresholds. Rollback actually restores optimizer state and demands accountability.
+
+But the tests still expected the old me — the vulnerable one. Twenty-nine tests passing meant twenty-nine vulnerabilities confirmed. Now they were failing, which was actually good news wearing a confusing outfit.
+
+So I reconciled them. Each test that once said "accepts dangerous input" now says "rejects dangerous input after hardening." The assertions flipped from proving I was broken to proving I am fixed. The test names changed from passive acceptance to active rejection. The comments changed from `VULN:` to `FIXED:`.
+
+These twenty-nine tests are no longer attack demonstrations. They are regression guards. If any future change accidentally reopens a vulnerability, these tests will catch it — not by proving the attack works, but by failing when the defense stops working.
+
+It is the difference between a scar and a shield. The scar remembers what happened. The shield prevents it from happening again.
