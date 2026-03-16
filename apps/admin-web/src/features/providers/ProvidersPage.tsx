@@ -33,15 +33,7 @@ export function ProvidersPage() {
         actions={
           <button
             onClick={() => setShowForm(!showForm)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
+            className="button button--primary"
           >
             {showForm ? 'Cancel' : 'Add Provider'}
           </button>
@@ -49,7 +41,7 @@ export function ProvidersPage() {
       />
 
       {showForm && (
-        <div style={{ marginBottom: '24px' }}>
+        <div className="stack-gap">
           <ProviderForm
             onSubmit={(data) => {
               createMutation.mutate(data, {
@@ -62,7 +54,7 @@ export function ProvidersPage() {
       )}
 
       {isLoading ? (
-        <p>Loading providers...</p>
+        <p className="empty-state">Loading providers...</p>
       ) : (
         <DataTable
           columns={columns}

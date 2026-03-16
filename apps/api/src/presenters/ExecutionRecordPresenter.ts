@@ -27,6 +27,17 @@ export interface ExecutionRecordView {
   completedAt: string | null;
 }
 
+export interface ExecutionRecordDetailView extends ExecutionRecordView {
+  rationaleSummary: string;
+  fallbackHistory: Array<{
+    attempt: number;
+    providerId: string;
+    status: string;
+    latencyMs: number | null;
+    errorMessage: string | null;
+  }>;
+}
+
 export interface ExecutionFamilyView {
   application: string;
   process: string;
@@ -67,6 +78,14 @@ export class ExecutionRecordPresenter {
    */
   static toViewList(records: ExecutionRecord[]): ExecutionRecordView[] {
     return records.map(ExecutionRecordPresenter.toView);
+  }
+
+  static toDetailView(record: ExecutionRecord): ExecutionRecordDetailView {
+    return {
+      ...ExecutionRecordPresenter.toView(record),
+      rationaleSummary: '',
+      fallbackHistory: [],
+    };
   }
 
   // ── Private helpers ────────────────────────────────────────────────────

@@ -76,21 +76,34 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
       <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 600 }}>New Profile</h3>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Type</label>
-        <select style={inputStyle} value={type} onChange={(e) => setType(e.target.value as 'model' | 'tactic')}>
+        <label htmlFor="profile-type" style={labelElStyle}>Type</label>
+        <select
+          id="profile-type"
+          style={inputStyle}
+          value={type}
+          onChange={(e) => setType(e.target.value as 'model' | 'tactic')}
+        >
           <option value="model">Model Profile</option>
           <option value="tactic">Tactic Profile</option>
         </select>
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Name</label>
-        <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} required />
+        <label htmlFor="profile-name" style={labelElStyle}>Name</label>
+        <input
+          id="profile-name"
+          style={inputStyle}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="off"
+          required
+        />
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Description</label>
+        <label htmlFor="profile-description" style={labelElStyle}>Description</label>
         <textarea
+          id="profile-description"
           style={{ ...inputStyle, minHeight: '60px' }}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -98,8 +111,9 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Supported Task Types (comma-separated)</label>
+        <label htmlFor="profile-task-types" style={labelElStyle}>Supported Task Types (comma-separated)</label>
         <input
+          id="profile-task-types"
           style={inputStyle}
           value={taskTypes}
           onChange={(e) => setTaskTypes(e.target.value)}
@@ -108,8 +122,9 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Supported Load Tiers (comma-separated)</label>
+        <label htmlFor="profile-load-tiers" style={labelElStyle}>Supported Load Tiers (comma-separated)</label>
         <input
+          id="profile-load-tiers"
           style={inputStyle}
           value={loadTiers}
           onChange={(e) => setLoadTiers(e.target.value)}
@@ -119,8 +134,13 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
 
       {type === 'model' && (
         <div style={fieldStyle}>
-          <label style={labelElStyle}>Minimum Cognitive Grade</label>
-          <select style={inputStyle} value={cognitiveGrade} onChange={(e) => setCognitiveGrade(e.target.value)}>
+          <label htmlFor="profile-cognitive-grade" style={labelElStyle}>Minimum Cognitive Grade</label>
+          <select
+            id="profile-cognitive-grade"
+            style={inputStyle}
+            value={cognitiveGrade}
+            onChange={(e) => setCognitiveGrade(e.target.value)}
+          >
             <option value="basic">basic</option>
             <option value="standard">standard</option>
             <option value="enhanced">enhanced</option>
@@ -133,8 +153,9 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
       {type === 'tactic' && (
         <>
           <div style={fieldStyle}>
-            <label style={labelElStyle}>Execution Method</label>
+            <label htmlFor="profile-execution-method" style={labelElStyle}>Execution Method</label>
             <input
+              id="profile-execution-method"
               style={inputStyle}
               value={executionMethod}
               onChange={(e) => setExecutionMethod(e.target.value)}
@@ -143,8 +164,12 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
             />
           </div>
           <div style={fieldStyle}>
-            <label style={{ ...labelElStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label
+              htmlFor="profile-multi-stage"
+              style={{ ...labelElStyle, display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
               <input
+                id="profile-multi-stage"
                 type="checkbox"
                 checked={multiStage}
                 onChange={(e) => setMultiStage(e.target.checked)}

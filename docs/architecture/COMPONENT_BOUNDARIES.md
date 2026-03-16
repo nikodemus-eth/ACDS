@@ -82,9 +82,11 @@ Every package in the ACDS monorepo has a defined responsibility and a set of for
 
 ## apps/admin-web
 
-**Owns:** React-based admin UI with pages for providers, profiles, policies, audit, and executions. Communicates with the API server via HTTP.
+**Owns:** React-based admin UI with pages for providers, profiles, policies, adaptation, audit, and executions. Owns the frontend routing shell, page-level query hooks, and the mock transport used for UI development and demos.
 
-**Must NOT import:** Any `packages/*` directly. All data access goes through the API.
+**May import:** `@acds/core-types` for shared enums and view-model-compatible types.
+
+**Must NOT import:** Domain service packages such as `provider-broker`, `policy-engine`, `routing-engine`, `execution-orchestrator`, or persistence packages. All runtime data access goes through the API client or the mock API transport.
 
 ## apps/worker
 

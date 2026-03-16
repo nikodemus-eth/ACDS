@@ -5,6 +5,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ProviderRegistryService } from '@acds/provider-broker';
 import type { ProviderConnectionTester } from '@acds/provider-broker';
+import type { ProviderHealthService } from '@acds/provider-broker';
 import type { CreateProviderInput } from '@acds/core-types';
 import type { SecretRotationService } from '@acds/security';
 import { ProviderPresenter } from '../presenters/ProviderPresenter.js';
@@ -18,6 +19,7 @@ export class ProvidersController {
     private readonly registry: ProviderRegistryService,
     private readonly connectionTester: ProviderConnectionTester,
     private readonly secretRotation: SecretRotationService,
+    private readonly healthService: ProviderHealthService,
   ) {}
 
   // ── POST / ──────────────────────────────────────────────────────────
@@ -52,7 +54,8 @@ export class ProvidersController {
       });
       return;
     }
-    reply.send(ProviderPresenter.toView(provider));
+    const health = await this.healthService.getHealth(provider.id);
+    reply.send(ProviderPresenter.toView(provider, health));
   }
 
   // ── PUT /:id ────────────────────────────────────────────────────────

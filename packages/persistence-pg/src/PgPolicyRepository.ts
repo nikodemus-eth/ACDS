@@ -26,7 +26,7 @@ export interface PolicyRepository {
     step?: string,
   ): Promise<ProcessPolicy | null>;
   findProcessPolicyById(id: string): Promise<ProcessPolicy | null>;
-  listProcessPolicies(application: string): Promise<ProcessPolicy[]>;
+  listProcessPolicies(application?: string): Promise<ProcessPolicy[]>;
   saveProcessPolicy(policy: ProcessPolicy): Promise<void>;
   deleteProcessPolicy(id: string): Promise<void>;
 }
@@ -182,11 +182,15 @@ export class PgPolicyRepository implements PolicyRepository {
     return result.rows.length > 0 ? this.mapProcessRow(result.rows[0]) : null;
   }
 
-  async listProcessPolicies(application: string): Promise<ProcessPolicy[]> {
-    const result = await this.pool.query(
-      'SELECT * FROM process_policies WHERE application = $1 ORDER BY process, step',
-      [application],
-    );
+  async listProcessPolicies(application?: string): Promise<ProcessPolicy[]> {
+    const result = application
+      ? await this.pool.query(
+          'SELECT * FROM process_policies WHERE application = $1 ORDER BY application, process, step',
+          [application],
+        )
+      : await this.pool.query(
+          'SELECT * FROM process_policies ORDER BY application, process, step',
+        );
     return result.rows.map(this.mapProcessRow);
   }
 

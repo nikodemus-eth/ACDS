@@ -21,6 +21,7 @@ export async function providersRoutes(
     app.diContainer!.registryService as any,
     app.diContainer!.connectionTester as any,
     app.diContainer!.secretRotationService as any,
+    app.diContainer!.providerHealthService as any,
   );
 
   // Apply auth to all routes in this plugin scope
@@ -35,10 +36,14 @@ export async function providersRoutes(
   app.get('/:id', (req, reply) => controller.getById(req as any, reply));
 
   app.put('/:id', (req, reply) => controller.update(req as any, reply));
+  app.patch('/:id', (req, reply) => controller.update(req as any, reply));
 
   app.post('/:id/disable', (req, reply) => controller.disable(req as any, reply));
 
   app.post('/:id/test-connection', (req, reply) =>
+    controller.testConnection(req as any, reply),
+  );
+  app.post('/:id/test', (req, reply) =>
     controller.testConnection(req as any, reply),
   );
 

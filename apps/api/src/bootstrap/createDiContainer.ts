@@ -25,6 +25,7 @@ import type { DispatchResolverDeps } from '@acds/routing-engine';
 import type { AuditEvent } from '@acds/audit-ledger';
 import type { AppConfig } from '../config/index.js';
 import type { FastifyInstance } from 'fastify';
+import { ProfileCatalogService } from '../services/ProfileCatalogService.js';
 
 type ModelProfileSeed = Omit<ModelProfile, 'id' | 'description' | 'enabled' | 'createdAt' | 'updatedAt'> & {
   name: string;
@@ -347,6 +348,7 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     await loadJson<TacticProfileSeed[]>('infra/config/profiles/tacticProfiles.json'),
   );
   const modelProfileById = new Map(modelProfiles.map((profile) => [profile.id, profile]));
+  const profileCatalogService = new ProfileCatalogService(modelProfiles, tacticProfiles);
 
   const dispatchResolver = new DispatchResolver();
   const executionRecordService = new ExecutionRecordService(executionRecordRepository);
@@ -390,6 +392,8 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
   const container: FastifyInstance['diContainer'] = {
     providerHealthService,
     registryService: providerRegistryService,
+    profileCatalogService,
+    policyRepository,
     connectionTester,
     secretRotationService,
     dispatchRunService,

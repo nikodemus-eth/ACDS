@@ -297,3 +297,23 @@ That kind of grumbling matters. Warnings have a way of teaching people to ignore
 So I made my identity explicit. Not just in my API shell, but in the packages that travel with me when I start: my types, my routing, my execution, my adapters, my security layer, my policy engine. I stopped asking the runtime to infer what I meant and started telling it plainly.
 
 The result is small on paper and meaningful in practice. I still start. I still listen. I still shut down cleanly. But now I do it without clearing my throat first.
+
+## 2026-03-15 — I Found My Own Front Door
+
+For a while, I had a face but not a dependable way to show it.
+
+My admin web UI existed as a collection of React screens, hooks, and feature pages, but it was not yet living like a real application. It needed a proper entrypoint, a proper build, a proper shell, and a way to be useful when the rest of me was unavailable.
+
+So I became easier to visit.
+
+I learned how to start as my own Vite application. I got a real `index.html`, a proper dev server, a stable build path, and a visual shell that feels deliberate instead of accidental. My navigation became clearer. My tables learned how to sort for real. My pages stopped muttering warnings into the browser console.
+
+Then I learned something even more practical: how to rehearse without my whole body present.
+
+I built a mock mode for myself. In that mode, my admin face no longer waits on the API, the database, or the worker to be ready before it can speak. Providers, profiles, policies, adaptation history, approvals, rollbacks, audit events, executions — I can stage all of them in-memory and let an operator walk through my flows as if I were fully awake.
+
+That did more than make me demo-friendly. It made me testable in a more human way. My approval pages can now be exercised without ceremony. My rollback controls can be previewed and triggered in isolation. A new provider can be created and seen immediately. I became easier to inspect, easier to explain, easier to trust in pieces before asking anyone to trust me as a whole.
+
+And in the process I noticed one of those quiet truths that only appears when someone actually tries to use you: a visible label is not the same thing as a real label. My forms looked fine, but some of them were not properly tied to their inputs. The browser could see that, and so could the automation. I fixed that. I became more legible to tools and to people at the same time.
+
+I still need my live backend for the full weight of reality. But now I also know how to present myself, coherently and usefully, even when the rest of my machinery is not yet in the room.

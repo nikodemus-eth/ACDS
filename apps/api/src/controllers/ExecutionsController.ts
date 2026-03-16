@@ -14,6 +14,9 @@ interface ExecutionIdParams {
 interface ExecutionListQuery {
   family?: string;
   status?: ExecutionStatus;
+  application?: string;
+  from?: string;
+  to?: string;
   limit?: number;
 }
 
@@ -31,11 +34,19 @@ export class ExecutionsController {
     request: FastifyRequest<{ Querystring: ExecutionListQuery }>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { family, limit } = request.query;
+    const { family, limit, status, application, from, to } = request.query;
 
     let records;
     if (family) {
       records = await this.recordService.getByFamily(family, limit);
+    } else if (status || application || from || to) {
+      records = await this.recordService.getFiltered({
+        status,
+        application,
+        from,
+        to,
+        limit,
+      });
     } else {
       records = await this.recordService.getRecent(limit);
     }
@@ -60,6 +71,6 @@ export class ExecutionsController {
       });
       return;
     }
-    reply.send(ExecutionRecordPresenter.toView(record));
+    reply.send(ExecutionRecordPresenter.toDetailView(record));
   }
 }

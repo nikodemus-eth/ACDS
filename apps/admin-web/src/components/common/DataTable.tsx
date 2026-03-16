@@ -5,6 +5,7 @@ export interface ColumnDef<T> {
   header: string;
   sortable?: boolean;
   render: (row: T) => React.ReactNode;
+  sortValue?: (row: T) => string | number | boolean | Date | null | undefined;
 }
 
 interface DataTableProps<T> {
@@ -39,34 +40,41 @@ export function DataTable<T>({
     return sortDirection === 'asc' ? ' \u25B2' : ' \u25BC';
   };
 
+  const sortedData = [...data].sort((left, right) => {
+    if (!sortColumn) return 0;
+
+    const column = columns.find((entry) => entry.key === sortColumn);
+    if (!column) return 0;
+
+    const leftValue = column.sortValue ? column.sortValue(left) : (left as Record<string, unknown>)[sortColumn];
+    const rightValue = column.sortValue ? column.sortValue(right) : (right as Record<string, unknown>)[sortColumn];
+
+    if (leftValue == null && rightValue == null) return 0;
+    if (leftValue == null) return 1;
+    if (rightValue == null) return -1;
+
+    const normalizedLeft = leftValue instanceof Date ? leftValue.getTime() : leftValue;
+    const normalizedRight = rightValue instanceof Date ? rightValue.getTime() : rightValue;
+
+    if (normalizedLeft < normalizedRight) {
+      return sortDirection === 'asc' ? -1 : 1;
+    }
+    if (normalizedLeft > normalizedRight) {
+      return sortDirection === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: '14px',
-          backgroundColor: '#ffffff',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        }}
-      >
-        <thead>
-          <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead className="data-table__head">
+          <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 onClick={col.sortable ? () => handleSort(col.key) : undefined}
-                style={{
-                  textAlign: 'left',
-                  padding: '12px 16px',
-                  fontWeight: 600,
-                  color: '#374151',
-                  cursor: col.sortable ? 'pointer' : 'default',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
+                className={col.sortable ? 'data-table__cell data-table__cell--head data-table__cell--sortable' : 'data-table__cell data-table__cell--head'}
               >
                 {col.header}
                 {col.sortable ? sortIndicator(col.key) : ''}
@@ -77,33 +85,19 @@ export function DataTable<T>({
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td
-                colSpan={columns.length}
-                style={{ padding: '24px 16px', textAlign: 'center', color: '#6b7280' }}
-              >
+              <td colSpan={columns.length} className="data-table__empty">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
-            data.map((row) => (
+            sortedData.map((row) => (
               <tr
                 key={keyExtractor(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                style={{
-                  borderBottom: '1px solid #f3f4f6',
-                  cursor: onRowClick ? 'pointer' : 'default',
-                }}
-                onMouseEnter={(e) => {
-                  if (onRowClick) {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = '';
-                }}
+                className={onRowClick ? 'data-table__row data-table__row--interactive' : 'data-table__row'}
               >
                 {columns.map((col) => (
-                  <td key={col.key} style={{ padding: '12px 16px', color: '#111827' }}>
+                  <td key={col.key} className="data-table__cell">
                     {col.render(row)}
                   </td>
                 ))}

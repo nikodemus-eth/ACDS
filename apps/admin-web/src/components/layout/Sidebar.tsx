@@ -4,54 +4,27 @@ const navItems = [
   { to: '/providers', label: 'Providers' },
   { to: '/profiles', label: 'Profiles' },
   { to: '/policies', label: 'Policies' },
+  { to: '/adaptation', label: 'Adaptation' },
   { to: '/audit', label: 'Audit' },
   { to: '/executions', label: 'Executions' },
 ] as const;
 
-const linkStyle: React.CSSProperties = {
-  display: 'block',
-  padding: '10px 20px',
-  textDecoration: 'none',
-  color: '#d1d5db',
-  fontSize: '14px',
-  borderLeft: '3px solid transparent',
-};
-
-const activeLinkStyle: React.CSSProperties = {
-  ...linkStyle,
-  color: '#ffffff',
-  backgroundColor: '#374151',
-  borderLeftColor: '#3b82f6',
-};
-
 export function Sidebar() {
   return (
-    <nav
-      style={{
-        width: '220px',
-        backgroundColor: '#1f2937',
-        color: '#ffffff',
-        display: 'flex',
-        flexDirection: 'column',
-        paddingTop: '16px',
-      }}
-    >
-      <div
-        style={{
-          padding: '0 20px 20px',
-          fontSize: '11px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: '#9ca3af',
-        }}
-      >
-        Navigation
+    <nav className="sidebar">
+      <div className="sidebar__brand">
+        <span className="sidebar__eyebrow">Governed Runtime</span>
+        <strong>ACDS Control</strong>
+        <p>Dispatch, policy, and adaptive health in one place.</p>
       </div>
+      <div className="sidebar__section-label">Navigation</div>
       {navItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
-          style={({ isActive }) => (isActive ? activeLinkStyle : linkStyle)}
+          className={({ isActive }) =>
+            isActive ? 'sidebar__link sidebar__link--active' : 'sidebar__link'
+          }
         >
           {item.label}
         </NavLink>

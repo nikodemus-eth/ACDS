@@ -33,9 +33,9 @@ export function updateProvider(id: string, payload: UpdateProviderPayload): Prom
 }
 
 export function disableProvider(id: string): Promise<Provider> {
-  return apiClient.patch<Provider>(`/providers/${id}`, { enabled: false });
+  return apiClient.post<Provider>(`/providers/${id}/disable`);
 }
 
 export function testConnection(id: string): Promise<ProviderHealth> {
-  return apiClient.post<ProviderHealth>(`/providers/${id}/test`);
+  return apiClient.post<ProviderHealth>(`/providers/${id}/test-connection`);
 }

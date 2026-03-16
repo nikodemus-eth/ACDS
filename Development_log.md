@@ -462,3 +462,33 @@ Performed comprehensive gap analysis comparing the GRITS Explanation Document sp
 - `pnpm exec tsc -b`
 - `pnpm exec vitest run ./tests/integration/apiDispatch.test.ts ./tests/integration/fallbackExecution.test.ts ./tests/integration/lowRiskAutoApply.test.ts ./tests/integration/adaptationRollback.test.ts ./tests/integration/adaptationApprovalWorkflow.test.ts`
 - Standalone startup smoke against `node apps/api/dist/main.js` on port `3211`
+
+## 2026-03-15 — Admin UI Runtime, Mock Mode, and API Parity
+
+### Frontend Runtime
+- Added a real Vite runtime for `apps/admin-web` with package-local build, dev, preview, and mock-dev scripts
+- Added `index.html`, `vite.config.ts`, env-aware API base handling, and a redesigned shared shell in `styles.css`
+- Refined layout primitives, top bar, sidebar, page headers, status badges, and sortable data tables
+- Removed previous browser-console noise from style warnings and router future-flag warnings
+
+### Mock Mode and Demoability
+- Added a built-in mock transport for providers, profiles, policies, adaptation, approvals, rollbacks, audit, and executions
+- Added visible mock-mode UI status in the top bar
+- Verified provider creation, approval decisions, rollback execution, and route walkthroughs entirely in browser automation without a live API or Postgres
+
+### Admin/API Parity
+- Added `/profiles` API routes, controller, presenter, and `ProfileCatalogService`
+- Added `/policies` API routes, controller, presenter, and repository-backed CRUD wiring
+- Extended provider detail to include health data and aligned provider action routes with the frontend client
+- Extended execution list/detail responses to support admin filters and stable detail fields for the UI
+- Added `tests/integration/adminApiControllers.test.ts` for new admin controller surfaces
+
+### Documentation
+- Added `docs/operator/ADMIN_UI_DEVELOPMENT.md`
+- Updated `README.md`, `docs/operator/ADMIN_GUIDE.md`, and `docs/architecture/COMPONENT_BOUNDARIES.md` to reflect the live admin runtime and mock workflow
+
+### Verification
+- `pnpm --filter @acds/admin-web run build`
+- `pnpm exec tsc -b`
+- `pnpm exec vitest run ./tests/integration/adminApiControllers.test.ts`
+- Browser walkthrough in mock mode across providers, profiles, policies, adaptation, audit, and executions

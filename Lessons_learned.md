@@ -135,3 +135,10 @@ Tracking lessons learned to prevent repeating pain points.
 - **A successful startup with warning spam is still an incomplete fix.** The standalone API was technically up, but Node was reparsing emitted files because package metadata did not match the compiled module format. That kind of noise makes real startup issues harder to spot.
 - **If a monorepo compiles to ES modules, package metadata should say so everywhere that code is executed directly.** Fixing `"type": "module"` in only the top-level app would have left the same ambiguity in its runtime dependencies.
 - **Retesting should include the real compiled entrypoint, not just `tsc` and unit coverage.** The ESM mismatch only showed up when running `node apps/api/dist/main.js`; it was invisible to typechecking alone.
+
+## 2026-03-15 — Admin UI Operability Matters
+
+- **A polished admin UI is still incomplete if it cannot open without an unavailable backend.** Adding mock mode turned the frontend into a dependable workspace for design, demos, and route-level QA even when the API or Postgres is offline.
+- **Frontend mocks become genuinely valuable only when they mirror real API shapes.** The mock layer became much more useful once it covered approval, rollback, audit detail, execution detail, and provider mutation flows instead of only list screens.
+- **Browser automation is an excellent accessibility reviewer.** The provider form looked correct visually, but Playwright exposed that labels were not actually bound to inputs. Fixing that improved automation reliability and keyboard/screen-reader usability at the same time.
+- **Architecture docs should describe intentional exceptions, not idealized rules.** `admin-web` intentionally imports `@acds/core-types`; updating the boundary documentation was better than pretending the code still followed an older constraint.

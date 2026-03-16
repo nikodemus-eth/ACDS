@@ -2,7 +2,7 @@
 export { DispatchRunService } from './run/DispatchRunService.js';
 export type { DispatchRunDeps } from './run/DispatchRunService.js';
 export { ExecutionRecordService } from './run/ExecutionRecordService.js';
-export type { ExecutionRecordRepository } from './run/ExecutionRecordService.js';
+export type { ExecutionRecordFilters, ExecutionRecordRepository } from './run/ExecutionRecordService.js';
 export { ExecutionStatusTracker } from './run/ExecutionStatusTracker.js';
 export type { TrackedExecution } from './run/ExecutionStatusTracker.js';
 

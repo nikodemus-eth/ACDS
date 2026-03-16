@@ -16,7 +16,12 @@ import { RollbackDetailPage } from '../features/adaptation/RollbackDetailPage';
 
 export function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/" element={<Navigate to="/providers" replace />} />

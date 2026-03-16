@@ -62,13 +62,25 @@ export function ProviderForm({ onSubmit, isSubmitting }: ProviderFormProps) {
       <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 600 }}>New Provider</h3>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Name</label>
-        <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} required />
+        <label htmlFor="provider-name" style={labelElStyle}>Name</label>
+        <input
+          id="provider-name"
+          style={inputStyle}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="organization"
+          required
+        />
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Vendor</label>
-        <select style={inputStyle} value={vendor} onChange={(e) => setVendor(e.target.value)}>
+        <label htmlFor="provider-vendor" style={labelElStyle}>Vendor</label>
+        <select
+          id="provider-vendor"
+          style={inputStyle}
+          value={vendor}
+          onChange={(e) => setVendor(e.target.value)}
+        >
           {Object.values(ProviderVendor).map((v) => (
             <option key={v} value={v}>
               {v}
@@ -78,8 +90,13 @@ export function ProviderForm({ onSubmit, isSubmitting }: ProviderFormProps) {
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Auth Type</label>
-        <select style={inputStyle} value={authType} onChange={(e) => setAuthType(e.target.value)}>
+        <label htmlFor="provider-auth-type" style={labelElStyle}>Auth Type</label>
+        <select
+          id="provider-auth-type"
+          style={inputStyle}
+          value={authType}
+          onChange={(e) => setAuthType(e.target.value)}
+        >
           {Object.values(AuthType).map((a) => (
             <option key={a} value={a}>
               {a}
@@ -89,19 +106,26 @@ export function ProviderForm({ onSubmit, isSubmitting }: ProviderFormProps) {
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Base URL</label>
+        <label htmlFor="provider-base-url" style={labelElStyle}>Base URL</label>
         <input
+          id="provider-base-url"
           style={inputStyle}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
           placeholder="http://localhost:11434"
+          autoComplete="url"
           required
         />
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Environment</label>
-        <select style={inputStyle} value={environment} onChange={(e) => setEnvironment(e.target.value)}>
+        <label htmlFor="provider-environment" style={labelElStyle}>Environment</label>
+        <select
+          id="provider-environment"
+          style={inputStyle}
+          value={environment}
+          onChange={(e) => setEnvironment(e.target.value)}
+        >
           <option value="development">development</option>
           <option value="staging">staging</option>
           <option value="production">production</option>
@@ -109,13 +133,15 @@ export function ProviderForm({ onSubmit, isSubmitting }: ProviderFormProps) {
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Secret (only set on create)</label>
+        <label htmlFor="provider-secret" style={labelElStyle}>Secret (only set on create)</label>
         <input
+          id="provider-secret"
           style={inputStyle}
           type="password"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
           placeholder="API key or token"
+          autoComplete="new-password"
         />
       </div>
 

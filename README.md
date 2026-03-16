@@ -144,6 +144,20 @@ After starting, open the admin UI and register at least one provider:
 
 See [Provider Setup](docs/operator/PROVIDER_SETUP.md) for detailed instructions.
 
+### Admin UI Development
+
+The admin UI is now a standalone Vite application with both live and mock-backed workflows.
+
+```bash
+# Live mode against the API proxy target
+pnpm --filter @acds/admin-web run dev
+
+# Mock mode with seeded in-browser data
+pnpm --filter @acds/admin-web run dev:mock
+```
+
+Mock mode is useful for demos, layout work, and route-level UI validation when Postgres or the API is unavailable. It exercises the full routed admin shell, including providers, profiles, policies, adaptation, approvals, rollbacks, audit, and executions.
+
 ## Key Concepts
 
 - **Model Profiles**: Abstract cognitive capabilities (e.g., `local_fast_advisory`, `cloud_frontier_reasoning`)
@@ -164,4 +178,4 @@ See [Provider Setup](docs/operator/PROVIDER_SETUP.md) for detailed instructions.
 
 - **Architecture:** [Overview](docs/architecture/ARCHITECTURE_OVERVIEW.md) | [Component Boundaries](docs/architecture/COMPONENT_BOUNDARIES.md) | [Routing Model](docs/architecture/ROUTING_MODEL.md) | [Execution Flow](docs/architecture/EXECUTION_FLOW.md)
 - **Security:** [Secret Storage](docs/security/SECRET_STORAGE.md) | [Audit Model](docs/security/AUDIT_MODEL.md)
-- **Operator:** [Admin Guide](docs/operator/ADMIN_GUIDE.md) | [Provider Setup](docs/operator/PROVIDER_SETUP.md) | [Policy Configuration](docs/operator/POLICY_CONFIGURATION.md) | [Troubleshooting](docs/operator/TROUBLESHOOTING.md)
+- **Operator:** [Admin Guide](docs/operator/ADMIN_GUIDE.md) | [Admin UI Development](docs/operator/ADMIN_UI_DEVELOPMENT.md) | [Provider Setup](docs/operator/PROVIDER_SETUP.md) | [Policy Configuration](docs/operator/POLICY_CONFIGURATION.md) | [Troubleshooting](docs/operator/TROUBLESHOOTING.md)

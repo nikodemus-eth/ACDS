@@ -89,8 +89,13 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
 
       {!initial && (
         <div style={fieldStyle}>
-          <label style={labelElStyle}>Level</label>
-          <select style={inputStyle} value={level} onChange={(e) => setLevel(e.target.value as PolicyPayload['level'])}>
+          <label htmlFor="policy-level" style={labelElStyle}>Level</label>
+          <select
+            id="policy-level"
+            style={inputStyle}
+            value={level}
+            onChange={(e) => setLevel(e.target.value as PolicyPayload['level'])}
+          >
             <option value="global">Global</option>
             <option value="application">Application</option>
             <option value="process">Process</option>
@@ -100,21 +105,36 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
 
       {(level === 'application' || level === 'process') && (
         <div style={fieldStyle}>
-          <label style={labelElStyle}>Application</label>
-          <input style={inputStyle} value={application} onChange={(e) => setApplication(e.target.value)} required />
+          <label htmlFor="policy-application" style={labelElStyle}>Application</label>
+          <input
+            id="policy-application"
+            style={inputStyle}
+            value={application}
+            onChange={(e) => setApplication(e.target.value)}
+            autoComplete="off"
+            required
+          />
         </div>
       )}
 
       {level === 'process' && (
         <div style={fieldStyle}>
-          <label style={labelElStyle}>Process</label>
-          <input style={inputStyle} value={process} onChange={(e) => setProcess(e.target.value)} required />
+          <label htmlFor="policy-process" style={labelElStyle}>Process</label>
+          <input
+            id="policy-process"
+            style={inputStyle}
+            value={process}
+            onChange={(e) => setProcess(e.target.value)}
+            autoComplete="off"
+            required
+          />
         </div>
       )}
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Allowed Vendors (comma-separated)</label>
+        <label htmlFor="policy-allowed-vendors" style={labelElStyle}>Allowed Vendors (comma-separated)</label>
         <input
+          id="policy-allowed-vendors"
           style={inputStyle}
           value={allowedVendors}
           onChange={(e) => setAllowedVendors(e.target.value)}
@@ -123,8 +143,9 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Blocked Vendors (comma-separated)</label>
+        <label htmlFor="policy-blocked-vendors" style={labelElStyle}>Blocked Vendors (comma-separated)</label>
         <input
+          id="policy-blocked-vendors"
           style={inputStyle}
           value={blockedVendors}
           onChange={(e) => setBlockedVendors(e.target.value)}
@@ -133,8 +154,9 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Defaults (JSON)</label>
+        <label htmlFor="policy-defaults" style={labelElStyle}>Defaults (JSON)</label>
         <textarea
+          id="policy-defaults"
           style={{ ...inputStyle, minHeight: '80px', fontFamily: 'monospace', fontSize: '12px' }}
           value={defaultsJson}
           onChange={(e) => setDefaultsJson(e.target.value)}
@@ -142,8 +164,9 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelElStyle}>Constraints (JSON)</label>
+        <label htmlFor="policy-constraints" style={labelElStyle}>Constraints (JSON)</label>
         <textarea
+          id="policy-constraints"
           style={{ ...inputStyle, minHeight: '80px', fontFamily: 'monospace', fontSize: '12px' }}
           value={constraintsJson}
           onChange={(e) => setConstraintsJson(e.target.value)}

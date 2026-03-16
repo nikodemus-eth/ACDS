@@ -4,11 +4,13 @@ import { Topbar } from './Topbar';
 
 export function AppShell() {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="app-shell">
+      <div className="app-shell__glow app-shell__glow--one" />
+      <div className="app-shell__glow app-shell__glow--two" />
       <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="app-shell__content">
         <Topbar />
-        <main style={{ flex: 1, padding: '24px', backgroundColor: '#f9fafb' }}>
+        <main className="app-shell__main">
           <Outlet />
         </main>
       </div>

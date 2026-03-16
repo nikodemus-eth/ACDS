@@ -49,16 +49,14 @@ export function AdaptationPage() {
 
       <PlateauAlertsPanel families={families} />
 
-      <h2 style={{ fontSize: '18px', fontWeight: 600, margin: '24px 0 12px', color: '#111827' }}>
-        Family Performance
-      </h2>
+      <h2 className="section-title">Family Performance</h2>
 
       {isLoading ? (
-        <p>Loading family performance data...</p>
+        <p className="empty-state">Loading family performance data...</p>
       ) : families.length === 0 ? (
-        <p style={{ color: '#6b7280' }}>No family performance data available.</p>
+        <p className="empty-state">No family performance data available.</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="data-table data-table--plain">
           <thead>
             <tr>
               <th style={headerCellStyle}>Family Key</th>

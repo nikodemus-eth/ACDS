@@ -30,16 +30,8 @@ export function StatusBadge({ status, label }: StatusBadgeProps) {
 
   return (
     <span
-      style={{
-        display: 'inline-block',
-        padding: '2px 10px',
-        borderRadius: '9999px',
-        fontSize: '12px',
-        fontWeight: 500,
-        backgroundColor: colors.bg,
-        color: colors.text,
-        whiteSpace: 'nowrap',
-      }}
+      className="status-badge"
+      style={{ backgroundColor: colors.bg, color: colors.text }}
     >
       {displayLabel}
     </span>

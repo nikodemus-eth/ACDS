@@ -7,17 +7,6 @@ import { useCreateProfile } from '../../hooks/useProfiles';
 
 type Tab = 'model' | 'tactic';
 
-const tabStyle = (active: boolean): React.CSSProperties => ({
-  padding: '8px 20px',
-  border: 'none',
-  borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
-  backgroundColor: 'transparent',
-  color: active ? '#3b82f6' : '#6b7280',
-  fontWeight: active ? 600 : 400,
-  cursor: 'pointer',
-  fontSize: '14px',
-});
-
 export function ProfilesPage() {
   const [tab, setTab] = useState<Tab>('model');
   const [showForm, setShowForm] = useState(false);
@@ -30,15 +19,7 @@ export function ProfilesPage() {
         actions={
           <button
             onClick={() => setShowForm(!showForm)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
+            className="button button--primary"
           >
             {showForm ? 'Cancel' : 'Add Profile'}
           </button>
@@ -46,7 +27,7 @@ export function ProfilesPage() {
       />
 
       {showForm && (
-        <div style={{ marginBottom: '24px' }}>
+        <div className="stack-gap">
           <ProfileForm
             onSubmit={(data) => {
               createMutation.mutate(data, {
@@ -58,11 +39,17 @@ export function ProfilesPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
-        <button style={tabStyle(tab === 'model')} onClick={() => setTab('model')}>
+      <div className="segmented-control">
+        <button
+          className={tab === 'model' ? 'segmented-control__button segmented-control__button--active' : 'segmented-control__button'}
+          onClick={() => setTab('model')}
+        >
           Model Profiles
         </button>
-        <button style={tabStyle(tab === 'tactic')} onClick={() => setTab('tactic')}>
+        <button
+          className={tab === 'tactic' ? 'segmented-control__button segmented-control__button--active' : 'segmented-control__button'}
+          onClick={() => setTab('tactic')}
+        >
           Tactic Profiles
         </button>
       </div>

@@ -1,6 +1,7 @@
 import type { ExecutionRecord } from '@acds/core-types';
 import {
   ExecutionRecordService,
+  type ExecutionRecordFilters,
   type ExecutionRecordRepository,
 } from '@acds/execution-orchestrator';
 
@@ -95,6 +96,21 @@ class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
 
   async findRecent(limit = 100): Promise<ExecutionRecord[]> {
     return [...this.records.values()].slice(-limit);
+  }
+
+  async findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]> {
+    return [...this.records.values()]
+      .filter((record) => (filters.status ? record.status === filters.status : true))
+      .filter((record) =>
+        filters.application ? record.executionFamily.application === filters.application : true,
+      )
+      .filter((record) =>
+        filters.from ? record.createdAt >= new Date(filters.from) : true,
+      )
+      .filter((record) =>
+        filters.to ? record.createdAt <= new Date(filters.to) : true,
+      )
+      .slice(-(filters.limit ?? 100));
   }
 
   async update(id: string, updates: Partial<ExecutionRecord>): Promise<ExecutionRecord> {

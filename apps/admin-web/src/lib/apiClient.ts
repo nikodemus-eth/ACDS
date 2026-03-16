@@ -1,5 +1,7 @@
-declare const __VITE_API_BASE_URL__: string | undefined;
-const BASE_URL = (typeof __VITE_API_BASE_URL__ !== 'undefined' ? __VITE_API_BASE_URL__ : undefined) ?? 'http://localhost:4000/api';
+import { mockRequest } from './mockApi';
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 
 export interface ApiError {
   status: number;
@@ -49,6 +51,9 @@ function buildUrl(path: string, params?: Record<string, string | undefined>): st
 
 export const apiClient = {
   async get<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {
+    if (USE_MOCKS) {
+      return mockRequest<T>('GET', path, undefined, params);
+    }
     const url = buildUrl(path, params);
     const response = await fetch(url, {
       method: 'GET',
@@ -61,6 +66,9 @@ export const apiClient = {
   },
 
   async post<T>(path: string, body?: unknown): Promise<T> {
+    if (USE_MOCKS) {
+      return mockRequest<T>('POST', path, body);
+    }
     const response = await fetch(buildUrl(path), {
       method: 'POST',
       headers: {
@@ -74,6 +82,9 @@ export const apiClient = {
   },
 
   async put<T>(path: string, body?: unknown): Promise<T> {
+    if (USE_MOCKS) {
+      return mockRequest<T>('PUT', path, body);
+    }
     const response = await fetch(buildUrl(path), {
       method: 'PUT',
       headers: {
@@ -87,6 +98,9 @@ export const apiClient = {
   },
 
   async patch<T>(path: string, body?: unknown): Promise<T> {
+    if (USE_MOCKS) {
+      return mockRequest<T>('PATCH', path, body);
+    }
     const response = await fetch(buildUrl(path), {
       method: 'PATCH',
       headers: {
@@ -100,6 +114,9 @@ export const apiClient = {
   },
 
   async delete<T>(path: string): Promise<T> {
+    if (USE_MOCKS) {
+      return mockRequest<T>('DELETE', path);
+    }
     const response = await fetch(buildUrl(path), {
       method: 'DELETE',
       headers: {

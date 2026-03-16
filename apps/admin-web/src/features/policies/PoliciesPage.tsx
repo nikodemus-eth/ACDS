@@ -24,15 +24,7 @@ export function PoliciesPage() {
         actions={
           <button
             onClick={() => setShowForm(!showForm)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
+            className="button button--primary"
           >
             {showForm ? 'Cancel' : 'Add Policy'}
           </button>
@@ -40,7 +32,7 @@ export function PoliciesPage() {
       />
 
       {showForm && (
-        <div style={{ marginBottom: '24px' }}>
+        <div className="stack-gap">
           <PolicyForm
             onSubmit={(data) => {
               createMutation.mutate(data, {
@@ -53,7 +45,7 @@ export function PoliciesPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div className="panel-stack">
         <GlobalPolicyPanel policy={globalPolicy} />
         <ApplicationPolicyPanel policies={appPolicies} />
         <ProcessPolicyPanel policies={processPolicies} />

@@ -18,6 +18,8 @@ export interface BuildAppOptions {
 const REQUIRED_CONTAINER_KEYS = [
   'providerHealthService',
   'registryService',
+  'profileCatalogService',
+  'policyRepository',
   'connectionTester',
   'secretRotationService',
   'dispatchRunService',

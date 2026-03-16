@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import type { ExecutionRecord } from '@acds/core-types';
-import type { ExecutionRecordRepository } from '@acds/execution-orchestrator';
+import type { ExecutionRecordFilters, ExecutionRecordRepository } from '@acds/execution-orchestrator';
 
 export class PgExecutionRecordRepository implements ExecutionRecordRepository {
   constructor(private readonly pool: Pool) {}
@@ -71,6 +71,45 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
       'SELECT * FROM execution_records ORDER BY created_at DESC LIMIT $1',
       [limit],
     );
+    return result.rows.map(this.mapRow);
+  }
+
+  async findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]> {
+    const where: string[] = [];
+    const values: unknown[] = [];
+    let index = 1;
+
+    if (filters.status) {
+      where.push(`status = $${index++}`);
+      values.push(filters.status);
+    }
+
+    if (filters.application) {
+      where.push(`application = $${index++}`);
+      values.push(filters.application);
+    }
+
+    if (filters.from) {
+      where.push(`created_at >= $${index++}`);
+      values.push(filters.from);
+    }
+
+    if (filters.to) {
+      where.push(`created_at <= $${index++}`);
+      values.push(filters.to);
+    }
+
+    const limit = filters.limit ?? 50;
+    values.push(limit);
+
+    const query = `
+      SELECT * FROM execution_records
+      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY created_at DESC
+      LIMIT $${index}
+    `;
+
+    const result = await this.pool.query(query, values);
     return result.rows.map(this.mapRow);
   }
 
