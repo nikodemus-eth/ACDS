@@ -118,11 +118,20 @@ pnpm --filter ./infra/db run migrate
 pnpm dev
 ```
 
-### Current Bootstrap Note
+### Standalone API Bootstrap
 
 The API layer now validates its dependency-injection container at startup and fails fast if required services are missing. This prevents the previous failure mode where the process started successfully but most routes crashed on first use.
 
-If you are running `apps/api` standalone, make sure your bootstrap path provides a fully wired `diContainer` to `buildApp()`. The route layer no longer falls back to placeholder `{}` dependencies.
+If you are running `apps/api` standalone, the default `src/main.ts` bootstrap now builds that `diContainer` for you from the seeded profile config, the Postgres-backed repositories, and env-provided cloud API keys. The route layer no longer falls back to placeholder `{}` dependencies.
+
+Use the package directly when you want to start only the API:
+
+```bash
+pnpm --filter @acds/api run build
+pnpm --filter @acds/api run start
+```
+
+The API package and its runtime dependencies now declare ESM package metadata as well, so the compiled standalone startup path runs without Node's module reparsing warnings.
 
 ### Register a Provider
 

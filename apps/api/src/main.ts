@@ -4,10 +4,12 @@
 
 import { buildApp } from './app.js';
 import { getAppConfig } from './config/index.js';
+import { createDiContainer } from './bootstrap/createDiContainer.js';
 
 async function main(): Promise<void> {
   const config = getAppConfig();
-  const app = await buildApp();
+  const diContainer = await createDiContainer(config);
+  const app = await buildApp({ diContainer });
 
   try {
     await app.listen({ port: config.port, host: '0.0.0.0' });

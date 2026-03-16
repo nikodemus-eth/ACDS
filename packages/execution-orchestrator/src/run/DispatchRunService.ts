@@ -6,7 +6,7 @@ import { FallbackDecisionTracker } from '../fallback/FallbackDecisionTracker.js'
 import { FallbackExecutionService } from '../fallback/FallbackExecutionService.js';
 
 export interface DispatchRunDeps {
-  resolveRoute(request: RoutingRequest): DispatchResult;
+  resolveRoute(request: RoutingRequest): Promise<DispatchResult>;
   executeProvider(providerId: string, request: AdapterRequest, apiKey?: string): Promise<AdapterResponse>;
   resolveApiKey(providerId: string): Promise<string | undefined>;
   resolveModelId(modelProfileId: string): Promise<string>;
@@ -31,8 +31,12 @@ export class DispatchRunService {
     );
   }
 
+  async resolveRoute(request: RoutingRequest): Promise<DispatchResult> {
+    return this.deps.resolveRoute(request);
+  }
+
   async run(request: DispatchRunRequest): Promise<DispatchRunResponse> {
-    const { decision, rationale } = this.deps.resolveRoute(request.routingRequest);
+    const { decision, rationale } = await this.deps.resolveRoute(request.routingRequest);
 
     const executionId = await this.statusTracker.create(decision, request.routingRequest);
     await this.statusTracker.markRunning(executionId);

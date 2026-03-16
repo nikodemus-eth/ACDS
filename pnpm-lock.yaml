@@ -16,7 +16,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.5.0)
+        version: 3.2.4(@types/node@25.5.0)(tsx@4.21.0)
 
   apps/admin-web:
     dependencies:
@@ -45,15 +45,30 @@ importers:
 
   apps/api:
     dependencies:
+      '@acds/adaptive-optimizer':
+        specifier: workspace:*
+        version: link:../../packages/adaptive-optimizer
       '@acds/audit-ledger':
         specifier: workspace:*
         version: link:../../packages/audit-ledger
       '@acds/core-types':
         specifier: workspace:*
         version: link:../../packages/core-types
+      '@acds/evaluation':
+        specifier: workspace:*
+        version: link:../../packages/evaluation
       '@acds/execution-orchestrator':
         specifier: workspace:*
         version: link:../../packages/execution-orchestrator
+      '@acds/persistence-pg':
+        specifier: workspace:*
+        version: link:../../packages/persistence-pg
+      '@acds/policy-engine':
+        specifier: workspace:*
+        version: link:../../packages/policy-engine
+      '@acds/provider-adapters':
+        specifier: workspace:*
+        version: link:../../packages/provider-adapters
       '@acds/provider-broker':
         specifier: workspace:*
         version: link:../../packages/provider-broker
@@ -73,6 +88,33 @@ importers:
       pino-pretty:
         specifier: ^13.0.0
         version: 13.1.3
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+
+  apps/grits-worker:
+    dependencies:
+      '@acds/adaptive-optimizer':
+        specifier: workspace:*
+        version: link:../../packages/adaptive-optimizer
+      '@acds/audit-ledger':
+        specifier: workspace:*
+        version: link:../../packages/audit-ledger
+      '@acds/core-types':
+        specifier: workspace:*
+        version: link:../../packages/core-types
+      '@acds/execution-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/execution-orchestrator
+      '@acds/grits':
+        specifier: workspace:*
+        version: link:../../packages/grits
+      '@acds/policy-engine':
+        specifier: workspace:*
+        version: link:../../packages/policy-engine
+      '@acds/provider-broker':
+        specifier: workspace:*
+        version: link:../../packages/provider-broker
 
   apps/worker:
     dependencies:
@@ -145,6 +187,12 @@ importers:
       '@acds/routing-engine':
         specifier: workspace:*
         version: link:../routing-engine
+
+  packages/grits:
+    dependencies:
+      '@acds/core-types':
+        specifier: workspace:*
+        version: link:../core-types
 
   packages/observability: {}
 
@@ -257,7 +305,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.5.0)
+        version: 3.2.4(@types/node@25.5.0)(tsx@4.21.0)
 
 packages:
 
@@ -769,6 +817,9 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  get-tsconfig@4.13.6:
+    resolution: {integrity: sha512-shZT/QMiSHc/YBLxxOkMtgSid5HFoauqCE3/exfsEcwg1WkeqjG+V40yBbBrsD+jW2HDXcs28xOfcbm2jI8Ddw==}
+
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
 
@@ -953,6 +1004,9 @@ packages:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
 
+  resolve-pkg-maps@1.0.0:
+    resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
+
   ret@0.5.0:
     resolution: {integrity: sha512-I1XxrZSQ+oErkRR4jYbAyEEu2I0avBvvMM5JN+6EBprOGRCs63ENqZ3vjavq8fBw2+62G5LF5XelKwuJpcvcxw==}
     engines: {node: '>=10'}
@@ -1047,6 +1101,11 @@ packages:
   toad-cache@3.7.0:
     resolution: {integrity: sha512-/m8M+2BJUpoJdgAHoG+baCwBT+tf2VraSfkBgl0Y00qIWt41DJ8R5B8nsEw0I58YwF5IZH6z24/2TobDKnqSWw==}
     engines: {node: '>=12'}
+
+  tsx@4.21.0:
+    resolution: {integrity: sha512-5C1sg4USs1lfG0GFb2RLXsdpXqBSEhAaA/0kPL01wxzpMqLILNxIxIOKiILz+cdg/pLnOUxFYOR5yhHU666wbw==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
@@ -1378,13 +1437,13 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@3.2.4(vite@7.3.1(@types/node@25.5.0))':
+  '@vitest/mocker@3.2.4(vite@7.3.1(@types/node@25.5.0)(tsx@4.21.0))':
     dependencies:
       '@vitest/spy': 3.2.4
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.1(@types/node@25.5.0)
+      vite: 7.3.1(@types/node@25.5.0)(tsx@4.21.0)
 
   '@vitest/pretty-format@3.2.4':
     dependencies:
@@ -1562,6 +1621,10 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  get-tsconfig@4.13.6:
+    dependencies:
+      resolve-pkg-maps: 1.0.0
 
   help-me@5.0.0: {}
 
@@ -1745,6 +1808,8 @@ snapshots:
 
   require-from-string@2.0.2: {}
 
+  resolve-pkg-maps@1.0.0: {}
+
   ret@0.5.0: {}
 
   reusify@1.1.0: {}
@@ -1839,17 +1904,24 @@ snapshots:
 
   toad-cache@3.7.0: {}
 
+  tsx@4.21.0:
+    dependencies:
+      esbuild: 0.27.4
+      get-tsconfig: 4.13.6
+    optionalDependencies:
+      fsevents: 2.3.3
+
   typescript@5.9.3: {}
 
   undici-types@7.18.2: {}
 
-  vite-node@3.2.4(@types/node@25.5.0):
+  vite-node@3.2.4(@types/node@25.5.0)(tsx@4.21.0):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 7.3.1(@types/node@25.5.0)
+      vite: 7.3.1(@types/node@25.5.0)(tsx@4.21.0)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -1864,7 +1936,7 @@ snapshots:
       - tsx
       - yaml
 
-  vite@7.3.1(@types/node@25.5.0):
+  vite@7.3.1(@types/node@25.5.0)(tsx@4.21.0):
     dependencies:
       esbuild: 0.27.4
       fdir: 6.5.0(picomatch@4.0.3)
@@ -1875,12 +1947,13 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.5.0
       fsevents: 2.3.3
+      tsx: 4.21.0
 
-  vitest@3.2.4(@types/node@25.5.0):
+  vitest@3.2.4(@types/node@25.5.0)(tsx@4.21.0):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.3.1(@types/node@25.5.0))
+      '@vitest/mocker': 3.2.4(vite@7.3.1(@types/node@25.5.0)(tsx@4.21.0))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4
@@ -1898,8 +1971,8 @@ snapshots:
       tinyglobby: 0.2.15
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
-      vite: 7.3.1(@types/node@25.5.0)
-      vite-node: 3.2.4(@types/node@25.5.0)
+      vite: 7.3.1(@types/node@25.5.0)(tsx@4.21.0)
+      vite-node: 3.2.4(@types/node@25.5.0)(tsx@4.21.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.5.0

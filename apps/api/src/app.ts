@@ -20,7 +20,6 @@ const REQUIRED_CONTAINER_KEYS = [
   'registryService',
   'connectionTester',
   'secretRotationService',
-  'dispatchResolver',
   'dispatchRunService',
   'executionRecordService',
   'auditEventReader',
@@ -31,7 +30,6 @@ const REQUIRED_CONTAINER_KEYS = [
   'adaptationApprovalRepository',
   'approvalAuditEmitter',
   'adaptationRollbackService',
-  'resolverDeps',
 ] as const;
 
 /**

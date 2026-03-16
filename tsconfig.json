@@ -25,6 +25,8 @@
       "@acds/evaluation/*": ["packages/evaluation/src/*"],
       "@acds/adaptive-optimizer": ["packages/adaptive-optimizer/src/index.ts"],
       "@acds/adaptive-optimizer/*": ["packages/adaptive-optimizer/src/*"],
+      "@acds/persistence-pg": ["packages/persistence-pg/src/index.ts"],
+      "@acds/persistence-pg/*": ["packages/persistence-pg/src/*"],
       "@acds/shared-utils": ["packages/shared-utils/src/index.ts"],
       "@acds/shared-utils/*": ["packages/shared-utils/src/*"],
       "@acds/grits": ["packages/grits/src/index.ts"],

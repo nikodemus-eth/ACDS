@@ -4,13 +4,11 @@
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { RoutingRequest, DispatchRunRequest } from '@acds/core-types';
-import type { DispatchResolver } from '@acds/routing-engine';
 import type { DispatchRunService } from '@acds/execution-orchestrator';
 import { RoutingDecisionPresenter } from '../presenters/RoutingDecisionPresenter.js';
 
 export class DispatchController {
   constructor(
-    private readonly resolver: DispatchResolver,
     private readonly runService: DispatchRunService,
   ) {}
 
@@ -23,18 +21,8 @@ export class DispatchController {
     request: FastifyRequest<{ Body: RoutingRequest }>,
     reply: FastifyReply,
   ): Promise<void> {
-    const deps = (request.server as any).diContainer?.resolverDeps;
-    if (!deps) {
-      reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'DispatchResolver dependencies not configured. Ensure DI container is initialized.',
-        statusCode: 500,
-      });
-      return;
-    }
-
     try {
-      const result = this.resolver.resolve(request.body, deps);
+      const result = await this.runService.resolveRoute(request.body);
       reply.send(RoutingDecisionPresenter.toView(result.decision));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

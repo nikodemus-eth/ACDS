@@ -427,3 +427,38 @@ Performed comprehensive gap analysis comparing the GRITS Explanation Document sp
 ### Verification
 - TypeScript: 0 errors
 - Tests: 518 passing across 49 test files (503 previous + 15 gap closure)
+
+## 2026-03-15 — Standalone API Bootstrap Closure
+
+### Build Boundary Fix
+- Restored `apps/api` to package-local TypeScript compilation instead of inheriting workspace path aliases during emit
+- Updated the API build script to compile workspace dependencies first, then emit the API package itself
+- Cleaned up accidental generated `.js` and `.d.ts` artifacts that had been emitted into package `src` directories during the broken build path
+
+### Standalone Startup Wiring
+- Added `apps/api/src/bootstrap/createDiContainer.ts` to build a real Fastify DI container for standalone startup
+- Bootstraps seeded model and tactic profiles from `infra/config/profiles`
+- Wires Postgres-backed provider, execution, optimizer, approval, and policy repositories
+- Resolves cloud API keys from environment for OpenAI and Gemini providers
+- Reuses `DispatchRunService.resolveRoute()` for `/dispatch/resolve` so routing and execution share the same dependency path
+
+### Verification
+- `pnpm exec tsc -b`
+- `pnpm --filter @acds/api run build`
+- Standalone startup smoke against `dist/main.js` with required env vars injected
+
+## 2026-03-15 — Standalone API Runtime Cleanup
+
+### Refactor
+- Added explicit `"type": "module"` metadata to the API app and emitted workspace packages that compile to ES module syntax
+- Kept the standalone bootstrap flow package-local while preserving dependency-first builds for `apps/api`
+
+### Errors Addressed
+- Removed Node `MODULE_TYPELESS_PACKAGE_JSON` warnings during standalone API startup
+- Verified the compiled `dist/main.js` path starts cleanly without reparsing warnings from `@acds/*` runtime dependencies
+
+### Verification
+- `pnpm --filter @acds/api run build`
+- `pnpm exec tsc -b`
+- `pnpm exec vitest run ./tests/integration/apiDispatch.test.ts ./tests/integration/fallbackExecution.test.ts ./tests/integration/lowRiskAutoApply.test.ts ./tests/integration/adaptationRollback.test.ts ./tests/integration/adaptationApprovalWorkflow.test.ts`
+- Standalone startup smoke against `node apps/api/dist/main.js` on port `3211`

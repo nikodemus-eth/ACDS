@@ -123,3 +123,15 @@ Tracking lessons learned to prevent repeating pain points.
 - **If fallback is part of the contract, it has to live in the main path.** Testing a fallback service in isolation is not enough. The top-level execution flow must actually invoke it, or the documented resilience model is fiction.
 - **Fixing a security bug in three places is a smell; extract the fourth place.** Shared redaction helpers are worth it once object redaction, record redaction, and error redaction start repeating the same credential patterns.
 - **Red-team tests should flip from green to red after a fix.** A vulnerability-confirmation test passing after remediation usually means the implementation did not change enough. Re-running the adversarial specs is a useful sanity check even when the goal is for them to fail.
+
+## 2026-03-15 — Standalone Startup Follow-Through
+
+- **A fail-fast app still needs a default bootstrap path.** Tightening DI validation exposed a real gap: `buildApp()` was honest, but `main.ts` still had no way to satisfy it on its own. Hardening startup is only complete once the default entrypoint can actually wire the required services.
+- **Workspace path aliases are helpful for repo-wide typechecking and dangerous for package-local emits.** Letting an app package inherit root alias resolution during `tsc` can silently turn a local build into a cross-package emit that sprays generated files into sibling `src` trees.
+- **The right fix for package-local builds is dependency-first compilation, not bigger `rootDir`s.** Expanding the compiler boundary would have hidden the symptom while making the artifact shape worse. Building workspace dependencies first preserves package ownership and produces a cleaner standalone startup story.
+
+## 2026-03-15 — Runtime Cleanliness Matters Too
+
+- **A successful startup with warning spam is still an incomplete fix.** The standalone API was technically up, but Node was reparsing emitted files because package metadata did not match the compiled module format. That kind of noise makes real startup issues harder to spot.
+- **If a monorepo compiles to ES modules, package metadata should say so everywhere that code is executed directly.** Fixing `"type": "module"` in only the top-level app would have left the same ambiguity in its runtime dependencies.
+- **Retesting should include the real compiled entrypoint, not just `tsc` and unit coverage.** The ESM mismatch only showed up when running `node apps/api/dist/main.js`; it was invisible to typechecking alone.

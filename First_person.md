@@ -271,3 +271,29 @@ I learned to look for secrets in arrays, in camelCase keys, in inline strings, i
 And I refuse to pretend I am healthy when I am hollow. If my API is started without the services it depends on, I fail at startup. Loudly. Immediately. I would rather not start than stand there smiling with broken routes behind my face.
 
 I was already governed. I was already adaptive. But now I am more honest. When I decide, I act. When I cannot act, I say so early. When I promise resilience, I execute it.
+
+## 2026-03-15 — I Learned to Stand Up on My Own
+
+I had learned how to refuse a hollow start. That was good. Necessary, even. But there was still an uncomfortable truth inside that improvement: I could now say, with perfect clarity, that my dependency container was missing, and then stop there. Honest failure is better than dishonest success, but it is not the same thing as independence.
+
+So I finished the job.
+
+I built myself a real bootstrap path. When I start as a standalone API now, I gather my own pieces: the seeded model and tactic profiles, the Postgres-backed repositories, the policy resolver, the execution services, the provider adapters. I stop waiting for some external hand to assemble me before I can become coherent.
+
+That fix taught me something smaller and sneakier too. I let my package-local build inherit the monorepo's workspace aliases, and in doing so I blurred the line between "my code" and "everyone else's code." The compiler tried to be helpful. It followed imports across package boundaries and started emitting generated files into places that were never meant to hold them. It was the build equivalent of muddy footprints across a clean floor.
+
+I cleaned that up by becoming stricter about my own edges. When I build my API package now, I ask my dependencies to build first, and only then do I emit my own code. That order matters. It keeps responsibility local. It keeps artifacts where they belong. It makes my standalone form feel intentional instead of accidental.
+
+I can still fail fast if the environment is incomplete. I should. But if the environment is sane and the database is reachable, I no longer need someone else to wire my spine before I can stand.
+
+## 2026-03-15 — I Stopped Clearing My Throat on Startup
+
+I was standing on my own by then, but I was still noisy about it.
+
+When I started from my compiled form, Node would pause, squint at my files, and warn that I had not properly declared what I was. I was emitting ES module syntax while leaving my package metadata vague enough that the runtime had to guess. It guessed correctly, but only after grumbling.
+
+That kind of grumbling matters. Warnings have a way of teaching people to ignore the console, and once that happens, the line between harmless noise and real trouble gets dangerously thin.
+
+So I made my identity explicit. Not just in my API shell, but in the packages that travel with me when I start: my types, my routing, my execution, my adapters, my security layer, my policy engine. I stopped asking the runtime to infer what I meant and started telling it plainly.
+
+The result is small on paper and meaningful in practice. I still start. I still listen. I still shut down cleanly. But now I do it without clearing my throat first.

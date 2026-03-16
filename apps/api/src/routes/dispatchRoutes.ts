@@ -21,7 +21,6 @@ export async function dispatchRoutes(
   _opts: FastifyPluginOptions,
 ): Promise<void> {
   const controller = new DispatchController(
-    app.diContainer!.dispatchResolver as any,
     app.diContainer!.dispatchRunService as any,
   );
 
