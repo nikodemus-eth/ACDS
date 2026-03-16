@@ -150,6 +150,7 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
               <option value="anthropic">Anthropic</option>
               <option value="google">Google</option>
               <option value="ollama">Ollama (local)</option>
+              <option value="apple">Apple Intelligence (local)</option>
             </select>
           </div>
           <div style={fieldStyle}>

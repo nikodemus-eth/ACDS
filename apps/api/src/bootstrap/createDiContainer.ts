@@ -13,7 +13,7 @@ import {
   ProviderExecutionProxy,
   ProviderHealthService,
 } from '@acds/provider-broker';
-import { OpenAIAdapter, OllamaAdapter, LMStudioAdapter, GeminiAdapter, type AdapterRequest, type AdapterResponse } from '@acds/provider-adapters';
+import { OpenAIAdapter, OllamaAdapter, LMStudioAdapter, GeminiAdapter, AppleIntelligenceAdapter, type AdapterRequest, type AdapterResponse } from '@acds/provider-adapters';
 import { DispatchResolver, type DispatchResult } from '@acds/routing-engine';
 import { DispatchRunService, ExecutionRecordService, ExecutionStatusTracker } from '@acds/execution-orchestrator';
 import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository } from '@acds/persistence-pg';
@@ -297,6 +297,8 @@ async function resolveProviderApiKey(providerRepository: PgProviderRepository, p
       return process.env.OPENAI_API_KEY;
     case ProviderVendor.GEMINI:
       return process.env.GEMINI_API_KEY;
+    case ProviderVendor.APPLE:
+      return undefined;
     default:
       return undefined;
   }
@@ -324,6 +326,7 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
   adapterResolver.register('ollama', new OllamaAdapter());
   adapterResolver.register('lmstudio', new LMStudioAdapter());
   adapterResolver.register('gemini', new GeminiAdapter());
+  adapterResolver.register('apple', new AppleIntelligenceAdapter());
 
   const providerExecutionProxy = new ProviderExecutionProxy(adapterResolver);
   const providerHealthService = new ProviderHealthService(providerHealthRepository);

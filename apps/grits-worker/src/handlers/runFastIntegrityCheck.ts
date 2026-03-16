@@ -8,6 +8,7 @@
 import { runIntegrityChecks } from '../engine/IntegrityEngine.js';
 import { ExecutionIntegrityChecker } from '../checkers/ExecutionIntegrityChecker.js';
 import { AdaptiveIntegrityChecker } from '../checkers/AdaptiveIntegrityChecker.js';
+import { AppleIntelligenceChecker } from '../checkers/AppleIntelligenceChecker.js';
 import { getExecutionRecordReadRepository } from '../repositories/InMemoryExecutionRecordReadRepository.js';
 import { getRoutingDecisionReadRepository } from '../repositories/InMemoryRoutingDecisionReadRepository.js';
 import { getAdaptationRollbackReadRepository } from '../repositories/InMemoryAdaptationRollbackReadRepository.js';
@@ -27,6 +28,10 @@ export async function runFastIntegrityCheck(): Promise<void> {
       getSharedApprovalRepository(),
       getSharedLedger(),
       getAdaptationRollbackReadRepository(),
+      getSharedProviderRepository(),
+    ),
+    new AppleIntelligenceChecker(
+      getExecutionRecordReadRepository(),
       getSharedProviderRepository(),
     ),
   ];

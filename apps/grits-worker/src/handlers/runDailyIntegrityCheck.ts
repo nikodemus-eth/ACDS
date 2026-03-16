@@ -12,6 +12,7 @@ import { AuditIntegrityChecker } from '../checkers/AuditIntegrityChecker.js';
 import { BoundaryIntegrityChecker } from '../checkers/BoundaryIntegrityChecker.js';
 import { PolicyIntegrityChecker } from '../checkers/PolicyIntegrityChecker.js';
 import { OperationalIntegrityChecker } from '../checkers/OperationalIntegrityChecker.js';
+import { AppleIntelligenceChecker } from '../checkers/AppleIntelligenceChecker.js';
 import { getExecutionRecordReadRepository } from '../repositories/InMemoryExecutionRecordReadRepository.js';
 import { getRoutingDecisionReadRepository } from '../repositories/InMemoryRoutingDecisionReadRepository.js';
 import { getAuditEventReadRepository } from '../repositories/InMemoryAuditEventReadRepository.js';
@@ -38,6 +39,7 @@ export async function runDailyIntegrityCheck(): Promise<void> {
     new BoundaryIntegrityChecker(execRepo, providerRepo, auditRepo),
     new PolicyIntegrityChecker(policyRepo, providerRepo),
     new OperationalIntegrityChecker(execRepo),
+    new AppleIntelligenceChecker(execRepo, providerRepo),
   ];
 
   const snapshot = await runIntegrityChecks(checkers, 'daily');

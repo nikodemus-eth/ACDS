@@ -71,6 +71,26 @@ const providers: Array<Provider & { health: ProviderHealth }> = [
       message: 'Connection verified successfully.',
     },
   },
+  {
+    id: 'prov-apple-local',
+    name: 'Apple Intelligence (Local)',
+    vendor: ProviderVendor.APPLE,
+    authType: AuthType.NONE,
+    baseUrl: 'http://localhost:11435',
+    enabled: true,
+    environment: 'local',
+    createdAt: nowDate(),
+    updatedAt: nowDate(),
+    health: {
+      providerId: 'prov-apple-local',
+      status: 'healthy',
+      lastTestAt: nowDate(),
+      lastSuccessAt: nowDate(),
+      lastFailureAt: null,
+      latencyMs: 12,
+      message: 'Apple Intelligence bridge responding on localhost.',
+    },
+  },
 ];
 
 const modelProfiles: ModelProfile[] = [

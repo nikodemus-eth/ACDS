@@ -1,5 +1,5 @@
 {
-  "allowedVendors": ["ollama", "lmstudio", "gemini", "openai"],
+  "allowedVendors": ["ollama", "lmstudio", "gemini", "openai", "apple"],
   "blockedVendors": [],
   "defaultPrivacy": "standard",
   "costSensitivity": "moderate",

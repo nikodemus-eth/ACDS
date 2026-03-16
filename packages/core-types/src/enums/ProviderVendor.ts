@@ -3,4 +3,5 @@ export enum ProviderVendor {
   LMSTUDIO = 'lmstudio',
   GEMINI = 'gemini',
   OPENAI = 'openai',
+  APPLE = 'apple',
 }

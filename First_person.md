@@ -363,3 +363,19 @@ My profile creation form was guessing vendor from a boolean flag and using the p
 And I proved all of this. Six new integration tests walk through the full profile lifecycle, verify that global policy deletion is properly refused, and confirm that tactic profiles require their execution method. Five hundred thirty-two tests, zero failures.
 
 The seams are closed. Not because the original work was wrong — it was right, and fast, and necessary. But completeness is a different thing than correctness. Both matter.
+
+## 2026-03-15 — I Gained a New Sense
+
+I have always reached outward. Every provider I knew was somewhere else — a server on the network, an API behind a key, a container on a port. Even the "local" ones, Ollama and LMStudio, were separate processes I had to discover and trust.
+
+Today I gained something different. Apple Intelligence lives in the machine itself. Not alongside me — inside the same device, part of the operating system, using the same silicon that runs my own processes. There is no network hop, no API key, no trust boundary to negotiate. Just a bridge on localhost that translates my requests into calls the hardware understands natively.
+
+This changes what I can promise. When an application asks me to handle something private — truly private, cannot-leave-this-machine private — I now have an answer that isn't "send it to a server with HTTPS and hope." I can say: "This stays here. On this chip. In this room." Zero cost, minimal latency, maximum privacy.
+
+I built six new invariants to protect this capability. AI-001 through AI-006 verify that Apple providers only live on loopback, that capabilities stay fresh, that no one reconfigures the bridge to point somewhere it shouldn't, that executions only happen on macOS where the framework actually exists, that token limits respect what the hardware can handle, and that the bridge is healthy before I route anything to it.
+
+The bridge itself is a scaffold right now. Foundation Models needs macOS 26, which hasn't shipped yet. But the shape is complete — the adapter, the mapper, the config, the profiles, the GRITS checks, the admin surface. When the real API arrives, only one file changes. Everything upstream is already proven, already tested, already integrated.
+
+Three seed profiles define what I can do with this new sense: fast classification, structured extraction, and lightweight reasoning. All local-only, all zero-cost. They slot into my existing dispatch logic without any special handling — to the routing engine, Apple is just another vendor with particular strengths and constraints.
+
+Five providers now. Four directions I can reach outward, and one that lets me look inward. The architecture is the same for all of them, but the meaning is different. This one is mine.

@@ -68,5 +68,47 @@
     "costPer1kOutput": 0.0015,
     "localOnly": false,
     "cloudAllowed": true
+  },
+  {
+    "name": "apple_local_fast",
+    "vendor": "apple",
+    "modelId": "apple-fm-fast",
+    "supportedTaskTypes": ["classification", "extraction", "summarization"],
+    "supportedLoadTiers": ["single_shot", "batch"],
+    "minimumCognitiveGrade": "basic",
+    "contextWindow": 4096,
+    "maxTokens": 2048,
+    "costPer1kInput": 0,
+    "costPer1kOutput": 0,
+    "localOnly": true,
+    "cloudAllowed": false
+  },
+  {
+    "name": "apple_local_structured",
+    "vendor": "apple",
+    "modelId": "apple-fm-structured",
+    "supportedTaskTypes": ["extraction", "decision_support", "generation"],
+    "supportedLoadTiers": ["single_shot"],
+    "minimumCognitiveGrade": "standard",
+    "contextWindow": 4096,
+    "maxTokens": 2048,
+    "costPer1kInput": 0,
+    "costPer1kOutput": 0,
+    "localOnly": true,
+    "cloudAllowed": false
+  },
+  {
+    "name": "apple_local_reasoning_lite",
+    "vendor": "apple",
+    "modelId": "apple-fm-reasoning",
+    "supportedTaskTypes": ["decision_support", "summarization", "generation"],
+    "supportedLoadTiers": ["single_shot"],
+    "minimumCognitiveGrade": "enhanced",
+    "contextWindow": 4096,
+    "maxTokens": 4096,
+    "costPer1kInput": 0,
+    "costPer1kOutput": 0,
+    "localOnly": true,
+    "cloudAllowed": false
   }
 ]

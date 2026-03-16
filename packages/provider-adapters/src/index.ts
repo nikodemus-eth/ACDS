@@ -25,3 +25,8 @@ export type { GeminiConfig } from './gemini/GeminiConfig.js';
 // OpenAI
 export { OpenAIAdapter } from './openai/OpenAIAdapter.js';
 export type { OpenAIConfig } from './openai/OpenAIConfig.js';
+
+// Apple Intelligence
+export { AppleIntelligenceAdapter } from './apple/AppleIntelligenceAdapter.js';
+export type { AppleIntelligenceConfig } from './apple/AppleIntelligenceConfig.js';
+export { DEFAULT_APPLE_INTELLIGENCE_CONFIG } from './apple/AppleIntelligenceConfig.js';

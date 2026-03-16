@@ -570,3 +570,44 @@ Re-evaluation of the codebase after the hardening pass, admin UI, and admin API 
 ### Verification
 - TypeScript: 0 errors
 - Tests: 532 passing across 51 test files, 0 failures (6 new tests added)
+
+## 2026-03-15 — Apple Intelligence Provider Integration
+
+Added Apple Intelligence as a fifth provider vendor in ACDS, backed by a Swift bridge service for on-device inference via Apple's Foundation Models framework.
+
+### Changes
+
+**1. Core Type Extensions**
+- Added `APPLE = 'apple'` to `ProviderVendor` enum in `packages/core-types/src/enums/ProviderVendor.ts`
+- Extended `InvariantId` type with 6 Apple-specific GRITS invariants (AI-001 through AI-006) in `packages/grits/src/types/InvariantId.ts`
+
+**2. Provider Adapter (4 files)**
+- Created `packages/provider-adapters/src/apple/AppleIntelligenceConfig.ts` — config interface with `localhost:11435` default
+- Created `packages/provider-adapters/src/apple/AppleIntelligenceMapper.ts` — request/response mapping between ACDS and bridge formats
+- Created `packages/provider-adapters/src/apple/AppleIntelligenceAdapter.ts` — implements `ProviderAdapter` with loopback-only validation
+- Created `packages/provider-adapters/src/apple/AppleIntelligenceAdapter.test.ts` — 13 tests covering vendorName, validateConfig, testConnection, execute
+- Exported from `packages/provider-adapters/src/index.ts`
+
+**3. Provider Registration**
+- Added `APPLE` to `LOCAL_VENDORS` in `packages/provider-broker/src/registry/ProviderValidationService.ts`
+- Registered `AppleIntelligenceAdapter` in `apps/api/src/bootstrap/createDiContainer.ts` with `undefined` API key
+- Added `'apple'` to `allowedVendors` in `infra/config/policies/globalPolicy.json`
+- Added 3 Apple model profile seeds in `infra/config/profiles/modelProfiles.json` (fast, structured, reasoning_lite)
+
+**4. GRITS Integrity Checker**
+- Created `apps/grits-worker/src/checkers/AppleIntelligenceChecker.ts` — 6 invariants: localhost-only binding, capabilities staleness, loopback enforcement, macOS platform, token limits, health verification
+- Created `apps/grits-worker/src/checkers/AppleIntelligenceChecker.test.ts` — 17 tests
+- Registered in both fast and daily integrity check handlers
+- Extended vitest config to include `apps/*/src/**/*.test.ts` pattern
+
+**5. Swift Bridge Service (Scaffold)**
+- Created `apps/apple-intelligence-bridge/` with Package.swift, BridgeServer, HealthEndpoint, CapabilitiesEndpoint, ExecuteEndpoint, FoundationModelsWrapper
+- Binds to `127.0.0.1:11435` using Swift NIO
+- Foundation Models calls stubbed pending macOS 26 availability
+
+**6. Admin Web Integration**
+- Added Apple provider mock data to `apps/admin-web/src/lib/mockApi.ts`
+- Added "Apple Intelligence (local)" option to `ProfileForm.tsx` vendor dropdown
+
+**7. Documentation**
+- Created `docs/integrations/apple-intelligence.md` covering architecture, security model, GRITS invariants, and model profiles

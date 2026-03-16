@@ -6,6 +6,7 @@ const VALID_AUTH_TYPES = new Set<string>(Object.values(AuthType));
 const LOCAL_VENDORS = new Set<string>([
   ProviderVendor.OLLAMA,
   ProviderVendor.LMSTUDIO,
+  ProviderVendor.APPLE,
 ]);
 const BLOCKED_HOSTS = new Set([
   '0.0.0.0',
