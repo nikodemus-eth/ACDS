@@ -659,3 +659,37 @@ Systematic replacement of in-memory stubs and empty placeholder implementations 
 ### Test Suite Verification
 - All 568 tests pass across 54 test files (unit, integration, chaos, red-team, scenario tests)
 - Zero regressions from the stub elimination campaign
+
+---
+
+## 2026-03-16 — DI Container Stub Elimination (Final Five)
+
+### Remaining Stubs Replaced
+- Replaced `InMemorySecretStore` with `PgSecretCipherStore` — encrypts provider API keys to `provider_secrets` table
+- Replaced `InMemoryAdaptationLedger` by extending `PgAdaptationEventRepository` with `writeEvent()`, `listEvents()`, `getEvent()` (implements `AdaptationLedgerWriter`)
+- Replaced `InMemoryRollbackRecordWriter` with `PgRollbackRecordWriter` — persists rollback snapshots to `adaptation_rollback_records`
+- Replaced `NoopApprovalAuditEmitter` with `PgApprovalAuditEmitter` — writes approval audit events to `audit_events` table
+- Replaced `NoopRollbackAuditEmitter` with `PgRollbackAuditEmitter` — writes rollback audit events to `audit_events` table
+
+### Migration 008
+- Created `infra/db/migrations/008_secret_store_and_rollback_snapshots.sql`
+- Adds `provider_secrets` table (id, provider_id UNIQUE, envelope JSONB, created_at, rotated_at, expires_at)
+- Adds `target_adaptation_event_id`, `previous_snapshot`, `restored_snapshot` JSONB columns to `adaptation_rollback_records`
+
+### New Persistence Module Files
+- `packages/persistence-pg/src/PgSecretCipherStore.ts` — implements `SecretCipherStore` from `@acds/security`
+- `packages/persistence-pg/src/PgRollbackRecordWriter.ts` — implements `RollbackRecordWriter` from `@acds/adaptive-optimizer`
+- `packages/persistence-pg/src/PgAuditEmitters.ts` — `PgApprovalAuditEmitter` and `PgRollbackAuditEmitter` with fire-and-forget writes
+- Added `@acds/security` as workspace dependency of `@acds/persistence-pg`
+
+### New Test Files (44 new tests)
+- `tests/unit/persistence/pgSecretCipherStore.test.ts` — 10 tests covering store/retrieve/rotate/revoke/exists with mock pool
+- `tests/unit/persistence/pgRollbackRecordWriter.test.ts` — 4 tests covering save, JSON serialization, conflict handling, error propagation
+- `tests/unit/persistence/pgAuditEmitters.test.ts` — 12 tests covering both emitters: event types, actor handling, fire-and-forget error resilience
+- `tests/unit/persistence/pgAdaptationEventRepository.test.ts` — 12 tests covering writeEvent, getEvent, listEvents with filter permutations
+- `tests/unit/bootstrap/createDiContainer.test.ts` — 9 tests verifying DI wiring, pool config parsing, absence of stubs, SSL support
+
+### Test Suite Final State
+- 612 tests pass across 59 test files
+- Zero `InMemory*` or `Noop*` stubs remain in the API DI container
+- All three apps typecheck clean (api, admin-web, grits-worker)

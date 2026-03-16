@@ -77,6 +77,16 @@ Three seed profiles are provided:
 
 All profiles are `localOnly: true, cloudAllowed: false` with zero cost.
 
+## Admin UI Dashboard
+
+The admin web includes a dedicated Apple Intelligence page at `/apple-intelligence` with three panels:
+
+- **Bridge Health Panel** -- Shows bridge status, platform, and version via `GET /health`. Auto-refreshes every 30 seconds.
+- **Capabilities Panel** -- Displays available models, supported task types, max tokens, and platform via `GET /capabilities`.
+- **Test Execution Panel** -- Interactive form to send a prompt to the bridge and see the response, token counts, and duration.
+
+The dashboard talks directly to `localhost:11435` (bypassing the ACDS API) since the bridge is always local. No mock routing is needed.
+
 ## Foundation Models Status
 
-As of the initial integration, the bridge uses stub responses because Foundation Models requires macOS 26+ which is not yet generally available. The `FoundationModelsWrapper.swift` contains TODO markers for replacing stubs with actual API calls when the runtime becomes available.
+The bridge runs on macOS 26 (Tahoe) and uses the real Foundation Models framework. The `FoundationModelsWrapper.swift` calls `LanguageModelSession` for inference with `apple-fm-on-device` as the primary model. Responses include actual inference latency, token counts, and model capabilities reported by the OS.

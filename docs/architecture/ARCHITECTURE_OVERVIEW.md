@@ -28,7 +28,7 @@ Supporting packages that sit outside the main dispatch path:
 
 - `packages/evaluation` -- Metrics, scoring, aggregation
 - `packages/adaptive-optimizer` -- Adaptive state, ranking, plateau detection, meta guidance, global budget allocation
-- `packages/persistence-pg` -- PostgreSQL repository implementations
+- `packages/persistence-pg` -- PostgreSQL repository implementations (providers, policies, execution records, optimizer state, audit events, adaptation events, secrets, rollback records)
 - `packages/observability` -- Abstract metrics and tracing interfaces (vendor-agnostic)
 - `packages/grits` -- Shared types for runtime integrity verification (IntegritySnapshot, DriftReport, DefectReport, IntegrityChecker interface, read-only repository interfaces)
 

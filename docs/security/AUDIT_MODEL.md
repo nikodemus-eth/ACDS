@@ -62,7 +62,30 @@ The audit model provides the following traceability guarantees:
 
 4. **Rationale linkage.** The routing decision's `rationaleId` links to the full rationale record, which explains the eligibility computation and selection logic in human-readable form.
 
+## Adaptation Audit Emitters
+
+In addition to domain audit writers, the adaptation subsystem uses specialized emitters for approval and rollback events:
+
+- **`PgApprovalAuditEmitter`** -- Writes approval lifecycle events (`approval_submitted`, `approval_approved`, `approval_rejected`, `approval_expired`) to the `audit_events` table with `resource_type = 'approval'`.
+- **`PgRollbackAuditEmitter`** -- Writes rollback events (`rollback_previewed`, `rollback_executed`) to the `audit_events` table with `resource_type = 'rollback'`.
+
+Both emitters use **fire-and-forget** semantics: the database write is non-blocking and failures are logged to stderr without interrupting the critical path. This ensures audit persistence does not become a bottleneck or single point of failure for adaptation operations.
+
 ## Storage Model
+
+Audit events are stored in the `audit_events` table (migration 006):
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID | Auto-generated primary key |
+| `event_type` | VARCHAR | The audit event type or adaptation event type |
+| `actor` | VARCHAR | Who initiated the action |
+| `action` | VARCHAR | The specific action performed |
+| `resource_type` | VARCHAR | Type of resource affected (provider, approval, rollback, etc.) |
+| `resource_id` | VARCHAR | ID of the affected resource |
+| `application` | VARCHAR | Application context (optional) |
+| `details` | JSONB | Type-specific event payload |
+| `created_at` | TIMESTAMPTZ | When the event was recorded |
 
 Audit events are append-oriented:
 

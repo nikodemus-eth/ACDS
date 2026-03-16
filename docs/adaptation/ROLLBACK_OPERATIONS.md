@@ -97,8 +97,29 @@ Rollback is NOT appropriate when:
 | `POST` | `/adaptation/rollbacks/:familyKey/preview` | Preview a rollback. Body: `{ targetEventId: string }` |
 | `POST` | `/adaptation/rollbacks/:familyKey/execute` | Execute a rollback. Body: `{ targetEventId: string, reason: string }` |
 
+## Persistence
+
+Rollback records are stored in the `adaptation_rollback_records` table:
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | TEXT | Primary key |
+| `family_key` | TEXT | The execution family that was rolled back |
+| `snapshot_id` | TEXT | Maps to `targetAdaptationEventId` |
+| `reason` | TEXT | Free-text rationale |
+| `executed_by` | TEXT | The actor who initiated the rollback |
+| `executed_at` | TIMESTAMPTZ | When the rollback was executed |
+| `target_adaptation_event_id` | TEXT | The adaptation event being rolled back to |
+| `previous_snapshot` | JSONB | Full `RankingSnapshot` before rollback |
+| `restored_snapshot` | JSONB | Full `RankingSnapshot` after rollback |
+
+The `PgRollbackRecordWriter` handles persistence with `ON CONFLICT (id) DO NOTHING` for idempotent writes. The `PgRollbackAuditEmitter` writes audit events to `audit_events` using fire-and-forget semantics.
+
+Migration: `infra/db/migrations/008_secret_store_and_rollback_snapshots.sql` adds the JSONB snapshot columns.
+
 ## Hardening Notes
 
 - Rollback execution now restores live optimizer state instead of stopping at record creation.
 - `executeRollback()` now requires non-empty `actor` and `reason` values.
+- Rollback records and audit events are now persisted to PostgreSQL (no longer in-memory).
 - Preview remains read-only and still does not emit a preview audit event. If preview traceability is required in production, add explicit `rollback_previewed` emission at the application boundary.

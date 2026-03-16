@@ -78,3 +78,23 @@ The system enforces several layers of protection to ensure plaintext secrets nev
 
 ### In Audit Events
 - Audit event builders never include raw secret material. Provider events reference providers by ID, not by credential.
+
+## Persistence
+
+Encrypted secrets are stored in the `provider_secrets` table:
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `provider_id` | VARCHAR (UNIQUE) | The provider this secret belongs to |
+| `envelope` | JSONB | The `EncryptedEnvelope` object |
+| `created_at` | TIMESTAMPTZ | When the secret was first stored |
+| `rotated_at` | TIMESTAMPTZ | When the secret was last rotated (null if never) |
+| `expires_at` | TIMESTAMPTZ | Optional expiry timestamp |
+
+The `PgSecretCipherStore` implements the `SecretCipherStore` interface and provides:
+- **Upsert semantics** on `store()` -- inserting a secret for a provider that already has one replaces the envelope.
+- **Rotation tracking** -- `rotate()` updates the envelope and sets `rotated_at`.
+- **Idempotent revocation** -- `revoke()` deletes the row; calling it twice is safe.
+
+Migration: `infra/db/migrations/008_secret_store_and_rollback_snapshots.sql`
