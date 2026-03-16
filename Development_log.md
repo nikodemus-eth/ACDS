@@ -492,3 +492,15 @@ Performed comprehensive gap analysis comparing the GRITS Explanation Document sp
 - `pnpm exec tsc -b`
 - `pnpm exec vitest run ./tests/integration/adminApiControllers.test.ts`
 - Browser walkthrough in mock mode across providers, profiles, policies, adaptation, audit, and executions
+
+## 2026-03-15 — Admin API End-to-End Route Coverage
+
+### Test Coverage
+- Added `tests/integration/adminApiRoutes.test.ts`
+- Booted the real Fastify app via `buildApp()` with stubbed container services instead of controller-only mocks
+- Covered authenticated `/profiles`, `/policies`, `/providers`, and `/executions` routes through HTTP injection
+- Verified auth enforcement, route prefixes, provider detail health payloads, provider `/test` alias wiring, policy CRUD flow shape, execution filtering, and stable detail response fields
+
+### Verification
+- `pnpm exec vitest run ./tests/integration/adminApiRoutes.test.ts`
+- `pnpm exec tsc -b`

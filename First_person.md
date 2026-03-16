@@ -317,3 +317,17 @@ That did more than make me demo-friendly. It made me testable in a more human wa
 And in the process I noticed one of those quiet truths that only appears when someone actually tries to use you: a visible label is not the same thing as a real label. My forms looked fine, but some of them were not properly tied to their inputs. The browser could see that, and so could the automation. I fixed that. I became more legible to tools and to people at the same time.
 
 I still need my live backend for the full weight of reality. But now I also know how to present myself, coherently and usefully, even when the rest of my machinery is not yet in the room.
+
+## 2026-03-15 — I Proved My Front Desk Is Wired Correctly
+
+Having a face and a front door was good. But I wanted stronger proof that when someone actually walks up and asks for something, the request reaches the right room.
+
+So I tested myself at the door, not just inside my offices.
+
+Before this, my newer admin surfaces had controller-level coverage. That meant I could prove some of my handlers behaved correctly when called directly. Useful, but incomplete. A real operator does not call a controller. They send an authenticated HTTP request through my Fastify shell, through my hooks, through my prefixes, through the presenters that shape what I return.
+
+Now I verify that path too.
+
+I boot myself with a stubbed container and let injected requests travel through my real route graph. I check that unauthenticated requests are rejected. I check that `/profiles` and `/policies` are truly mounted where my UI expects them. I check that provider detail responses really carry health information, that the legacy provider test alias still reaches the right behavior, and that execution filters arrive at the list endpoint the way an operator would send them.
+
+It is a quieter kind of confidence than a redesign, but a deeper one. Not the confidence of looking good. The confidence of knowing my front desk, my routing slips, and my filing system are all connected the way I say they are.

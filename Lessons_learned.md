@@ -142,3 +142,8 @@ Tracking lessons learned to prevent repeating pain points.
 - **Frontend mocks become genuinely valuable only when they mirror real API shapes.** The mock layer became much more useful once it covered approval, rollback, audit detail, execution detail, and provider mutation flows instead of only list screens.
 - **Browser automation is an excellent accessibility reviewer.** The provider form looked correct visually, but Playwright exposed that labels were not actually bound to inputs. Fixing that improved automation reliability and keyboard/screen-reader usability at the same time.
 - **Architecture docs should describe intentional exceptions, not idealized rules.** `admin-web` intentionally imports `@acds/core-types`; updating the boundary documentation was better than pretending the code still followed an older constraint.
+
+## 2026-03-15 — Route-Level Coverage Catches a Different Class of Drift
+
+- **Controller tests are not a substitute for real route tests.** The new admin APIs looked covered at the controller layer, but only Fastify injection verifies auth hooks, URL prefixes, alias routes, and presenter wiring together.
+- **When framework overload types get in the way, cast at the boundary and keep assertions strict inside.** The Fastify inject helper was easier to keep maintainable once the overload friction was isolated to a tiny helper instead of spread across every test.
