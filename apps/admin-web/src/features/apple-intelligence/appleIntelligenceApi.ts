@@ -1,5 +1,3 @@
-import { apiClient } from '../../lib/apiClient';
-
 const BRIDGE_URL = 'http://localhost:11435';
 
 export interface BridgeHealth {
@@ -33,12 +31,18 @@ export interface ExecuteResponse {
   capabilities: string[];
 }
 
+async function bridgeGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${BRIDGE_URL}${path}`);
+  if (!response.ok) throw new Error(`Bridge request failed: ${response.status}`);
+  return response.json();
+}
+
 export function getBridgeHealth(): Promise<BridgeHealth> {
-  return apiClient.get<BridgeHealth>('/apple-intelligence/health');
+  return bridgeGet<BridgeHealth>('/health');
 }
 
 export function getBridgeCapabilities(): Promise<BridgeCapabilities> {
-  return apiClient.get<BridgeCapabilities>('/apple-intelligence/capabilities');
+  return bridgeGet<BridgeCapabilities>('/capabilities');
 }
 
 export async function executeBridgePrompt(request: ExecuteRequest): Promise<ExecuteResponse> {
