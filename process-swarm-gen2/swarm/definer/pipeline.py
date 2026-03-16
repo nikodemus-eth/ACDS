@@ -24,7 +24,10 @@ import json
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from process_swarm.inference import InferenceProvider
 
 from swarm.definer.action_extraction import action_summary_from_tuples
 from swarm.definer.archetype import (
@@ -129,7 +132,7 @@ def _run_planning_pipeline(
     draft_id: str,
     repo: SwarmRepository,
     events: object | None = None,
-    ollama_base: str = "http://localhost:11434",
+    inference: Optional[InferenceProvider] = None,
     override_archetype: str | None = None,
 ) -> PipelineResult:
     """Run the full planning pipeline body (stages 2-7).
@@ -143,7 +146,7 @@ def _run_planning_pipeline(
         # Stage 2: Archetype Classification
         classification, archetype_id = _stage_classify(
             swarm_id, intent_text, draft_id, repo, events,
-            pipeline_events, ollama_base, override_archetype,
+            pipeline_events, inference, override_archetype,
         )
 
         archetype_name = classification.swarm_archetype
@@ -151,7 +154,7 @@ def _run_planning_pipeline(
         # Stage 3: Constraint Extraction
         constraints, constraint_set_id = _stage_extract_constraints(
             swarm_id, intent_text, archetype_name, draft_id,
-            repo, events, pipeline_events, ollama_base,
+            repo, events, pipeline_events, inference,
         )
 
         # Stage 4: Template Expansion
@@ -162,7 +165,7 @@ def _run_planning_pipeline(
         # Stage 5: Action Specialization
         action_ids = _stage_specialize_actions(
             swarm_id, base_actions, constraints, archetype_name,
-            intent_text, repo, events, pipeline_events, ollama_base,
+            intent_text, repo, events, pipeline_events, inference,
         )
 
         # Stage 6: Dependency Assignment
@@ -189,7 +192,7 @@ def run_canonical_pipeline_for_swarm(
     swarm_id: str,
     repo: SwarmRepository,
     events: object | None = None,
-    ollama_base: str = "http://localhost:11434",
+    inference: Optional[InferenceProvider] = None,
     override_archetype: str | None = None,
 ) -> PipelineResult:
     """Run the planning pipeline preferring accepted action-table artifacts."""
@@ -215,7 +218,7 @@ def run_canonical_pipeline_for_swarm(
         draft_id=draft["draft_id"],
         repo=repo,
         events=events,
-        ollama_base=ollama_base,
+        inference=inference,
         override_archetype=override_archetype,
     )
 
@@ -226,7 +229,7 @@ def run_action_table_pipeline(
     draft_id: str,
     repo: SwarmRepository,
     events: object | None = None,
-    ollama_base: str = "http://localhost:11434",
+    inference: Optional[InferenceProvider] = None,
     override_archetype: str | None = None,
 ) -> PipelineResult:
     """Backward-compatible entry point for pre-canonical callers."""
@@ -236,7 +239,7 @@ def run_action_table_pipeline(
         draft_id=draft_id,
         repo=repo,
         events=events,
-        ollama_base=ollama_base,
+        inference=inference,
         override_archetype=override_archetype,
     )
 
@@ -253,7 +256,7 @@ def _stage_classify(
     repo: SwarmRepository,
     events: object | None,
     pipeline_events: list[str],
-    ollama_base: str,
+    inference: Optional[InferenceProvider],
     override_archetype: str | None,
 ) -> tuple[SwarmArchetypeClassification, str]:
     """Stage 2: Archetype Classification."""
@@ -311,7 +314,7 @@ def _stage_classify(
                         canonical_match.get("classification_state") == "candidate"
                     )
         if classification is None:
-            classification = classify_swarm_archetype(intent_text)
+            classification = classify_swarm_archetype(intent_text, inference)
 
     if classification.needs_clarification:
         raise ClarificationNeeded(
@@ -385,7 +388,7 @@ def _stage_extract_constraints(
     repo: SwarmRepository,
     events: object | None,
     pipeline_events: list[str],
-    ollama_base: str,
+    inference: Optional[InferenceProvider],
 ) -> tuple[ConstraintSet, str]:
     """Stage 3: Constraint Extraction."""
     action_table = repo.get_latest_action_table_for_swarm(swarm_id)
@@ -413,12 +416,9 @@ def _stage_extract_constraints(
         constraints_payload = json.loads(record["constraints_json"] or "{}")
         constraints = constraint_set_from_dict(constraints_payload)
         warnings_raw = record.get("ambiguous_fields_json")
-        if isinstance(warnings_raw, str):
-            warnings = json.loads(warnings_raw or "[]")
-        else:
-            warnings = warnings_raw or []
+        warnings = json.loads(warnings_raw) if warnings_raw else []
     else:
-        constraints = extract_constraints(intent_text, archetype_name)
+        constraints = extract_constraints(intent_text, archetype_name, inference)
         warnings = validate_constraints(constraints)
         extraction_notes = "; ".join(warnings) if warnings else None
         constraint_set_id = repo.create_constraint_set(
@@ -495,7 +495,7 @@ def _stage_specialize_actions(
     repo: SwarmRepository,
     events: object | None,
     pipeline_events: list[str],
-    ollama_base: str,
+    inference: Optional[InferenceProvider],
 ) -> list[str]:
     """Stage 5: Action Specialization.
 
@@ -513,7 +513,7 @@ def _stage_specialize_actions(
     for i, template_action in enumerate(base_actions):
         expanded = _maybe_expand_action(
             template_action, constraints, archetype_name,
-            intent_text, ollama_base,
+            intent_text, inference,
         )
 
         for j, (name, text, action_type) in enumerate(expanded):
@@ -651,7 +651,7 @@ def _maybe_expand_action(
     constraints: ConstraintSet,
     archetype_name: str,
     intent_text: str,
-    ollama_base: str,
+    inference: Optional[InferenceProvider],
 ) -> list[tuple[str, str, str]]:
     """Possibly expand a single template action into multiple actions.
 

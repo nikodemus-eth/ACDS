@@ -105,18 +105,7 @@ class PipelineRunner:
         )
 
         # 5. Gate check
-        gate = ExecutionGate()
-        decision = gate.check(
-            plan=plan,
-            validation_result=validation_result,
-            lease=lease,
-            keys_dir=self.keys_dir,
-        )
-
-        if not decision.allowed:
-            raise ValueError(
-                f"Execution gate denied: {'; '.join(decision.reasons)}"
-            )
+        self._enforce_gate(plan, validation_result, lease)
 
         # 6. Execute with ToolGate enforcement
         toolgate = ToolGate()
@@ -172,3 +161,19 @@ class PipelineRunner:
                 save_receipt(receipt, self.artifacts_dir / "exchange")
 
         return results
+
+    def _enforce_gate(
+        self, plan: dict, validation_result: dict, lease: dict
+    ) -> None:
+        """Run the execution gate and raise on denial."""
+        gate = ExecutionGate()
+        decision = gate.check(
+            plan=plan,
+            validation_result=validation_result,
+            lease=lease,
+            keys_dir=self.keys_dir,
+        )
+        if not decision.allowed:
+            raise ValueError(
+                f"Execution gate denied: {'; '.join(decision.reasons)}"
+            )

@@ -177,8 +177,6 @@ class LifecycleManager:
                 acknowledged=True,
             )
             for persisted_warning in persisted:
-                if persisted_warning["warning_family"] != "reduced_assurance_governance":
-                    continue
                 event = build_reduced_assurance_event(
                     warning=persisted_warning,
                     governance_action_type=_to_governance_action_type(to_state),

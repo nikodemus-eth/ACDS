@@ -63,8 +63,6 @@ class SessionWatcher:
 
         recorded = 0
         for session_file in self.sessions_dir.glob("*.jsonl"):
-            if session_file.name.endswith(".lock"):
-                continue
             recorded += self._process_session_file(session_file)
 
         if recorded > 0:

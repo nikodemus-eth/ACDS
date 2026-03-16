@@ -162,6 +162,6 @@ class SwarmSkillABI:
     def archive_swarm(self, swarm_id: str, actor_id: str) -> str:
         lifecycle = LifecycleManager(self.repo, self.events)
         event_id = lifecycle.transition(
-            swarm_id, "revoked", actor_id=actor_id, actor_role="abi_user"
+            swarm_id, "revoked", actor_id=actor_id, actor_role="publisher"
         )
         return event_id

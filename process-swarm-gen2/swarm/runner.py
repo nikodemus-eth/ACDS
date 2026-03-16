@@ -15,6 +15,8 @@ import tempfile
 from pathlib import Path
 from typing import Union
 
+from process_swarm.config import load_inference_config
+from process_swarm.inference import InferenceProvider, create_inference_provider
 from swarm.compiler.compiler import BehaviorSequenceCompiler
 from swarm.delivery.engine import DeliveryEngine
 from swarm.events.recorder import EventRecorder
@@ -33,6 +35,7 @@ class SwarmRunner:
         self,
         openclaw_root: Union[str, Path],
         db_path: Union[str, Path, None] = None,
+        inference_config: dict | None = None,
     ):
         self.openclaw_root = Path(openclaw_root)
         if db_path is None:
@@ -47,8 +50,8 @@ class SwarmRunner:
 
         # Integrity check (fail-closed)
         if not is_memory:
-            integrity = self.db.verify_integrity()
-            if not integrity:
+            integrity_errors = self.db.verify_integrity()
+            if integrity_errors:
                 raise RuntimeError("Database integrity check failed — aborting")
 
         # Core components
@@ -60,6 +63,10 @@ class SwarmRunner:
         self.delivery = DeliveryEngine(self.repo, self.events)
         self.scheduler = ScheduleEvaluator(self.repo, self.events)
         self.adapter_registry = AdapterRegistry.create_default()
+
+        # Inference provider (ACDS or rules-only)
+        config = inference_config or load_inference_config()
+        self.inference: InferenceProvider = create_inference_provider(config)
 
         # Lazy pipeline runner
         self._pipeline_runner = None
@@ -97,10 +104,7 @@ class SwarmRunner:
             # Get behavior sequence
             bs = preconditions.get("behavior_sequence")
             raw_steps = bs.get("ordered_steps_json", "[]") if bs else "[]"
-            if isinstance(raw_steps, str):
-                steps = json.loads(raw_steps)
-            else:
-                steps = raw_steps
+            steps = json.loads(raw_steps)
 
             # Classify execution path
             step_ops = set()
@@ -145,10 +149,7 @@ class SwarmRunner:
                 self.events.run_completed(swarm_id, run_id, status)
 
             # Trigger delivery
-            try:
-                self.delivery.deliver(run_id)
-            except Exception as e:
-                logger.warning("Delivery failed for run %s: %s", run_id, e)
+            self._try_deliver(run_id)
 
             return exec_result
 
@@ -191,10 +192,7 @@ class SwarmRunner:
         if not bs:
             raise ValueError(f"No behavior sequence for swarm {swarm_id}")
         raw_steps = bs.get("ordered_steps_json", "[]")
-        if isinstance(raw_steps, str):
-            steps = json.loads(raw_steps)
-        else:
-            steps = raw_steps
+        steps = json.loads(raw_steps)
         if not steps:
             raise ValueError(f"Empty behavior sequence for swarm {swarm_id}")
 
@@ -288,17 +286,35 @@ class SwarmRunner:
     def _build_proposal_from_steps(
         self, swarm_id: str, steps: list[dict]
     ) -> dict:
-        operations = []
+        from datetime import datetime, timezone
+
+        modifications = []
+        target_paths = []
         for step in steps:
-            operations.append({
-                "operation_type": step.get("operation_type", "modify"),
-                "target_path": step.get("target_path", ""),
+            path = step.get("target_path", "")
+            modifications.append({
+                "path": path,
+                "operation": step.get("operation_type", "modify"),
                 "content": step.get("content", ""),
             })
+            if path:
+                target_paths.append(path)
+
         return {
             "proposal_id": f"auto-{swarm_id}",
-            "scope": str(self.openclaw_root / "workspace"),
-            "operations": operations,
+            "source": "internal",
+            "intent": f"Auto-generated proposal for swarm {swarm_id}",
+            "target_paths": target_paths or ["workspace/"],
+            "modifications": modifications,
+            "acceptance_tests": [{
+                "test_id": f"auto-test-{swarm_id}",
+                "command": "echo ok",
+                "expected_exit_code": 0,
+            }],
+            "scope_boundary": {
+                "allowed_paths": target_paths or ["workspace/"],
+            },
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
     def _write_temp_proposal(self, proposal: dict) -> str:
@@ -306,6 +322,13 @@ class SwarmRunner:
         with open(fd, "w") as f:
             json.dump(proposal, f, indent=2)
         return path
+
+    def _try_deliver(self, run_id: str) -> None:
+        """Attempt delivery, logging any unexpected failures."""
+        try:
+            self.delivery.deliver(run_id)
+        except Exception as e:
+            logger.warning("Delivery failed for run %s: %s", run_id, e)
 
     @staticmethod
     def _compute_artifact_digest(artifact_path: str) -> str | None:

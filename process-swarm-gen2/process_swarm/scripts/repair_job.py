@@ -53,10 +53,7 @@ def repair_job(schema: dict, job: dict, errors: list[str]) -> dict:
         repaired["assumptions"] = []
 
     # Fix execution_policy internals
-    ep = repaired.get("execution_policy", {})
-    if not isinstance(ep, dict):
-        ep = copy.deepcopy(_DEFAULT_EXECUTION_POLICY)
-        repaired["execution_policy"] = ep
+    ep = repaired["execution_policy"]
 
     if ep.get("mode") not in _EXECUTION_MODES:
         ep["mode"] = "sequential"
@@ -70,10 +67,7 @@ def repair_job(schema: dict, job: dict, errors: list[str]) -> dict:
             rp["retry_on_failure"] = True
 
     # Fix failure_handling internals
-    fh = repaired.get("failure_handling", {})
-    if not isinstance(fh, dict):
-        fh = copy.deepcopy(_DEFAULT_FAILURE_HANDLING)
-        repaired["failure_handling"] = fh
+    fh = repaired["failure_handling"]
 
     if fh.get("on_validation_failure") not in _VALIDATION_FAILURE_ACTIONS:
         fh["on_validation_failure"] = "reject"
@@ -81,10 +75,7 @@ def repair_job(schema: dict, job: dict, errors: list[str]) -> dict:
         fh["on_execution_failure"] = "flag_for_review"
 
     # Fix lineage_tracking internals
-    lt = repaired.get("lineage_tracking", {})
-    if not isinstance(lt, dict):
-        lt = copy.deepcopy(_DEFAULT_LINEAGE_TRACKING)
-        repaired["lineage_tracking"] = lt
+    lt = repaired["lineage_tracking"]
 
     for field in ("enabled", "record_inputs", "record_outputs", "record_agent_lineage"):
         if field not in lt or not isinstance(lt[field], bool):

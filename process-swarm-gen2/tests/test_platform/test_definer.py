@@ -513,6 +513,116 @@ class TestPipelineRun:
 
 
 # ──────────────────────────────────────────────
+# ACDS Inference Integration
+# ──────────────────────────────────────────────
+
+
+class _MockInferenceProvider:
+    """Test double that returns canned LLM responses."""
+
+    def __init__(self, response: str | None):
+        self._response = response
+        self.calls: list[dict] = []
+
+    def infer(self, prompt, *, task_type="generation", cognitive_grade="standard",
+              process="definer", step="general"):
+        self.calls.append({
+            "prompt": prompt, "task_type": task_type,
+            "cognitive_grade": cognitive_grade, "step": step,
+        })
+        return self._response
+
+
+class TestACDSInferencePipeline:
+    """Tests verifying the ACDS inference integration path."""
+
+    def test_pipeline_with_inference_provider(self, repo):
+        """LLM-based classification is used when an inference provider returns valid JSON."""
+        seed_default_tools(repo)
+        swarm_id = repo.create_swarm(
+            swarm_name="acds-test", description="test", created_by="tester",
+        )
+        draft_id = repo.create_intent_draft(
+            swarm_id=swarm_id,
+            raw_text="Generate a weekly intelligence report with 3 sections",
+            created_by="tester",
+        )
+
+        mock = _MockInferenceProvider(
+            '{"swarm_archetype": "scheduled_structured_report", '
+            '"complexity": "moderate", "confidence": 0.92, '
+            '"reasoning": "Weekly recurring report with sections"}'
+        )
+
+        result = run_action_table_pipeline(
+            swarm_id=swarm_id,
+            intent_text="Generate a weekly intelligence report with 3 sections",
+            draft_id=draft_id,
+            repo=repo,
+            events=None,
+            inference=mock,
+        )
+
+        assert isinstance(result, PipelineResult)
+        assert len(result.action_ids) > 0
+        # Verify inference was called for classification
+        assert any(c["step"] == "archetype_classification" for c in mock.calls)
+
+    def test_pipeline_falls_back_when_inference_returns_none(self, repo):
+        """Pipeline uses rules when the inference provider returns None."""
+        seed_default_tools(repo)
+        swarm_id = repo.create_swarm(
+            swarm_name="fallback-test", description="test", created_by="tester",
+        )
+        draft_id = repo.create_intent_draft(
+            swarm_id=swarm_id,
+            raw_text="Build a code project with tests",
+            created_by="tester",
+        )
+
+        mock = _MockInferenceProvider(None)
+
+        result = run_action_table_pipeline(
+            swarm_id=swarm_id,
+            intent_text="Build a code project with tests",
+            draft_id=draft_id,
+            repo=repo,
+            events=None,
+            inference=mock,
+            override_archetype="code_generation",
+        )
+
+        assert isinstance(result, PipelineResult)
+        assert len(result.action_ids) > 0
+
+    def test_pipeline_falls_back_on_invalid_llm_response(self, repo):
+        """Pipeline uses rules when the LLM returns unparseable output."""
+        seed_default_tools(repo)
+        swarm_id = repo.create_swarm(
+            swarm_name="invalid-test", description="test", created_by="tester",
+        )
+        draft_id = repo.create_intent_draft(
+            swarm_id=swarm_id,
+            raw_text="Generate a weekly report",
+            created_by="tester",
+        )
+
+        mock = _MockInferenceProvider("This is not valid JSON at all")
+
+        result = run_action_table_pipeline(
+            swarm_id=swarm_id,
+            intent_text="Generate a weekly report",
+            draft_id=draft_id,
+            repo=repo,
+            events=None,
+            inference=mock,
+        )
+
+        assert isinstance(result, PipelineResult)
+        assert len(result.action_ids) > 0
+
+
+# ──────────────────────────────────────────────
 # Tool Matching Wrapper
 # ──────────────────────────────────────────────
 

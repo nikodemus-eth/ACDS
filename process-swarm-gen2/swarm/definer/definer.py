@@ -25,16 +25,11 @@ from swarm.definer.action_extraction import (
 from swarm.definer.archetype_classifier import classify_action_table
 from swarm.registry.repository import SwarmRepository
 
-# Phase 3 dependencies — optional until governance layer is built (Lesson #11).
-try:
-    from swarm.governance.warnings import (
-        evaluate_semantic_ambiguity,
-        persist_warning_records,
-        summarize_warnings,
-    )
-    _HAS_GOVERNANCE = True
-except ImportError:
-    _HAS_GOVERNANCE = False
+from swarm.governance.warnings import (
+    evaluate_semantic_ambiguity,
+    persist_warning_records,
+    summarize_warnings,
+)
 
 
 class SwarmDefiner:
@@ -191,7 +186,11 @@ class SwarmDefiner:
                     for key, value in response.items():
                         if key in {"qualifiers", "conditions", "dependencies"} and value is not None:
                             if key == "qualifiers":
-                                action.setdefault("qualifiers", {}).update(value)
+                                existing_q = action.get("qualifiers")
+                                if isinstance(existing_q, dict) and isinstance(value, dict):
+                                    existing_q.update(value)
+                                else:
+                                    action["qualifiers"] = value
                             else:
                                 action[key] = value
                         elif key != "step":
@@ -270,7 +269,11 @@ class SwarmDefiner:
                 if action and response.get(f):
                     action[f] = response[f]
             if action and response.get("qualifiers"):
-                action.setdefault("qualifiers", {}).update(response["qualifiers"])
+                existing_q = action.get("qualifiers")
+                if isinstance(existing_q, dict) and isinstance(response["qualifiers"], dict):
+                    existing_q.update(response["qualifiers"])
+                else:
+                    action["qualifiers"] = response["qualifiers"]
 
             if record.get("resolution_status") == "resolved":
                 unresolved = [
@@ -494,57 +497,56 @@ class SwarmDefiner:
                 f"Restatement {restatement_id} is already accepted"
             )
 
-        # Governance warning evaluation (optional — Phase 3 dependency)
-        if _HAS_GOVERNANCE:
-            evaluation = self.evaluate_pre_acceptance(
-                swarm_id=swarm_id,
-                restatement_id=restatement_id,
-                actor_id=accepted_by,
+        # Governance warning evaluation
+        evaluation = self.evaluate_pre_acceptance(
+            swarm_id=swarm_id,
+            restatement_id=restatement_id,
+            actor_id=accepted_by,
+        )
+        current_blocks = [
+            w for w in evaluation["governance_warnings"]
+            if w["severity"] == "block"
+        ]
+        current_warns = [
+            w for w in evaluation["governance_warnings"]
+            if w["severity"] == "warn"
+        ]
+        if current_blocks:
+            persist_warning_records(
+                self.repo, self.events, current_blocks,
+                operator_decision="blocked_by_system",
             )
-            current_blocks = [
-                w for w in evaluation["governance_warnings"]
-                if w["severity"] == "block"
+            raise ValueError(
+                "Intent acceptance blocked by governance warnings"
+            )
+        if current_warns:
+            warning_ids = warning_ids or []
+            provided_fingerprints = set()
+            for wid in warning_ids:
+                record = self.repo.get_governance_warning_record(wid)
+                if record:
+                    provided_fingerprints.add(record["decision_fingerprint"])
+
+            missing = [
+                w for w in current_warns
+                if w["decision_fingerprint"] not in provided_fingerprints
             ]
-            current_warns = [
-                w for w in evaluation["governance_warnings"]
-                if w["severity"] == "warn"
-            ]
-            if current_blocks:
+            if missing:
                 persist_warning_records(
-                    self.repo, self.events, current_blocks,
-                    operator_decision="blocked_by_system",
+                    self.repo, self.events, missing,
+                    operator_decision="deferred",
                 )
                 raise ValueError(
-                    "Intent acceptance blocked by governance warnings"
+                    "Explicit governance warning acknowledgment is required "
+                    "before intent acceptance"
                 )
-            if current_warns:
-                warning_ids = warning_ids or []
-                provided_fingerprints = set()
-                for wid in warning_ids:
-                    record = self.repo.get_governance_warning_record(wid)
-                    if record:
-                        provided_fingerprints.add(record["decision_fingerprint"])
-
-                missing = [
-                    w for w in current_warns
-                    if w["decision_fingerprint"] not in provided_fingerprints
-                ]
-                if missing:
-                    persist_warning_records(
-                        self.repo, self.events, missing,
-                        operator_decision="deferred",
-                    )
-                    raise ValueError(
-                        "Explicit governance warning acknowledgment is required "
-                        "before intent acceptance"
-                    )
-                persist_warning_records(
-                    self.repo, self.events, current_warns,
-                    operator_decision="acknowledged_and_proceeded",
-                    override_reason_category=override_reason_category,
-                    override_reason=override_reason,
-                    acknowledged=True,
-                )
+            persist_warning_records(
+                self.repo, self.events, current_warns,
+                operator_decision="acknowledged_and_proceeded",
+                override_reason_category=override_reason_category,
+                override_reason=override_reason,
+                acknowledged=True,
+            )
 
         unresolved_raw = restatement.get("unresolved_issues_json")
         unresolved_issues = json.loads(unresolved_raw) if unresolved_raw else []
@@ -616,13 +618,6 @@ class SwarmDefiner:
         actor_id: str,
     ) -> dict:
         """Evaluate governance warnings before intent acceptance."""
-        if not _HAS_GOVERNANCE:
-            return {
-                "governance_warnings": [],
-                "assurance_posture": "full",
-                "can_proceed": True,
-            }
-
         restatement = self.repo.get_restatement(restatement_id)
         if not restatement:
             raise ValueError(f"Restatement not found: {restatement_id}")

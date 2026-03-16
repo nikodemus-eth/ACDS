@@ -32,14 +32,39 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## ACDS Integration (Optional)
+
+To enable LLM-backed inference through ACDS, set these environment variables:
+
+```bash
+# Enable ACDS inference (default is "rules" — pure keyword matching)
+export INFERENCE_PROVIDER=acds
+
+# ACDS dispatch API URL (default: http://localhost:3000)
+export ACDS_BASE_URL=http://localhost:3000
+
+# Optional: authentication token for ACDS
+export ACDS_AUTH_TOKEN=your-token-here
+
+# Optional: request timeout in seconds (default: 30)
+export ACDS_TIMEOUT_SECONDS=30
+```
+
+When `INFERENCE_PROVIDER=rules` (the default), the system uses deterministic keyword-matching for archetype classification and constraint extraction. No ACDS server is required.
+
+When `INFERENCE_PROVIDER=acds`, the definer pipeline sends classification and extraction prompts to ACDS, which routes them to the best available model. If ACDS is unreachable, the system falls back to rules automatically.
+
 ## Verify Installation
 
 ```bash
 # Verify imports work
-python -c "import runtime; import swarm; print('Imports OK')"
+python -c "import runtime; import swarm; import process_swarm; print('Imports OK')"
 
 # Run tests
 pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=runtime --cov=swarm --cov=process_swarm --cov-report=term-missing
 
 # Run red-team tests only
 pytest tests/ -m redteam -v
@@ -63,7 +88,15 @@ Process Swarm Gen 2/
 │   ├── proposal/     # Proposal loading
 │   └── bridge/       # Runtime bridge translation
 ├── swarm/            # Process automation platform
-├── tests/            # Test suite
+├── process_swarm/    # Job authoring + ACDS integration
+│   ├── acds_client.py   # Python ACDS dispatch client
+│   ├── inference.py     # InferenceProvider protocol
+│   ├── config.py        # Environment-based configuration
+│   ├── scripts/         # Job authoring pipeline scripts
+│   ├── classes/         # Job class definitions
+│   ├── extraction/      # Parameter extraction
+│   └── planner/         # Execution planning
+├── tests/            # Test suite (1706 tests, 100% coverage)
 ├── schemas/          # JSON Schema definitions
 └── docs/             # Documentation & logs
 ```

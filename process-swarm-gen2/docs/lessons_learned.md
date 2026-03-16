@@ -109,3 +109,27 @@ These lessons were documented in the original Process Swarm and are being applie
 47. **Documentation is parallelizable when modules are independent** — All 12 documentation files were written by 5 parallel subagents with zero conflicts. The key is that each doc covers a distinct concern (architecture, security, identity, tools, agents, etc.) with clear boundaries. This mirrors the codebase's own modularity — well-separated modules produce well-separated documentation.
 
 48. **Config reference files should be templates, not live configs** — `node_identity.json`, `key_registry.json`, `tool_policy.json`, and `baseline.manifest.json` are documentation artifacts (templates with placeholders), not runtime configuration. Storing them in `docs/` rather than the project root prevents accidental loading by application code that might expect real values.
+
+## Discovered During 100% Coverage Campaign
+
+49. **SQLite corruption testing requires three distinct techniques** — (1) `PRAGMA writable_schema` with ghost tables breaks `connect()` entirely. (2) Data page zeroing (skip page 1) lets connect succeed but `PRAGMA integrity_check` raises `DatabaseError`. (3) Index byte-flipping produces non-ok rows from `integrity_check` without raising. Each technique covers a different code path in the integrity verification logic.
+
+50. **`PRAGMA integrity_check` can raise, not just return rows** — On severe corruption, the pragma itself throws `sqlite3.DatabaseError` rather than returning error rows. Production code that calls it must wrap in try/except if it wants to report errors rather than crash. This is an underdocumented SQLite behavior.
+
+51. **Defense-in-depth code should be extracted into testable methods** — Gate denial and delivery failure catch-all paths were embedded in monolithic orchestrator methods (`run()`, `execute_run()`). They were architecturally correct but unreachable through normal API flows. Extracting them into focused methods (`_enforce_gate()`, `_try_deliver()`) improves both testability and code clarity — no mocks needed.
+
+52. **100% coverage with zero mocks is achievable but requires production code quality** — Every unreachable code path represented either dead code (remove it) or defense-in-depth code (extract it into a testable method). The discipline of "no mocks" forced three genuine production code improvements that made the codebase better, not just better-tested.
+
+53. **In-memory schema cache defeats integrity testing** — SQLite caches the schema in the connection object. If you corrupt the database file while a connection is open, `integrity_check` may still return "ok" because it reads from the cache. You must close the connection and open a fresh one to test file-level corruption.
+
+54. **Behavior proposal schema uses `modifications`/`operation`, not `operations`/`operation_type`** — The canonical schema field for proposal file changes is `modifications` with keys `path`, `operation`, and `content`. Earlier code and tests sometimes used `operations` with `operation_type`. Always check the actual schema file, not code assumptions.
+
+## Discovered During ACDS Integration
+
+55. **Protocol is better than ABC for cross-package interfaces** — The `InferenceProvider` protocol uses structural typing (duck typing) rather than inheritance. This means any object with an `infer()` method works, without needing to import or inherit from a base class. This is cleaner for cross-package boundaries where you don't want tight coupling.
+
+56. **Graceful degradation by returning None** — When an ACDS call fails, the provider returns `None` rather than raising. Callers check `if result is not None` and fall back to rules. This is simpler and more robust than try/except at every call site, and it means the system works identically whether ACDS is configured, unreachable, or not configured at all.
+
+57. **Mirror TypeScript contracts exactly in Python dataclasses** — The ACDS core-types package defines contracts in TypeScript. The Python client mirrors these as dataclasses with identical field names and enum values. This makes cross-language debugging trivial — a `RoutingRequest` in Python has the same shape as one in TypeScript, so you can compare JSON payloads directly.
+
+58. **Environment variables with sensible defaults enable zero-config operation** — `INFERENCE_PROVIDER` defaults to "rules", so the system works without any ACDS configuration. Setting `INFERENCE_PROVIDER=acds` and `ACDS_BASE_URL` is the only change needed to enable LLM-backed inference. No code changes, no config files, no feature flags.

@@ -125,3 +125,32 @@ Timestamped record of what was done and when during the rebuild.
 |------|------|---------|
 | Start | Phase 10: Architecture Documentation | 5 parallel subagents writing: ARCHITECTURE.md (system architecture + diagrams), SECURITY.md (threat model + trust chain), IDENTITY.md (signing system), TOOLS.md (adapter framework), AGENTS.md (agent model), SOUL.md (design philosophy), USER.md (user guide), MEMORY.md (state model), plus 4 config files (node_identity.json, key_registry.json, tool_policy.json, baseline.manifest.json) |
 | — | **Phase 10 Complete** | **12 documentation files created (8 .md + 4 .json). 937 tests still passing. Full rebuild complete.** |
+
+### Sessions 12–15: 100% Code Coverage Campaign
+
+| Time | Activity | Details |
+|------|----------|---------|
+| Start | Coverage analysis | Ran `pytest --cov` to identify uncovered lines across all 129 source files |
+| — | Batch 1–3 tests | Created test_full_coverage_batch1–3.py covering: registry edge cases, governance FSM, definer pipeline, BSC compiler, bridge translator, sequencer, session watcher, gateway recorder, GRITS diagnostics |
+| — | Batch 4–5 tests | Delivery engine, governance warnings, definer capability, repository CRUD, action tables, action extraction, DSL parser, runtime modules |
+| — | Batch 6–8 tests | Adaptive orchestrator, tool adapters, ProofUI, scheduler, pipeline runner, exchange ingress, proposal loader, schema validation edge cases |
+| — | Batch 9–10 tests | SwarmRunner execution paths, archetype classifier, constraint extractor, repair_job, compile_intent, plan_job_execution |
+| — | Production fix: `verify_integrity()` | `PRAGMA integrity_check` raises `DatabaseError` on severe corruption. Added try/except in `database.py` to catch and return as error string |
+| — | Production fix: `_enforce_gate()` | Extracted gate denial path from monolithic `PipelineRunner.run()` into testable `_enforce_gate()` method |
+| — | Production fix: `_try_deliver()` | Extracted delivery failure catch-all from `SwarmRunner.execute_run()` into testable `_try_deliver()` method |
+| — | Batch 11–12 tests | Final 3 uncovered lines: corrupted DB integrity check, gate denial with revoked lease, circular dependency detection in pipeline |
+| — | **Coverage Complete** | **1706 tests passing in 18.78s. 5538/5538 statements covered = 100%. Zero mocks, zero stubs, zero fakes.** |
+
+### Sessions 16: ACDS Inference Integration (Step 1–2)
+
+| Time | Activity | Details |
+|------|----------|---------|
+| Start | ACDS client | Created `process_swarm/acds_client.py` — Python HTTP client mirroring TypeScript SDK's DispatchClient. Dataclasses for RoutingRequest, DispatchRunRequest, DispatchRunResponse. Enums for TaskType (13), CognitiveGrade (5), LoadTier (4), DecisionPosture (5). Uses stdlib `urllib.request`. 260 lines |
+| — | Inference provider | Created `process_swarm/inference.py` — InferenceProvider protocol with `infer()` method. ACDSInferenceProvider wraps client with routing defaults (privacy=local_only, loadTier=single_shot). RulesOnlyProvider stub returns None. Factory function `create_inference_provider()`. 143 lines |
+| — | Configuration | Created `process_swarm/config.py` — `load_inference_config()` reads INFERENCE_PROVIDER, ACDS_BASE_URL, ACDS_AUTH_TOKEN, ACDS_TIMEOUT_SECONDS from environment. 26 lines |
+| — | Pipeline wiring | Modified `swarm/definer/pipeline.py` — replaced `ollama_base` parameter with `inference: InferenceProvider` across all stage functions |
+| — | LLM classification | Modified `swarm/definer/archetype.py` — added `_llm_classify_swarm()` path that calls ACDS with classification prompt, falls back to rules on failure. Source field set to "acds" |
+| — | LLM extraction | Modified `swarm/definer/constraints.py` — added `_llm_extract_constraints()` path that calls ACDS with extraction prompt, falls back to rules on failure |
+| — | Schema updates | Updated `archetype_classification.schema.json` source enum to include "acds". Updated `database.py` CHECK constraint to allow "acds" source |
+| — | Runner wiring | Modified `swarm/runner.py` — imports `load_inference_config`/`create_inference_provider`, passes inference provider to pipeline |
+| — | **ACDS Steps 1–2 Complete** | **3 new files (429 lines), 16 modified files. Inference provider abstraction operational with graceful fallback to rules.** |

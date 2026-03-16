@@ -119,7 +119,7 @@ def integration_proposal_to_m4(proposal: dict[str, Any]) -> dict[str, Any]:
         "modifications": modifications,
         "acceptance_tests": acceptance_tests,
         "scope_boundary": scope_boundary,
-        "side_effect_flags": proposal.get("constraints", {}).get("side_effect_flags", []),
+        "declared_side_effects": proposal.get("constraints", {}).get("side_effect_flags", []),
         "created_at": proposal.get("created_at", datetime.now(timezone.utc).isoformat()),
     }
 

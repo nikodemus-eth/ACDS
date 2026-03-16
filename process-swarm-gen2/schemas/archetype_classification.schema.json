@@ -79,6 +79,7 @@
       "type": "string",
       "enum": [
         "rules",
+        "acds",
         "ollama",
         "user_override"
       ],

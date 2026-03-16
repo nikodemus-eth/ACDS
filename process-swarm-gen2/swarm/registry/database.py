@@ -420,7 +420,7 @@ class RegistryDatabase:
                 confidence          REAL NOT NULL DEFAULT 0.0,
                 reasoning           TEXT,
                 source              TEXT NOT NULL DEFAULT 'rules'
-                    CHECK (source IN ('ollama', 'rules', 'user_override')),
+                    CHECK (source IN ('acds', 'ollama', 'rules', 'user_override')),
                 created_at          TEXT NOT NULL,
                 FOREIGN KEY (intent_id) REFERENCES intent_drafts(draft_id)
             )
@@ -729,7 +729,10 @@ class RegistryDatabase:
     def verify_integrity(self) -> list[str]:
         if not self.conn:
             raise RuntimeError("Database not connected. Call connect() first.")
-        rows = self.conn.execute("PRAGMA integrity_check").fetchall()
+        try:
+            rows = self.conn.execute("PRAGMA integrity_check").fetchall()
+        except Exception as exc:
+            return [f"integrity_check failed: {exc}"]
         errors = []
         for row in rows:
             value = row[0] if isinstance(row, (tuple, list)) else row["integrity_check"]

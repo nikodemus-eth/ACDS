@@ -1,15 +1,23 @@
 """Swarm archetype classification.
 
 Classifies user intent into one of 12 swarm archetypes using
-rule-based keyword matching (LLM classification can be added later).
+rule-based keyword matching, with optional LLM-based classification
+via ACDS (Adaptive Cognitive Dispatch System).
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from process_swarm.inference import InferenceProvider
+
+logger = logging.getLogger(__name__)
 
 
 class ArtifactType(str, Enum):
@@ -68,9 +76,106 @@ _DOC_WORDS = {"document", "documentation", "readme", "guide", "manual", "specifi
 
 def classify_swarm_archetype(
     request_text: str,
+    inference: Optional[InferenceProvider] = None,
 ) -> SwarmArchetypeClassification:
-    """Classify intent text into a swarm archetype using rule-based matching."""
+    """Classify intent text into a swarm archetype.
+
+    If an inference provider is available, attempts LLM-based classification
+    first and falls back to rule-based matching on failure.
+    """
+    if inference is not None:
+        result = _llm_classify_swarm(request_text, inference)
+        if result is not None:
+            return result
     return _rule_based_classify_swarm(request_text)
+
+
+_ARCHETYPE_DESCRIPTIONS = {
+    "structured_report": "One-off report with sections, sources, and structured output",
+    "scheduled_structured_report": "Recurring/scheduled report (daily, weekly, monthly)",
+    "document_generation": "Documentation, READMEs, guides, manuals, specifications",
+    "single_file_web_app": "Single-file web page, dashboard, or HTML application",
+    "multi_file_web_app": "Multi-file web application with multiple components",
+    "code_generation": "Scripts, functions, modules, CLI tools, libraries",
+    "data_transformation": "ETL, data conversion, parsing, normalization pipelines",
+    "configuration": "System configuration, setup, deployment, provisioning",
+    "software_build": "Build, compile, package, release, bundle creation",
+    "communication_artifact": "Email, notification, alert, message composition",
+    "monitoring_workflow": "System monitoring, health checks, status observation",
+    "delivery_workflow": "Content delivery, distribution, multi-channel dispatch",
+}
+
+_CLASSIFICATION_PROMPT = """Classify the following task description into exactly one swarm archetype.
+
+Available archetypes:
+{archetype_list}
+
+Task description:
+{intent_text}
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{{
+  "swarm_archetype": "<archetype_id>",
+  "complexity": "simple" | "moderate" | "complex",
+  "confidence": <0.0 to 1.0>,
+  "reasoning": "<brief explanation>"
+}}"""
+
+
+def _llm_classify_swarm(
+    request_text: str,
+    inference: InferenceProvider,
+) -> Optional[SwarmArchetypeClassification]:
+    """Attempt LLM-based archetype classification via ACDS."""
+    from process_swarm.acds_client import CognitiveGrade, TaskType
+
+    archetype_list = "\n".join(
+        f"  - {k}: {v}" for k, v in _ARCHETYPE_DESCRIPTIONS.items()
+    )
+    prompt = _CLASSIFICATION_PROMPT.format(
+        archetype_list=archetype_list,
+        intent_text=request_text,
+    )
+
+    raw = inference.infer(
+        prompt,
+        task_type=TaskType.CLASSIFICATION.value,
+        cognitive_grade=CognitiveGrade.STANDARD.value,
+        process="definer",
+        step="archetype_classification",
+    )
+    if raw is None:
+        return None
+
+    try:
+        # Strip markdown fences if present
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```\w*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
+        data = json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning("Failed to parse LLM classification response: %s", e)
+        return None
+
+    archetype = data.get("swarm_archetype", "")
+    valid = {a.value for a in SwarmArchetype}
+    if archetype not in valid:
+        logger.warning("LLM returned unknown archetype: %s", archetype)
+        return None
+
+    complexity = data.get("complexity", "moderate")
+    confidence = float(data.get("confidence", 0.85))
+
+    return SwarmArchetypeClassification(
+        swarm_archetype=archetype,
+        complexity=complexity,
+        decomposition_required=complexity != "simple",
+        confidence=confidence,
+        reasoning=data.get("reasoning", "LLM classification via ACDS"),
+        source="acds",
+        needs_clarification=confidence < 0.5,
+    )
 
 
 def _rule_based_classify_swarm(request_text: str) -> SwarmArchetypeClassification:

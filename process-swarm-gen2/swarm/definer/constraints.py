@@ -2,14 +2,22 @@
 
 Extracts structured constraints (sections, word counts, sources,
 freshness windows, delivery channels, output formats) from raw
-intent text using rule-based pattern matching.
+intent text using rule-based pattern matching, with optional
+LLM-based extraction via ACDS.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from process_swarm.inference import InferenceProvider
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,9 +37,72 @@ class ConstraintSet:
 def extract_constraints(
     raw_text: str,
     archetype: str,
+    inference: Optional[InferenceProvider] = None,
 ) -> ConstraintSet:
-    """Extract constraints from raw intent text using rule-based matching."""
+    """Extract constraints from raw intent text.
+
+    If an inference provider is available, attempts LLM-based extraction
+    first and falls back to rule-based matching on failure.
+    """
+    if inference is not None:
+        result = _llm_extract_constraints(raw_text, archetype, inference)
+        if result is not None:
+            return result
     return _rule_based_extract(raw_text, archetype)
+
+
+_EXTRACTION_PROMPT = """Extract structured constraints from the following task description.
+The task has been classified as archetype: {archetype}
+
+Task description:
+{raw_text}
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{{
+  "sections": ["list of section names if specified, else empty list"],
+  "min_word_count": null or integer,
+  "max_word_count": null or integer,
+  "required_sources": null or integer,
+  "freshness_window_days": null or integer (convert weeks to days * 7, months * 30),
+  "delivery_channel": null or "email" | "telegram" | "slack" | "webhook",
+  "output_format": null or "pdf" | "html" | "markdown" | "json" | "csv" | "xlsx",
+  "schedule_hint": null or "daily" | "weekly" | "monthly" | "cron:<expression>",
+  "fail_closed_conditions": ["list of conditions that must cause failure"],
+  "custom": {{}}
+}}"""
+
+
+def _llm_extract_constraints(
+    raw_text: str,
+    archetype: str,
+    inference: InferenceProvider,
+) -> Optional[ConstraintSet]:
+    """Attempt LLM-based constraint extraction via ACDS."""
+    from process_swarm.acds_client import CognitiveGrade, TaskType
+
+    prompt = _EXTRACTION_PROMPT.format(raw_text=raw_text, archetype=archetype)
+
+    raw = inference.infer(
+        prompt,
+        task_type=TaskType.EXTRACTION.value,
+        cognitive_grade=CognitiveGrade.STANDARD.value,
+        process="definer",
+        step="constraint_extraction",
+    )
+    if raw is None:
+        return None
+
+    try:
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```\w*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
+        data = json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning("Failed to parse LLM constraint response: %s", e)
+        return None
+
+    return constraint_set_from_dict(data)
 
 
 def _rule_based_extract(raw_text: str, archetype: str) -> ConstraintSet:

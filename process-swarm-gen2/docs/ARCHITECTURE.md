@@ -1,7 +1,7 @@
 # Process Swarm Gen 2 -- Architecture Document
 
-**Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema**
-**213 Python files, 937 tests, 18 JSON schemas**
+**Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema / ACDS Dispatch**
+**129 source files, 1706 tests (100% coverage), 18 JSON schemas**
 
 ---
 
@@ -353,6 +353,61 @@ The job authoring layer provides a **deterministic intent-to-job
 pipeline**. Intent classification uses keyword scoring: single-word
 keywords score +1 (token match), multi-word phrases score +2 (substring
 match). Falls back to `generic_job` if score is 0.
+
+### ACDS Integration Layer
+
+```
+process_swarm/
+  acds_client.py     Python HTTP client for ACDS Dispatch API
+  inference.py       InferenceProvider protocol and implementations
+  config.py          Environment-based configuration loader
+```
+
+The ACDS integration layer connects Process Swarm to the ACDS
+(Anthropic Claude Dispatch System) for LLM-backed inference. ACDS
+provides intelligent model routing — requests are dispatched to the
+best available model (OpenAI, Gemini, Ollama, LM Studio, etc.) based
+on policy, cognitive grade, and task type.
+
+**ACDSClient** (`acds_client.py`):
+- HTTP client using stdlib `urllib.request` (no new dependencies)
+- `dispatch(request) -> DispatchRunResponse` — calls `POST /v1/dispatch/run`
+- `health() -> bool` — calls `GET /health`
+- Python dataclasses mirror TypeScript SDK contracts exactly:
+  `RoutingRequest`, `RoutingConstraints`, `DispatchRunRequest`,
+  `DispatchRunResponse`
+- Enums: `TaskType` (13 values), `CognitiveGrade` (5), `LoadTier` (4),
+  `DecisionPosture` (5)
+
+**InferenceProvider** (`inference.py`):
+- `InferenceProvider` protocol with `infer(prompt, task_type,
+  cognitive_grade) -> Optional[str]`
+- `ACDSInferenceProvider` — wraps client with routing defaults
+  (`privacy="local_only"`, `loadTier=SINGLE_SHOT`,
+  `decisionPosture=OPERATIONAL`)
+- `RulesOnlyProvider` — returns `None` (signals rules-based fallback)
+- `create_inference_provider(config)` — factory function
+
+**Configuration** (`config.py`):
+- Reads from environment variables:
+  - `INFERENCE_PROVIDER` — `"rules"` (default) or `"acds"`
+  - `ACDS_BASE_URL` — default `http://localhost:3000`
+  - `ACDS_AUTH_TOKEN` — optional
+  - `ACDS_TIMEOUT_SECONDS` — default 30
+
+**Pipeline Integration**:
+
+| Pipeline Stage | ACDS TaskType | CognitiveGrade |
+|----------------|--------------|----------------|
+| Archetype Classification | `classification` | `standard` |
+| Constraint Extraction | `extraction` | `standard` |
+
+The inference provider is threaded through the definer pipeline. When
+ACDS is configured and reachable, classification and constraint extraction
+use LLM-backed inference. When ACDS is unavailable (or provider is set
+to "rules"), the system falls back to the existing keyword-matching
+rules with zero behavioral change. This graceful degradation is the
+key architectural property.
 
 ---
 
@@ -801,7 +856,9 @@ reviewer), the system:
                    scheduler, tools, runtime/pipeline     +-----+
                    (lazy-loaded)
                                                           |
-  process_swarm ──> (standalone scripts)                  |
+  process_swarm ──> acds_client (HTTP to ACDS dispatch)    |
+  process_swarm/inference ──> acds_client                  |
+  swarm/definer ──> process_swarm/inference (optional)     |
                                                           |
   grits ──> (standalone, reads openclaw_root)             |
                                                           |

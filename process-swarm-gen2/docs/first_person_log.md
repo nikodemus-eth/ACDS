@@ -362,3 +362,74 @@ Process Swarm Gen 2 is rebuilt across 11 phases (0-10), producing:
 - **30 SQLite tables** with full FK constraint enforcement
 
 The core invariant — "No signed plan, no execution" — is enforced at every layer.
+
+## 2026-03-15 — 100% Code Coverage Campaign
+
+### The Mandate
+
+The mandate was absolute: achieve 100% statement coverage across every source file in `swarm/`, `process_swarm/`, and `runtime/` — with zero mocks, zero stubs, zero fakes, zero monkeypatches. Every test must use real objects, real databases, real file operations, real signing keys, real subprocess calls.
+
+This is a significantly harder constraint than typical coverage work. Defense-in-depth code — the gate denial path in `PipelineRunner.run()`, the delivery failure catch-all in `SwarmRunner.execute_run()` — is architecturally correct but unreachable through normal public API flows. Without mocks, you can't just stub a dependency to force the error path. The code must be restructured so the defense-in-depth paths are directly testable.
+
+### SQLite Corruption: Three Techniques
+
+The most technically interesting discovery was SQLite corruption testing. The system has three distinct corruption-detection paths, and each requires a different corruption technique:
+
+1. **`PRAGMA writable_schema` with ghost tables** — Creates entries with invalid rootpage values. This is severe enough that even `PRAGMA journal_mode=WAL` triggers a schema parse failure. The connection itself fails. Useful for testing "can't even connect" scenarios, but NOT for testing `verify_integrity()` on an open connection.
+
+2. **Data page zeroing** — Zero out data pages while preserving page 1 (the schema page). The connection succeeds because the schema is intact, but `PRAGMA integrity_check` detects the corruption. Without a limit parameter, it raises `DatabaseError` rather than returning rows. This required a production fix: wrapping `integrity_check` in try/except in `verify_integrity()`.
+
+3. **Index byte-flipping** — Flip a single byte in the index area of the file. The connection succeeds, the schema is intact, and `integrity_check` returns rows like "row N missing from index idx_name" without raising. This is the only technique that produces non-ok rows without raising an exception — needed for testing the row-parsing path in `verify_integrity()`.
+
+### Defense-in-Depth Refactoring
+
+Two methods were extracted from monolithic orchestrator methods to make defense-in-depth code testable:
+
+**`PipelineRunner._enforce_gate()`** — The gate denial path was embedded inline in `run()`. The compiler performs the same checks as the gate, so valid proposals never fail the gate check. Extracting `_enforce_gate()` lets us test it directly with a real but revoked lease, which the gate correctly rejects.
+
+**`SwarmRunner._try_deliver()`** — The delivery failure catch-all was embedded in `execute_run()`. `DeliveryEngine` handles all errors internally, so the outer catch-all is architecturally correct but unreachable. Extracting `_try_deliver()` lets us test it directly by closing the DB connection before the call, triggering a real `ProgrammingError`.
+
+Both refactors improved the architecture — smaller, focused methods with clear responsibilities — AND made the code testable without any form of faking.
+
+### The Numbers
+
+The campaign produced 12 test batch files (test_full_coverage_batch1–12.py) plus one pipeline coverage file. Starting from 937 tests, the final count is:
+
+- **1706 tests** passing in 18.78 seconds
+- **5538/5538 statements** covered = **100%**
+- **3 production code fixes** (verify_integrity, _enforce_gate, _try_deliver)
+- **Zero mocks, zero stubs, zero fakes, zero monkeypatches**
+
+## 2026-03-16 — ACDS Inference Integration
+
+### The Goal
+
+Process Swarm Gen 2 has `ollama_base` parameters threaded through its pipeline but no actual LLM inference calls — all classification and extraction is rule-based keyword matching. ACDS provides a full HTTP dispatch API that routes requests to the best available model (OpenAI, Gemini, Ollama, LM Studio, etc.) based on policy, cognitive grade, and task type.
+
+The goal is to replace the `ollama_base` plumbing with an ACDS-backed inference layer so Process Swarm gets its LLM capabilities from ACDS's intelligent dispatch system.
+
+### Step 1: Python ACDS Client
+
+Created `process_swarm/acds_client.py` — a Python HTTP client that mirrors the TypeScript SDK's `DispatchClient`. The key design decisions:
+
+1. **Stdlib-only HTTP** — Uses `urllib.request` to avoid adding new dependencies. The client is intentionally simple: build JSON, POST it, parse the response.
+
+2. **Exact type parity** — Python dataclasses mirror the TypeScript contracts exactly: `RoutingRequest`, `RoutingConstraints`, `InstanceContext`, `DispatchRunRequest`, `DispatchRunResponse`. Enums match too: `TaskType` (13 values), `CognitiveGrade` (5), `LoadTier` (4), `DecisionPosture` (5).
+
+3. **Custom error type** — `ACDSClientError` wraps HTTP errors, timeouts, and parse failures with the status code attached for retry logic.
+
+### Step 2: Inference Provider Abstraction
+
+Created `process_swarm/inference.py` — an `InferenceProvider` protocol that abstracts over rules-based and ACDS-backed inference:
+
+1. **Protocol, not ABC** — The provider is a `Protocol` with a single `infer()` method. This allows duck-typing without inheritance coupling.
+
+2. **Graceful fallback** — `ACDSInferenceProvider.infer()` catches all exceptions and returns `None` on failure. Callers interpret `None` as "use rules-based logic." This means an unreachable ACDS server degrades gracefully to the existing behavior.
+
+3. **Routing defaults** — The provider sets sensible defaults: `privacy="local_only"`, `loadTier=SINGLE_SHOT`, `decisionPosture=OPERATIONAL`, `costSensitivity="medium"`. These can be overridden per-call via `task_type` and `cognitive_grade` parameters.
+
+### Pipeline Wiring
+
+The `ollama_base: str` parameter was replaced with `inference: InferenceProvider | None` across all pipeline entry points. In `archetype.py`, if inference is provided, `_llm_classify_swarm()` sends a classification prompt to ACDS and parses the JSON response. In `constraints.py`, `_llm_extract_constraints()` does the same for constraint extraction. Both fall back to rule-based logic on any failure.
+
+The SwarmRunner now reads inference configuration from environment variables (`INFERENCE_PROVIDER`, `ACDS_BASE_URL`, `ACDS_AUTH_TOKEN`) and creates the appropriate provider at startup.

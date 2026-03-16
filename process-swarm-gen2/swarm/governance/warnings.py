@@ -367,10 +367,15 @@ def evaluate_reduced_assurance_governance(
     elif previous == {"reviewer"} and current_role == "publisher":
         reduction_type = "reviewer_publisher_role_collapse"
 
+    # Complete governance collapse: actor holds 3+ distinct lifecycle roles
+    all_roles = previous | {current_role}
+    governance_roles = all_roles & {"author", "reviewer", "publisher"}
+    severity = "block" if len(governance_roles) >= 3 else "warn"
+
     return [
         _make_warning(
             warning_family="reduced_assurance_governance",
-            severity="warn",
+            severity=severity,
             trigger_stage=trigger_stage,
             message="The same actor is performing multiple governance roles for this swarm lifecycle.",
             boundary_at_risk="assurance_separation",

@@ -29,7 +29,7 @@ class AdaptiveResult:
     success: bool
     artifacts: list[str] = field(default_factory=list)
     total_cycles: int = 0
-    decisions_log: list[dict] = field(default_factory=dict)
+    decisions_log: list[dict] = field(default_factory=list)
     final_validation: dict = field(default_factory=dict)
 
     @property
