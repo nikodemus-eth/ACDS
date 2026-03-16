@@ -133,3 +133,17 @@ These lessons were documented in the original Process Swarm and are being applie
 57. **Mirror TypeScript contracts exactly in Python dataclasses** — The ACDS core-types package defines contracts in TypeScript. The Python client mirrors these as dataclasses with identical field names and enum values. This makes cross-language debugging trivial — a `RoutingRequest` in Python has the same shape as one in TypeScript, so you can compare JSON payloads directly.
 
 58. **Environment variables with sensible defaults enable zero-config operation** — `INFERENCE_PROVIDER` defaults to "rules", so the system works without any ACDS configuration. Setting `INFERENCE_PROVIDER=acds` and `ACDS_BASE_URL` is the only change needed to enable LLM-backed inference. No code changes, no config files, no feature flags.
+
+## Discovered During ACDS Evaluation Harness
+
+59. **Coverage ratio beats Jaccard for relevance scoring** — Jaccard similarity (`|A∩B| / |A∪B|`) penalizes long correct answers because output tokens dilute the union. Coverage ratio (`|task_tokens ∩ output_tokens| / |task_tokens|`) correctly identifies relevant answers regardless of output length. Use Jaccard for symmetric similarity, coverage for asymmetric "does X contain Y" checks.
+
+60. **Filler detection thresholds need empirical tuning** — Circular content like "The analysis analyzes the analysis" has higher trigram uniqueness than expected (~75%). A uniqueness threshold of 0.4 was too lenient. Raised to 0.85 based on testing with known-filler and known-substantive examples. Always test thresholds against concrete adversarial inputs, not just intuitive values.
+
+61. **Append-only event ledgers simplify replay and audit** — The `ProviderEventLedger` records every provider interaction as an immutable event dict. This makes replay trivial (replay the event sequence), audit complete (every decision is recorded), and debugging straightforward (filter by task_id or event_type). The "append-only" constraint is enforced by API design (only `record_*` methods, no update/delete).
+
+62. **Policy-as-data makes routing auditable** — `ProviderPolicy` encodes routing rules as sets of qualified task types and grade ranges. This is inspectable, versionable, and diffable — unlike routing logic embedded in code. When the policy changes, the diff shows exactly what changed.
+
+63. **Red-team tests should exercise exact adversarial inputs** — Generic tests miss edge cases. The filler detection test uses "This section contains the summary of the summary" — a real adversarial pattern. The citation test uses `[Source 7]` against known sources `["Source 1", "Source 2", "Source 3"]`. Specific, realistic adversarial inputs catch threshold bugs that synthetic tests miss.
+
+64. **100% coverage gap tests reveal no dead code when the architecture is clean** — All 19 uncovered lines in the evaluation module were real code paths: ValueError branches, empty-input guards, scoring threshold boundaries, loop-skip conditions. None were dead code requiring removal. This validates the architecture — every line serves a purpose.

@@ -1,7 +1,7 @@
 # Process Swarm Gen 2 -- Architecture Document
 
 **Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema / ACDS Dispatch**
-**129 source files, 1706 tests (100% coverage), 18 JSON schemas**
+**129 source files, 1904 tests (100% coverage), 18 JSON schemas**
 
 ---
 
@@ -957,3 +957,65 @@ Required roles per transition:
 
 All transitions produce governance events recorded in `swarm_events`
 for complete auditability.
+
+---
+
+## ACDS Evaluation Harness (`process_swarm/evaluation/`)
+
+The evaluation harness is a comprehensive acceptance testing framework that
+validates ACDS as a governed inference provider within Process Swarm. It
+covers 25 use cases and 29 red-team adversarial scenarios.
+
+### Module Structure
+
+| Module | Purpose | Key Classes |
+|--------|---------|-------------|
+| `routing.py` | Policy-driven provider selection | `ProviderPolicy`, `ProviderSelector`, `RoutingDecision` |
+| `ledger.py` | Append-only provider event recording | `ProviderEventLedger` |
+| `validation.py` | Structural and constraint validation gates | `ProviderOutputValidator`, `ConstraintValidator`, `AcceptanceGate` |
+| `runtime.py` | Provider invocation and failure simulation | `ProviderRuntime`, `CompletenessChecker`, `FallbackOrchestrator` |
+| `scoring.py` | Deterministic quality scoring (6 dimensions, 1-5 ordinal) | `QualityScorer`, `ScoreResult` |
+| `comparative.py` | Same-task ACDS vs baseline comparison | `ComparativeEvaluator`, `ComparisonReport` |
+| `runner.py` | End-to-end orchestration and replay | `EvaluationRunner`, `EvaluationRun`, `aggregate_runs()` |
+| `integrity.py` | Red-team defense components (21 classes) | Provenance, routing integrity, filler detection, citation resolution, drift tracking, etc. |
+
+### Evaluation Workflow
+
+```
+  Task Description
+       |
+       v
+  [1. Route] --- ProviderSelector + ProviderPolicy
+       |
+       v
+  [2. Invoke] --- ProviderRuntime (with fallback orchestration)
+       |
+       v
+  [3. Validate] --- AcceptanceGate (structural + constraint)
+       |
+       v
+  [4. Score] --- QualityScorer (accuracy, relevance, coherence,
+       |          constraint_adherence, source_fidelity, ranking_quality)
+       v
+  [5. Compare] --- ComparativeEvaluator (optional ACDS vs baseline)
+       |
+       v
+  EvaluationRun (serializable, replayable)
+```
+
+### Quality Dimensions
+
+All scored on a 1-5 ordinal scale using deterministic token-overlap heuristics:
+
+- **Accuracy** -- Token overlap against ground truth (containment check first, then Jaccard)
+- **Relevance** -- Coverage ratio of task keywords in output (asymmetric, not Jaccard)
+- **Coherence** -- Structural heuristics: sentence count, average length, connective words
+- **Constraint Adherence** -- Binary: 5 if met, 1 if violated, 3 if not specified
+- **Source Fidelity** -- Keyword presence ratio from source materials
+- **Ranking Quality** -- Numbered list structure detection
+
+**Composite** = mean of the 5 core dimensions (excludes ranking_quality).
+
+### Coverage
+
+198 evaluation-specific tests. 729 statements, 100% coverage. Zero mocks.

@@ -433,3 +433,31 @@ Created `process_swarm/inference.py` — an `InferenceProvider` protocol that ab
 The `ollama_base: str` parameter was replaced with `inference: InferenceProvider | None` across all pipeline entry points. In `archetype.py`, if inference is provided, `_llm_classify_swarm()` sends a classification prompt to ACDS and parses the JSON response. In `constraints.py`, `_llm_extract_constraints()` does the same for constraint extraction. Both fall back to rule-based logic on any failure.
 
 The SwarmRunner now reads inference configuration from environment variables (`INFERENCE_PROVIDER`, `ACDS_BASE_URL`, `ACDS_AUTH_TOKEN`) and creates the appropriate provider at startup.
+
+## 2026-03-16 — ACDS Evaluation & Red-Team Harness
+
+### Building the Evaluation Harness (Sessions 17–18)
+
+The ACDS evaluation harness is a comprehensive acceptance testing framework. It validates that ACDS behaves correctly as a governed inference provider within Process Swarm — from routing decisions through quality scoring to comparative analysis against baselines.
+
+**Design: Policy-driven routing.** The `ProviderPolicy` class explicitly declares which task types and cognitive grades qualify for ACDS routing. This is the enforcement surface — if a task type isn't in the qualified set, it goes to baseline. The policy is data, not logic, making it auditable and versioned.
+
+**Design: Append-only event ledger.** Every provider interaction — selection, invocation, validation outcome, fallback — gets recorded in an in-memory `ProviderEventLedger`. This is the observability backbone. The ledger is append-only by design; events are never modified or deleted. This makes it suitable for audit trails and replay.
+
+**Design: Token-overlap scoring.** Rather than requiring an LLM to judge quality, the scorer uses deterministic token-overlap heuristics. Accuracy uses overlap against ground truth, relevance uses task-keyword coverage ratio (not Jaccard — a long correct answer shouldn't be penalized for containing tokens beyond the task description), and source fidelity checks presence of source keywords. Coherence uses structural heuristics (sentence count, average length, connective words).
+
+**Key fix: Relevance scoring.** The initial implementation used Jaccard similarity for relevance, but this penalizes long, correct answers because the many output tokens dilute the intersection/union ratio. Switched to coverage ratio (what fraction of task tokens appear in the output), which correctly identifies relevant answers regardless of output length.
+
+### Red-Team Defense Components (Session 18)
+
+The red-team harness tests 29 adversarial scenarios across 7 phases. The philosophy: if an adversary can evade a defense, the defense doesn't exist.
+
+**Key component: Filler detection.** `SemanticMinimumChecker` catches superficially compliant output — correct headers with circular or empty content. It tokenizes each section, measures the ratio of unique trigrams to total trigrams, and flags sections where uniqueness exceeds a threshold (0.85 means nearly all trigrams are unique, which sounds good, but actually the threshold detects when content is *below* it — high repetition).
+
+**Key fix: Filler threshold.** Initially set `_FILLER_RATIO_THRESHOLD = 0.4`, which was too lenient. Circular content like "This section contains the summary of the summary" has ~75% unique trigrams (above 0.4), so it passed. Raised to 0.85 to catch this pattern.
+
+**Key component: Citation resolution.** `CitationResolver` extracts bracket citations from text (e.g., `[Source 7]`) and validates them against known sources. Fake citations that don't resolve to real sources fail the check. This prevents citation-shaped noise from inflating credibility.
+
+### Coverage Completion (Session 19)
+
+Closing the final 19 coverage gaps required targeted edge-case tests: unknown cognitive grade strings, empty token sets, scoring threshold boundaries, empty/untokenizable inputs, and integrity component edge cases. Every gap represented a real code path — no dead code was found. The evaluation module now has 100% statement coverage across all 729 statements with 198 tests.

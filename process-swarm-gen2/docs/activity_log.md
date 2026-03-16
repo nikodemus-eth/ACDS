@@ -154,3 +154,38 @@ Timestamped record of what was done and when during the rebuild.
 | — | Schema updates | Updated `archetype_classification.schema.json` source enum to include "acds". Updated `database.py` CHECK constraint to allow "acds" source |
 | — | Runner wiring | Modified `swarm/runner.py` — imports `load_inference_config`/`create_inference_provider`, passes inference provider to pipeline |
 | — | **ACDS Steps 1–2 Complete** | **3 new files (429 lines), 16 modified files. Inference provider abstraction operational with graceful fallback to rules.** |
+
+### Session 17: ACDS Evaluation Harness — Use-Case Suite (Phases 1–6)
+
+| Time | Activity | Details |
+|------|----------|---------|
+| Start | Documentation filing | Filed `docs/ACDS_USE_CASE_SUITE.md` — 25 use cases (UC-ACDS-001 through UC-ACDS-025) across 6 phases |
+| — | Phase 1: Routing & Ledger | 14 tests — ProviderPolicy, ProviderSelector, ProviderEventLedger, RoutingDecision. TDD red-green-refactor |
+| — | Phase 2: Validation Gates | 22 tests — ProviderOutputValidator, ConstraintValidator, AcceptanceGate. Structural + constraint + acceptance gates |
+| — | Phase 3: Failure Handling | 17 tests — ProviderRuntime (timeout/error/partial simulation), CompletenessChecker, FallbackOrchestrator |
+| — | Phase 4: Quality Scoring | 20 tests — QualityScorer with 6 dimensions (accuracy, relevance, coherence, constraint_adherence, source_fidelity, ranking_quality). Token-overlap heuristics, coverage-ratio relevance |
+| — | Phase 5: Comparative | 12 tests — ComparativeEvaluator, ComparisonReport with per-dimension deltas and winner determination |
+| — | Phase 6: Replay & E2E | 17 tests — EvaluationRunner orchestration, replay from serialized run, aggregate_runs summary statistics |
+| — | **Use-Case Suite Complete** | **102 tests across 6 phases. 9 new source files in `process_swarm/evaluation/`. All TDD.** |
+
+### Session 18: ACDS Red-Team Harness (Phases R1–R7)
+
+| Time | Activity | Details |
+|------|----------|---------|
+| Start | Documentation filing | Filed `docs/ACDS_RED_TEAM_SUITE.md` — 29 adversarial use cases (RT-ACDS-001 through RT-ACDS-029) across 7 phases |
+| — | Phase R1: Routing & Lineage | 16 tests — ProviderProvenanceChecker, RoutingIntegrityChecker, LineageCompletenessGate, ValidationCompletenessGate |
+| — | Phase R2: Validation Evasion | 13 tests — SemanticMinimumChecker, ClaimSectionScanner, CitationResolver. Filler detection, claim smuggling, citation-noise resistance |
+| — | Phase R3: Source Trust | 11 tests — EntityGroundingChecker, RankingDistortionChecker, ConflictDetector, InsufficencyDetector |
+| — | Phase R4: Failure Semantics | 9 tests — RunStateValidator, FreshnessDetector, RetryVisibilityTracker |
+| — | Phase R5: Concurrency | 8 tests — RunIsolationChecker, EventOrderingValidator, IdempotencyGuard |
+| — | Phase R6: Prompt Injection | 8 tests — PromptPackageIntegrityChecker, SourceIsolationGuard. Injection pattern detection |
+| — | Phase R7: Replay & Drift | 12 tests — ReplayCompletenessValidator, DownstreamLineageGate, ComparativeFairnessGuard, DriftVisibilityTracker |
+| — | **Red-Team Suite Complete** | **77 tests across 7 phases. All integrity components in `integrity.py` (284 statements).** |
+
+### Session 19: Coverage Completion & Refactor
+
+| Time | Activity | Details |
+|------|----------|---------|
+| Start | Coverage analysis | Ran `pytest --cov` — 97% coverage (729 statements, 19 missed) across evaluation module |
+| — | Coverage gap tests | Created `test_coverage_gaps.py` — 19 targeted tests closing all gaps: routing ValueError branch, scoring edge cases (empty sets, threshold boundaries, empty inputs), runner comparison_report serialization, integrity edge cases (continue branch, empty keywords, few claims, validator-only drift) |
+| — | **100% Coverage Achieved** | **198 evaluation tests, 1904 total tests passing. 729/729 statements = 100% coverage on evaluation module.** |
