@@ -282,4 +282,16 @@ describe('Routing Engine – Tactic Selection', () => {
     const selected = selector.select([], policy);
     expect(selected).toBeNull();
   });
+
+  it('falls back to first eligible tactic when all are multi-stage and no default', () => {
+    const tactics = [
+      makeTactic({ id: 't1', name: 'Multi1', multiStage: true }),
+      makeTactic({ id: 't2', name: 'Multi2', multiStage: true }),
+    ];
+    const policy = makePolicy();
+
+    const selected = selector.select(tactics, policy);
+    expect(selected).toBeDefined();
+    expect(selected!.id).toBe('t1');
+  });
 });

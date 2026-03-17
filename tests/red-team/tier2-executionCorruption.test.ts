@@ -5,7 +5,7 @@
  * have gaps in error handling, metric coverage, and edge case behavior.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   ExecutionOutcomePublisher,
   evaluateOutcome,
@@ -34,16 +34,22 @@ describe('ARGUS D1-D3: Execution Corruption', () => {
     it('logs handler errors to console only — no audit trail', async () => {
       // VULN: handler failures are console.error'd but not audited
       const publisher = new ExecutionOutcomePublisher();
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const captured: unknown[][] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => { captured.push(args); };
 
-      publisher.onOutcome(() => { throw new Error('handler crashed'); });
-      await publisher.publish(makeOutcome());
+      try {
+        publisher.onOutcome(() => { throw new Error('handler crashed'); });
+        await publisher.publish(makeOutcome());
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[outcome-publisher] Handler error'),
-        'handler crashed',
-      );
-      consoleSpy.mockRestore();
+        const match = captured.find(
+          (args) => typeof args[0] === 'string' && args[0].includes('[outcome-publisher] Handler error'),
+        );
+        expect(match).toBeDefined();
+        expect(match![1]).toBe('handler crashed');
+      } finally {
+        console.error = originalError;
+      }
     });
 
     it('permits duplicate handler registration', async () => {
@@ -63,15 +69,19 @@ describe('ARGUS D1-D3: Execution Corruption', () => {
     it('continues executing remaining handlers after first throws', async () => {
       // VULN: error isolation is only console.error — no escalation path
       const publisher = new ExecutionOutcomePublisher();
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const originalError = console.error;
+      console.error = () => {};
       const secondHandlerCalled = { value: false };
 
-      publisher.onOutcome(() => { throw new Error('first fails'); });
-      publisher.onOutcome(() => { secondHandlerCalled.value = true; });
-      await publisher.publish(makeOutcome());
+      try {
+        publisher.onOutcome(() => { throw new Error('first fails'); });
+        publisher.onOutcome(() => { secondHandlerCalled.value = true; });
+        await publisher.publish(makeOutcome());
 
-      expect(secondHandlerCalled.value).toBe(true);
-      consoleSpy.mockRestore();
+        expect(secondHandlerCalled.value).toBe(true);
+      } finally {
+        console.error = originalError;
+      }
     });
 
     it('exposes mutable handler count but no way to remove handlers', () => {

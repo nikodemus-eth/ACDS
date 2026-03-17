@@ -61,7 +61,7 @@ export class PgAdaptationEventRepository implements AdaptationEventReader, Adapt
     params.push(limit);
 
     const result = await this.pool.query(query, params);
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async getEvent(id: string): Promise<AdaptationEvent | undefined> {
@@ -102,7 +102,7 @@ export class PgAdaptationEventRepository implements AdaptationEventReader, Adapt
     params.push(limit);
 
     const result = await this.pool.query(query, params);
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   private mapRow(row: Record<string, unknown>): AdaptationEvent {
@@ -127,7 +127,7 @@ export class PgAdaptationRecommendationRepository implements AdaptationRecommend
     const result = await this.pool.query(
       `SELECT * FROM adaptation_approval_records WHERE status = 'pending' ORDER BY submitted_at DESC`,
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   private mapRow(row: Record<string, unknown>): AdaptationRecommendation {

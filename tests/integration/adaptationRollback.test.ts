@@ -375,3 +375,59 @@ describe('Adaptation Rollback – Audit Emission', () => {
     expect(auditEmitter.events).toHaveLength(0);
   });
 });
+
+// ===========================================================================
+// Rollback Input Validation
+// ===========================================================================
+
+describe('Adaptation Rollback – Input Validation', () => {
+  let ledger: InMemoryLedger;
+  let optimizerRepo: InMemoryOptimizerRepo;
+  let rollbackWriter: CollectingRollbackWriter;
+  let auditEmitter: CollectingRollbackAuditEmitter;
+  let service: AdaptationRollbackService;
+
+  beforeEach(() => {
+    ledger = new InMemoryLedger();
+    optimizerRepo = new InMemoryOptimizerRepo();
+    rollbackWriter = new CollectingRollbackWriter();
+    auditEmitter = new CollectingRollbackAuditEmitter();
+    service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
+    setupDefaults(ledger, optimizerRepo);
+  });
+
+  it('throws when actor is empty', async () => {
+    await expect(
+      service.executeRollback(FAMILY_KEY, EVENT_ID, '', 'Reason'),
+    ).rejects.toThrow('actor is required');
+  });
+
+  it('throws when actor is whitespace only', async () => {
+    await expect(
+      service.executeRollback(FAMILY_KEY, EVENT_ID, '   ', 'Reason'),
+    ).rejects.toThrow('actor is required');
+  });
+
+  it('throws when reason is empty', async () => {
+    await expect(
+      service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', ''),
+    ).rejects.toThrow('reason is required');
+  });
+
+  it('throws when reason is whitespace only', async () => {
+    await expect(
+      service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', '   '),
+    ).rejects.toThrow('reason is required');
+  });
+
+  it('flags event with empty previous ranking as unsafe', async () => {
+    ledger.addEvent(makeAdaptationEvent({
+      id: 'empty-ranking-event',
+      previousRanking: [],
+    }));
+
+    const preview = await service.previewRollback(FAMILY_KEY, 'empty-ranking-event');
+    expect(preview.safe).toBe(false);
+    expect(preview.warnings.some((w) => w.includes('empty previous ranking'))).toBe(true);
+  });
+});

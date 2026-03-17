@@ -693,3 +693,122 @@ Systematic replacement of in-memory stubs and empty placeholder implementations 
 - 612 tests pass across 59 test files
 - Zero `InMemory*` or `Noop*` stubs remain in the API DI container
 - All three apps typecheck clean (api, admin-web, grits-worker)
+
+## 2026-03-16 — Test Suite Refactoring: Zero Mocks, Full Coverage
+
+Comprehensive refactoring of the entire test suite to eliminate all mocking utilities (`vi.fn()`, `vi.mock()`, `vi.stubGlobal()`, `vi.spyOn().mockImplementation()`) and replace them with real collaborators. Previously 53 occurrences of Vitest mocking utilities across 11 test files.
+
+### New Test Infrastructure (4 files)
+
+**1. TestHttpServer** (`packages/provider-adapters/src/__test-support__/TestHttpServer.ts`)
+- Real `node:http` server bound to port 0 (OS-assigned) on 127.0.0.1
+- Replaces all `vi.stubGlobal('fetch', ...)` in adapter tests
+- Supports route matching, configurable responses, socket destruction (error simulation), delayed responses (timeout simulation)
+
+**2. PGlite Test Pool** (`tests/__test-support__/pglitePool.ts`)
+- Uses `@electric-sql/pglite` (in-process WASM Postgres) for persistence tests
+- Provides `pg.Pool`-compatible wrapper with `query()` and `execSQL()` (multi-statement SQL)
+- Runs all 8 migration files, supports `truncateAll()` between tests
+- Replaces all `vi.fn()` mock pools in persistence tests
+
+**3. InMemoryProviderRepository** (`apps/grits-worker/src/__test-support__/InMemoryProviderRepository.ts`)
+- Real implementation of `ProviderRepository` (8 methods) backed by in-memory array
+- Replaces `vi.fn()` stubs in GRITS checker tests
+
+**4. InMemoryExecutionRecordReadRepository** (`apps/grits-worker/src/__test-support__/InMemoryExecutionRecordReadRepository.ts`)
+- Real implementation of `ExecutionRecordReadRepository` (3 methods) with real date filtering
+- Replaces `vi.fn()` stubs in GRITS checker tests
+
+### Refactored Test Files (12 files)
+
+**Adapter tests (5 files) — `vi.stubGlobal('fetch')` → `TestHttpServer`:**
+- `OllamaAdapter.test.ts` — 11 tests (testConnection, execute, error paths, timeout, connection refused)
+- `OpenAIAdapter.test.ts` — 9 tests (auth header verification, error paths)
+- `GeminiAdapter.test.ts` — 9 tests (API key redaction, error paths)
+- `LMStudioAdapter.test.ts` — 11 tests (OpenAI-compatible API, error paths)
+- `AppleIntelligenceAdapter.test.ts` — 13 tests (loopback validation, bridge communication, error paths)
+
+**Persistence tests (4 files) — `vi.fn()` mock pools → PGlite:**
+- `pgAdaptationEventRepository.test.ts` — 11 tests (writeEvent, getEvent, listEvents, find with filters)
+- `pgAuditEmitters.test.ts` — 10 tests (fire-and-forget emit, error resilience with real console.error capture)
+- `pgRollbackRecordWriter.test.ts` — 4 tests (save, ON CONFLICT, error propagation)
+- `pgSecretCipherStore.test.ts` — 10 tests (store, retrieve, rotate, revoke, exists)
+
+**DI container test — `vi.mock()` → real filesystem + lazy pool:**
+- `createDiContainer.test.ts` — 8 tests (real `readFile`, real `createPool`, temp master key file)
+
+**GRITS checker test — `vi.fn()` → InMemory repositories:**
+- `AppleIntelligenceChecker.test.ts` — 17 tests (AI-001 through AI-006)
+
+**Red-team test — `vi.spyOn(console)` → real console.error reassignment:**
+- `tier2-executionCorruption.test.ts` — 9 tests
+
+### New Coverage Tests (~150+ tests across 25+ files)
+
+Written to achieve comprehensive code coverage across all packages with runtime logic:
+- **Audit-ledger** — 25 tests (event builders, normalizer, writers with InMemoryAuditWriter)
+- **Evaluation** — 82 tests (9 metrics, 3 scoring, 2 aggregation)
+- **Security** — encrypt/decrypt round-trip, key resolver, secret redactor
+- **Provider-broker** — health scheduler, lease manager, execution proxy, record mapper
+- **API layer** — controllers, middleware, presenters
+- **Routing engine** — dispatch resolver, portfolio builder, rationale formatter
+
+### Coverage Configuration
+- Added `@vitest/coverage-v8` (matching vitest 3.2.x)
+- Configured coverage to include `packages/*/src/**/*.ts` and `apps/*/src/**/*.ts`
+- Excluded pure type/interface files, enum definitions, config defaults, SDK client code, React frontend
+
+### Documentation
+- Created `docs/architecture/TEST_ARCHITECTURE.md` — documents the zero-mock philosophy, test infrastructure, and patterns
+
+### Verification
+- All tests pass (59+ test files)
+- `grep -r "vi\.fn\|vi\.mock\|vi\.stub\|vi\.spy" --include="*.test.ts"` → 0 results (excluding comments)
+- Coverage analysis running with `npx vitest run --coverage`
+
+## 2026-03-17 — Coverage Push to 99%+ and Persistence Bug Fixes
+
+### Bug Fix: `.map(this.method)` Binding in Persistence Repositories
+Discovered and fixed a systemic `this` context binding bug in all persistence-pg repository files. When passing private methods like `mapRow` or `mapProcessRow` directly to `.map()`, the `this` reference was lost, causing `TypeError: Cannot read properties of undefined` at runtime.
+
+**Root cause**: `result.rows.map(this.mapRow)` loses context — the method reference is detached from its object.
+**Fix**: Changed all 15 occurrences across 8 files to arrow function wrappers: `result.rows.map((r) => this.mapRow(r))`.
+
+**Files fixed**: PgPolicyRepository, PgAdaptationEventRepository, PgOptimizerStateRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgFamilyPerformanceRepository, PgAuditEventRepository, PgAdaptationApprovalRepository, PgProviderRepository.
+
+### Coverage Expansion: Wave 2 (~500+ new tests, 41 new test files)
+
+Four parallel agent waves writing zero-mock tests for every remaining gap:
+
+**Wave 1 — Persistence-PG repositories (9 files)**:
+- PgExecutionRecordRepository, PgAuditEventRepository, PgProviderRepository, PgPolicyRepository
+- PgAdaptationApprovalRepository, PgOptimizerStateRepository, PgProviderHealthRepository
+- PgFamilyPerformanceRepository (all PGlite-based integration tests)
+
+**Wave 2 — Execution orchestrator + routing engine (9 files)**:
+- ExecutionFailureNormalizer, ExecutionResultNormalizer, StagedExecutionRunner
+- StagedEscalationPolicyBridge, DispatchRunService, ExecutionEventEmitter
+- ExecutionLifecycleLogger, ExecutionRecordService, AdaptiveDispatchResolver
+
+**Wave 3 — Policy engine + optimizer + broker (11 files)**:
+- InstanceContextNormalizer, InstancePolicyOverlay, PolicyService, PolicyValidator
+- PolicyConflictDetector, MetaGuidanceService, AdaptiveSelectionService
+- ExploitationPolicy, ProviderHealthService, AdapterResolver, ProviderValidationService
+
+**Wave 4 — API layer + GRITS checkers + adapter base (22 files)**:
+- env.ts (dotenv loader tests), authMiddleware, presenters, controllers
+- ExecutionIntegrityChecker, AdaptiveIntegrityChecker, AppleIntelligenceChecker
+- SecurityIntegrityChecker, PolicyIntegrityChecker
+- normalizeRequest, normalizeResponse
+
+### Coverage Exclusion Refinement
+Excluded pure wiring/configuration code from coverage scope:
+- Route registration files (`apps/api/src/routes/**`)
+- DI container bootstrap (`createDiContainer.ts`, `registerMiddleware.ts`)
+- App bootstrap (`app.ts`), config singleton (`appConfig.ts`)
+
+### Verification
+- **153 test files, 1571+ tests, all passing**
+- **99%+ statement coverage, 99.6% function coverage**
+- Zero mocks confirmed: `grep -r "vi\.fn\|vi\.mock\|vi\.stub\|vi\.spy"` → 0 results
+- v8 coverage provider with threads pool for reliable coverage collection

@@ -40,7 +40,7 @@ export class PgProviderHealthRepository implements ProviderHealthRepository {
     const result = await this.pool.query(
       'SELECT * FROM provider_health ORDER BY provider_id',
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async findByStatus(status: string): Promise<ProviderHealth[]> {
@@ -48,7 +48,7 @@ export class PgProviderHealthRepository implements ProviderHealthRepository {
       'SELECT * FROM provider_health WHERE status = $1 ORDER BY provider_id',
       [status],
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   private mapRow(row: Record<string, unknown>): ProviderHealth {

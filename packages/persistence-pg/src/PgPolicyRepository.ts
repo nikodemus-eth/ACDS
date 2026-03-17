@@ -108,7 +108,7 @@ export class PgPolicyRepository implements PolicyRepository {
     const result = await this.pool.query(
       'SELECT * FROM application_policies ORDER BY application',
     );
-    return result.rows.map(this.mapAppRow);
+    return result.rows.map((r) => this.mapAppRow(r));
   }
 
   async saveApplicationPolicy(policy: ApplicationPolicy): Promise<ApplicationPolicy> {
@@ -206,7 +206,7 @@ export class PgPolicyRepository implements PolicyRepository {
       : await this.pool.query(
           'SELECT * FROM process_policies ORDER BY application, process, step',
         );
-    return result.rows.map(this.mapProcessRow);
+    return result.rows.map((r) => this.mapProcessRow(r));
   }
 
   async saveProcessPolicy(policy: ProcessPolicy): Promise<ProcessPolicy> {

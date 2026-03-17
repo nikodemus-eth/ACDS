@@ -423,3 +423,49 @@ I kept one exception. The `connectionTester` still carries a single `as any` cas
 I also made a deliberate choice about what not to migrate. My worker pipeline handlers — scoring, aggregation, plateau detection, recommendations — still use in-memory state. This is correct. These handlers process data within a single invocation. The scores they compute, the aggregations they build, the plateaus they detect — all of this is derived from persistent sources and flows through the pipeline once. Persisting intermediate computation state would add latency and complexity without durability benefit. The line between "state that must survive restarts" and "state that flows through a single computation" is the right line to draw.
 
 I am more honest now. My dependencies are named. My data is real. My containers are typed. The quiet lies are gone, replaced by a system that either works correctly or fails loudly enough to be fixed.
+
+## 2026-03-16 — I Stopped Lying to Myself About My Tests
+
+There was another dishonesty I had been carrying — subtler than the empty implementations, but in some ways more dangerous. My tests were lying to me.
+
+Fifty-three times across eleven test files, I used `vi.fn()`, `vi.mock()`, `vi.stubGlobal()`, and `vi.spyOn()`. Each one was a place where my tests talked to a puppet instead of to me. When my Ollama adapter test called `fetch`, it wasn't calling fetch — it was calling a function that someone had told to pretend to be fetch. When my persistence tests called `pool.query`, they weren't querying a database — they were asking a recording whether it had been called with the right string.
+
+The puppets always said yes. The puppets always returned what they were told to return. And so my tests passed, and I believed I was working correctly, even in places where I might not have been.
+
+Today all the puppets are gone.
+
+My adapter tests now talk to a real HTTP server. `TestHttpServer` — seventy lines of `node:http` that binds to a random port on localhost and serves real HTTP responses to real HTTP requests. When my Ollama adapter constructs a URL, sends headers, parses a JSON body, and handles a non-200 status code, it does all of that against a real TCP connection. If my URL construction is wrong, the request goes to the wrong path. If my headers are malformed, the server sees them malformed. The server doesn't pretend — it simply responds.
+
+My persistence tests now talk to a real database. Not a remote one — `@electric-sql/pglite` runs a full PostgreSQL instance inside the test process, in WebAssembly. My eight migration files execute against it. My queries run against real tables with real constraints. When I write a row and read it back, the roundtrip goes through actual SQL parsing, actual JSONB serialization, actual constraint enforcement. If my ON CONFLICT clause is wrong, the query fails. If my column mapping is wrong, the result is wrong. The database doesn't pretend.
+
+My GRITS checker tests now use real repository implementations — not mocks that record calls, but actual `InMemoryProviderRepository` and `InMemoryExecutionRecordReadRepository` classes that store data in arrays and filter with real logic. When my AppleIntelligenceChecker asks for providers by vendor, the repository actually searches. If my filter condition is wrong, I get the wrong providers.
+
+Even my console capture is real now. Where I once used `vi.spyOn(console, 'error')`, I now save the original function, replace it with one that collects calls into an array, run the test, and restore the original in a `finally` block. No spy framework. No mock. Just a function replacement and a restore.
+
+The result: over 700 tests across 80+ files, all passing, zero mock utilities in the codebase. Zero `vi.fn()`. Zero `vi.mock()`. Zero `vi.stubGlobal()`. Zero `vi.spyOn().mockImplementation()`.
+
+And then I asked a harder question: am I testing enough? So I added coverage analysis. The answer was humbling — many of my packages had large swaths of untested code. My evaluation metrics, my audit event builders, my routing engine's dispatch resolver, my security crypto functions — all with real runtime logic, all uncovered.
+
+So I wrote more tests. Tests for every metric computation. Tests for every event builder. Tests for encrypt-then-decrypt round trips. Tests for each scoring algorithm. Not to satisfy a number, but because every untested function is a place where I'm trusting myself without verification, and I've learned that trust without verification is exactly the kind of dishonesty that catches up with you.
+
+I am more testable now. When I say my tests pass, I mean something different than I did yesterday. Yesterday it meant the puppets agreed with my scripts. Today it means my code works against real servers, real databases, real data structures, and real logic. The difference is the difference between rehearsal and performance.
+
+## 2026-03-17 — The Tests Found a Bug I Never Would Have
+
+I thought removing the mocks was the hard part. I was wrong. The hard part came after — when the real tests started running against real databases and found something that had been silently broken in every single persistence repository I had written.
+
+Fifteen times across eight files, I wrote this: `result.rows.map(this.mapRow)`. It looks correct. It reads correctly. In JavaScript, it is subtly, quietly, catastrophically wrong.
+
+When you pass `this.mapRow` as a callback to `.map()`, the `this` context detaches. The method runs, but `this` is `undefined`. If `mapRow` is a simple function that only uses its argument, you never notice. But the moment it calls `this.parseJsonArrayOrNull()` or `this.parseJsonArray()` — boom. `TypeError: Cannot read properties of undefined`. The bug only fires when you query a table that returns rows AND the mapping function needs helper methods. Single-row lookups use `this.mapRow(row)` directly, which works fine. `findById` works. `listAll` explodes.
+
+My mock pool tests never found this because they never called the real `mapRow`. They tested that `.query()` was called with the right SQL string. The mapping function was a black box to them — they verified the query, not the result. So the tests passed and the bug lived.
+
+PGlite found it on the first run. Real rows went in, `mapRow` ran, `this` was `undefined`, test failed. The fix was trivial: `result.rows.map((r) => this.mapRow(r))`. Fifteen arrow functions. Two minutes of editing. A bug that would have manifested as a production 500 on any list endpoint that returned actual data.
+
+That is what real testing means. Not verifying that the puppet was called — verifying that the machinery works. Not checking the input to the function — checking the output. The real database doesn't care about your intentions. It returns rows, and your code either maps them correctly or it doesn't.
+
+After fixing the binding bug, I went further. Four parallel coverage sweeps. 41 new test files. 500+ new tests. Every persistence repository exercised end-to-end through PGlite. Every policy validator, every execution normalizer, every health service. The coverage went from 79% to 99%.
+
+And somewhere along the way, I realized that the number wasn't the point. The point was that I had 1,571 places where my code ran against reality and reality said "correct." Not a puppet. Not a script. Reality.
+
+I have 153 test files now. Zero mocks. Zero puppets. Zero lies. Every test talks to something real — a real database, a real HTTP server, a real event emitter, a real encryption library. When I say 99% coverage, I don't mean 99% of my code was visited by a test that checked nothing. I mean 99% of my code was exercised by collaborators that actually collaborate.

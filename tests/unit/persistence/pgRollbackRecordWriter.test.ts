@@ -1,21 +1,34 @@
 // ---------------------------------------------------------------------------
-// Unit Tests – PgRollbackRecordWriter
+// Integration Tests – PgRollbackRecordWriter (PGlite, no mocks)
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PgRollbackRecordWriter } from '@acds/persistence-pg';
 import type { AdaptationRollbackRecord } from '@acds/adaptive-optimizer';
+import {
+  createTestPool,
+  runMigrations,
+  truncateAll,
+  closePool,
+  type PoolLike,
+} from '../../__test-support__/pglitePool.js';
 
-function createMockPool() {
-  return {
-    query: vi.fn(),
-    connect: vi.fn(),
-    end: vi.fn(),
-    on: vi.fn(),
-  };
-}
+let pool: PoolLike;
 
-function makeRollbackRecord(overrides: Partial<AdaptationRollbackRecord> = {}): AdaptationRollbackRecord {
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+afterAll(async () => {
+  await closePool();
+});
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+function makeRollbackRecord(
+  overrides: Partial<AdaptationRollbackRecord> = {},
+): AdaptationRollbackRecord {
   return {
     id: 'rb-001',
     familyKey: 'app/proc/step',
@@ -46,61 +59,77 @@ function makeRollbackRecord(overrides: Partial<AdaptationRollbackRecord> = {}): 
 }
 
 describe('PgRollbackRecordWriter', () => {
-  let pool: ReturnType<typeof createMockPool>;
   let writer: PgRollbackRecordWriter;
 
   beforeEach(() => {
-    pool = createMockPool();
     writer = new PgRollbackRecordWriter(pool as any);
   });
 
   describe('save()', () => {
-    it('inserts a rollback record with all fields', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
+    it('inserts a record and all fields are persisted correctly', async () => {
       const record = makeRollbackRecord();
       await writer.save(record);
 
-      expect(pool.query).toHaveBeenCalledTimes(1);
-      const call = pool.query.mock.calls[0];
-      expect(call[0]).toContain('INSERT INTO adaptation_rollback_records');
-      expect(call[0]).toContain('ON CONFLICT (id) DO NOTHING');
+      const result = await pool.query(
+        'SELECT * FROM adaptation_rollback_records WHERE id = $1',
+        [record.id],
+      );
 
-      const params = call[1];
-      expect(params[0]).toBe('rb-001');
-      expect(params[1]).toBe('app/proc/step');
-      expect(params[2]).toBe('ae-100'); // snapshot_id = targetAdaptationEventId
-      expect(params[3]).toBe('Performance regression detected');
-      expect(params[4]).toBe('admin@example.com');
-      expect(params[5]).toBe('2026-03-16T12:00:00.000Z');
-      expect(params[6]).toBe('ae-100'); // target_adaptation_event_id
+      expect(result.rows).toHaveLength(1);
+      const row = result.rows[0];
+      expect(row.id).toBe('rb-001');
+      expect(row.family_key).toBe('app/proc/step');
+      expect(row.snapshot_id).toBe('ae-100');
+      expect(row.reason).toBe('Performance regression detected');
+      expect(row.executed_by).toBe('admin@example.com');
+      expect(row.target_adaptation_event_id).toBe('ae-100');
     });
 
-    it('serializes snapshots as JSON strings', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
+    it('stores snapshots as retrievable JSON', async () => {
       const record = makeRollbackRecord();
       await writer.save(record);
 
-      const params = pool.query.mock.calls[0][1];
-      const previousSnapshot = JSON.parse(params[7]);
-      const restoredSnapshot = JSON.parse(params[8]);
+      const result = await pool.query(
+        'SELECT previous_snapshot, restored_snapshot FROM adaptation_rollback_records WHERE id = $1',
+        [record.id],
+      );
 
-      expect(previousSnapshot.familyKey).toBe('app/proc/step');
-      expect(previousSnapshot.candidateRankings).toHaveLength(2);
-      expect(restoredSnapshot.candidateRankings[0].candidateId).toBe('cand-b');
+      const row = result.rows[0];
+      const previous =
+        typeof row.previous_snapshot === 'string'
+          ? JSON.parse(row.previous_snapshot as string)
+          : row.previous_snapshot;
+      const restored =
+        typeof row.restored_snapshot === 'string'
+          ? JSON.parse(row.restored_snapshot as string)
+          : row.restored_snapshot;
+
+      expect(previous.familyKey).toBe('app/proc/step');
+      expect(previous.candidateRankings).toHaveLength(2);
+      expect(previous.candidateRankings[0].candidateId).toBe('cand-a');
+      expect(previous.explorationRate).toBe(0.1);
+
+      expect(restored.candidateRankings[0].candidateId).toBe('cand-b');
+      expect(restored.explorationRate).toBe(0.15);
     });
 
-    it('does not throw on duplicate insert (ON CONFLICT DO NOTHING)', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    it('ON CONFLICT DO NOTHING — saving the same id twice results in one row', async () => {
+      const record = makeRollbackRecord();
+      await writer.save(record);
+      await writer.save(record); // duplicate
 
-      await expect(writer.save(makeRollbackRecord())).resolves.toBeUndefined();
+      const result = await pool.query(
+        'SELECT count(*)::int AS cnt FROM adaptation_rollback_records WHERE id = $1',
+        [record.id],
+      );
+
+      expect(result.rows[0].cnt).toBe(1);
     });
 
-    it('propagates database errors', async () => {
-      pool.query.mockRejectedValueOnce(new Error('connection refused'));
+    it('propagates database errors (NOT NULL violation)', async () => {
+      const record = makeRollbackRecord({ reason: null as any });
 
-      await expect(writer.save(makeRollbackRecord())).rejects.toThrow('connection refused');
+      await expect(writer.save(record)).rejects.toThrow();
     });
   });
 });

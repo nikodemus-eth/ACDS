@@ -1,10 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { AppleIntelligenceAdapter } from './AppleIntelligenceAdapter.js';
+import { AdapterError } from '../base/AdapterError.js';
+import { TestHttpServer, readBody, jsonResponse } from '../__test-support__/TestHttpServer.js';
 import type { AdapterConfig, AdapterRequest } from '../base/AdapterTypes.js';
 
 describe('AppleIntelligenceAdapter', () => {
+  const server = new TestHttpServer();
+  let baseUrl: string;
   let adapter: AppleIntelligenceAdapter;
-  const config: AdapterConfig = { baseUrl: 'http://localhost:11435' };
+
+  beforeAll(async () => {
+    baseUrl = await server.start();
+  });
+
+  afterAll(async () => {
+    await server.close();
+  });
 
   beforeEach(() => {
     adapter = new AppleIntelligenceAdapter();
@@ -16,7 +27,7 @@ describe('AppleIntelligenceAdapter', () => {
 
   describe('validateConfig', () => {
     it('should validate valid localhost config', () => {
-      const result = adapter.validateConfig(config);
+      const result = adapter.validateConfig({ baseUrl: 'http://localhost:11435' });
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -51,68 +62,94 @@ describe('AppleIntelligenceAdapter', () => {
   });
 
   describe('testConnection', () => {
-    it('should succeed when bridge /health responds OK', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ status: 'healthy', models: ['apple-fm-base'] }),
-      }));
+    it('should succeed when bridge /health responds OK with models', async () => {
+      server.setRoutes({
+        'GET /health': (_req, res) => {
+          jsonResponse(res, 200, { status: 'healthy', models: ['apple-fm-base'] });
+        },
+      });
+
+      // The server binds on 127.0.0.1 which is a valid loopback address
+      const config: AdapterConfig = { baseUrl };
       const result = await adapter.testConnection(config);
       expect(result.success).toBe(true);
       expect(result.models).toContain('apple-fm-base');
-      vi.unstubAllGlobals();
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
     });
 
-    it('should fail when bridge returns non-OK', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: false,
-        status: 503,
-      }));
+    it('should fail when bridge returns non-OK (503)', async () => {
+      server.setRoutes({
+        'GET /health': (_req, res) => {
+          jsonResponse(res, 503, { status: 'unavailable' });
+        },
+      });
+
+      const config: AdapterConfig = { baseUrl };
       const result = await adapter.testConnection(config);
       expect(result.success).toBe(false);
       expect(result.message).toContain('503');
-      vi.unstubAllGlobals();
     });
 
     it('should fail when bridge is unreachable', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
-      const result = await adapter.testConnection(config);
+      const tempServer = new TestHttpServer();
+      const tempUrl = await tempServer.start();
+      await tempServer.close();
+
+      const result = await adapter.testConnection({ baseUrl: tempUrl });
       expect(result.success).toBe(false);
-      expect(result.message).toContain('ECONNREFUSED');
-      vi.unstubAllGlobals();
     });
   });
 
   describe('execute', () => {
+    const request: AdapterRequest = { prompt: 'Hi', model: 'apple-fm-base' };
+
     it('should send request and map response', async () => {
-      const mockResponse = { model: 'apple-fm-base', content: 'Hello from Apple', done: true, outputTokens: 5 };
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      }));
-      const request: AdapterRequest = { prompt: 'Hi', model: 'apple-fm-base' };
+      server.setRoutes({
+        'POST /execute': async (req, res) => {
+          const body = JSON.parse(await readBody(req));
+          jsonResponse(res, 200, {
+            model: 'apple-fm-base',
+            content: 'Hello from Apple',
+            done: true,
+            outputTokens: 5,
+          });
+        },
+      });
+
+      const config: AdapterConfig = { baseUrl };
       const result = await adapter.execute(config, request);
       expect(result.content).toBe('Hello from Apple');
       expect(result.finishReason).toBe('stop');
       expect(result.outputTokens).toBe(5);
-      vi.unstubAllGlobals();
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
     });
 
-    it('should throw on non-OK response', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-      }));
-      const request: AdapterRequest = { prompt: 'Hi', model: 'apple-fm-base' };
+    it('should throw on non-OK response (500)', async () => {
+      server.setRoutes({
+        'POST /execute': (_req, res) => {
+          jsonResponse(res, 500, { error: 'Internal Server Error' });
+        },
+      });
+
+      const config: AdapterConfig = { baseUrl };
       await expect(adapter.execute(config, request)).rejects.toThrow('Apple Intelligence bridge returned HTTP 500');
-      vi.unstubAllGlobals();
     });
 
-    it('should throw on network error', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network failure')));
-      const request: AdapterRequest = { prompt: 'Hi', model: 'apple-fm-base' };
-      await expect(adapter.execute(config, request)).rejects.toThrow('Apple Intelligence execution failed');
-      vi.unstubAllGlobals();
+    it('should throw EXECUTION_FAILED on network error (destroyed socket)', async () => {
+      server.setHandler((req, _res) => {
+        req.socket.destroy();
+      });
+
+      const config: AdapterConfig = { baseUrl };
+      try {
+        await adapter.execute(config, request);
+        expect.unreachable('should have thrown');
+      } catch (err) {
+        const adapterErr = err as AdapterError;
+        expect(adapterErr).toBeInstanceOf(AdapterError);
+        expect(adapterErr.code).toBe('EXECUTION_FAILED');
+        expect(adapterErr.message).toContain('Apple Intelligence execution failed');
+      }
     });
   });
 });

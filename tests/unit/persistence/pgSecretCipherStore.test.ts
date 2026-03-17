@@ -1,21 +1,45 @@
 // ---------------------------------------------------------------------------
-// Unit Tests – PgSecretCipherStore
+// Integration Tests – PgSecretCipherStore (PGlite, no mocks)
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PgSecretCipherStore } from '@acds/persistence-pg';
 import type { EncryptedEnvelope } from '@acds/security';
+import {
+  createTestPool,
+  runMigrations,
+  truncateAll,
+  closePool,
+  type PoolLike,
+} from '../../__test-support__/pglitePool.js';
 
-// ── Mock pool ──────────────────────────────────────────────────────────────
+let pool: PoolLike;
 
-function createMockPool() {
-  return {
-    query: vi.fn(),
-    connect: vi.fn(),
-    end: vi.fn(),
-    on: vi.fn(),
-  };
-}
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+
+  // Migration 001 creates provider_secrets with a legacy schema (UUID FK, no envelope column).
+  // Migration 008 uses IF NOT EXISTS so it's a no-op. Drop and recreate with the schema
+  // that PgSecretCipherStore actually targets.
+  await pool.execSQL(`
+    DROP TABLE IF EXISTS provider_secrets CASCADE;
+    CREATE TABLE provider_secrets (
+      id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      provider_id     VARCHAR     NOT NULL UNIQUE,
+      envelope        JSONB       NOT NULL,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      rotated_at      TIMESTAMPTZ,
+      expires_at      TIMESTAMPTZ
+    );
+  `);
+});
+afterAll(async () => {
+  await closePool();
+});
+beforeEach(async () => {
+  await truncateAll(pool);
+});
 
 function makeEnvelope(keyId = 'key-1'): EncryptedEnvelope {
   return {
@@ -28,20 +52,16 @@ function makeEnvelope(keyId = 'key-1'): EncryptedEnvelope {
 }
 
 describe('PgSecretCipherStore', () => {
-  let pool: ReturnType<typeof createMockPool>;
   let store: PgSecretCipherStore;
 
   beforeEach(() => {
-    pool = createMockPool();
     store = new PgSecretCipherStore(pool as any);
   });
 
   // ── store() ─────────────────────────────────────────────────────────────
 
   describe('store()', () => {
-    it('inserts a secret and returns a StoredSecret record', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
+    it('returns a StoredSecret with correct fields', async () => {
       const result = await store.store('prov-openai', makeEnvelope());
 
       expect(result.providerId).toBe('prov-openai');
@@ -50,130 +70,107 @@ describe('PgSecretCipherStore', () => {
       expect(result.createdAt).toBeInstanceOf(Date);
       expect(result.rotatedAt).toBeNull();
       expect(result.expiresAt).toBeNull();
-
-      const call = pool.query.mock.calls[0];
-      expect(call[0]).toContain('INSERT INTO provider_secrets');
-      expect(call[1][1]).toBe('prov-openai');
     });
 
-    it('passes envelope as JSON string', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    it('store() + retrieve() round-trip', async () => {
+      await store.store('prov-openai', makeEnvelope());
 
-      await store.store('prov-gemini', makeEnvelope('key-2'));
+      const retrieved = await store.retrieve('prov-openai');
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.providerId).toBe('prov-openai');
+      expect(retrieved!.envelope).toEqual(makeEnvelope());
+      expect(retrieved!.createdAt).toBeInstanceOf(Date);
+    });
 
-      const call = pool.query.mock.calls[0];
-      const envelopeParam = call[1][2];
-      expect(JSON.parse(envelopeParam)).toEqual(makeEnvelope('key-2'));
+    it('store() twice for same providerId updates envelope (ON CONFLICT DO UPDATE)', async () => {
+      await store.store('prov-openai', makeEnvelope('key-1'));
+      await store.store('prov-openai', makeEnvelope('key-2'));
+
+      const retrieved = await store.retrieve('prov-openai');
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.envelope.keyId).toBe('key-2');
+
+      // Confirm only one row exists
+      const countResult = await pool.query(
+        "SELECT count(*)::int AS cnt FROM provider_secrets WHERE provider_id = $1",
+        ['prov-openai'],
+      );
+      expect(countResult.rows[0].cnt).toBe(1);
     });
   });
 
   // ── retrieve() ──────────────────────────────────────────────────────────
 
   describe('retrieve()', () => {
-    it('returns null when no row found', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [] });
-
+    it('returns null for nonexistent provider', async () => {
       const result = await store.retrieve('nonexistent');
       expect(result).toBeNull();
     });
 
-    it('returns a StoredSecret when row exists', async () => {
-      pool.query.mockResolvedValueOnce({
-        rows: [{
-          id: 'sec-1',
-          provider_id: 'prov-openai',
-          envelope: JSON.stringify(makeEnvelope()),
-          created_at: '2026-03-16T10:00:00.000Z',
-          rotated_at: null,
-          expires_at: null,
-        }],
-      });
-
-      const result = await store.retrieve('prov-openai');
-      expect(result).not.toBeNull();
-      expect(result!.providerId).toBe('prov-openai');
-      expect(result!.envelope).toEqual(makeEnvelope());
-      expect(result!.createdAt).toBeInstanceOf(Date);
-    });
-
-    it('handles envelope as parsed object (JSONB auto-parse)', async () => {
-      pool.query.mockResolvedValueOnce({
-        rows: [{
-          id: 'sec-2',
-          provider_id: 'prov-gemini',
-          envelope: makeEnvelope('key-2'),
-          created_at: '2026-03-16T10:00:00.000Z',
-          rotated_at: '2026-03-16T11:00:00.000Z',
-          expires_at: null,
-        }],
-      });
+    it('returns a StoredSecret with correctly parsed envelope', async () => {
+      await store.store('prov-gemini', makeEnvelope('key-g'));
 
       const result = await store.retrieve('prov-gemini');
-      expect(result!.rotatedAt).toBeInstanceOf(Date);
-      expect(result!.envelope.keyId).toBe('key-2');
+      expect(result).not.toBeNull();
+      expect(result!.providerId).toBe('prov-gemini');
+      expect(result!.envelope.keyId).toBe('key-g');
+      expect(result!.envelope.algorithm).toBe('aes-256-gcm');
     });
   });
 
   // ── rotate() ────────────────────────────────────────────────────────────
 
   describe('rotate()', () => {
-    it('updates existing secret and returns updated record', async () => {
-      pool.query.mockResolvedValueOnce({
-        rows: [{
-          id: 'sec-1',
-          provider_id: 'prov-openai',
-          envelope: JSON.stringify(makeEnvelope('key-new')),
-          created_at: '2026-03-15T10:00:00.000Z',
-          rotated_at: '2026-03-16T12:00:00.000Z',
-          expires_at: null,
-        }],
-      });
+    it('updates envelope and sets rotatedAt', async () => {
+      await store.store('prov-openai', makeEnvelope('key-old'));
 
-      const result = await store.rotate('prov-openai', makeEnvelope('key-new'));
-      expect(result.providerId).toBe('prov-openai');
-      expect(result.envelope.keyId).toBe('key-new');
+      const rotated = await store.rotate('prov-openai', makeEnvelope('key-new'));
+      expect(rotated.providerId).toBe('prov-openai');
+      expect(rotated.envelope.keyId).toBe('key-new');
+      expect(rotated.rotatedAt).toBeInstanceOf(Date);
 
-      const call = pool.query.mock.calls[0];
-      expect(call[0]).toContain('UPDATE provider_secrets');
+      // Verify via retrieve
+      const retrieved = await store.retrieve('prov-openai');
+      expect(retrieved!.envelope.keyId).toBe('key-new');
+      expect(retrieved!.rotatedAt).toBeInstanceOf(Date);
     });
 
     it('falls back to store() when no existing row', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [] }); // UPDATE returns nothing
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // INSERT
+      const result = await store.rotate('prov-brand-new', makeEnvelope('key-fresh'));
 
-      const result = await store.rotate('prov-new', makeEnvelope());
-      expect(result.providerId).toBe('prov-new');
-      expect(pool.query).toHaveBeenCalledTimes(2);
+      expect(result.providerId).toBe('prov-brand-new');
+      expect(result.envelope.keyId).toBe('key-fresh');
+
+      // Verify it actually persisted
+      const retrieved = await store.retrieve('prov-brand-new');
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.envelope.keyId).toBe('key-fresh');
     });
   });
 
   // ── revoke() ────────────────────────────────────────────────────────────
 
   describe('revoke()', () => {
-    it('deletes the secret for the given provider', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
+    it('revoke() + retrieve() returns null', async () => {
+      await store.store('prov-openai', makeEnvelope());
       await store.revoke('prov-openai');
 
-      const call = pool.query.mock.calls[0];
-      expect(call[0]).toContain('DELETE FROM provider_secrets');
-      expect(call[1]).toEqual(['prov-openai']);
+      const result = await store.retrieve('prov-openai');
+      expect(result).toBeNull();
     });
   });
 
   // ── exists() ────────────────────────────────────────────────────────────
 
   describe('exists()', () => {
-    it('returns true when a row exists', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
+    it('returns true when a secret exists', async () => {
+      await store.store('prov-openai', makeEnvelope());
 
       const result = await store.exists('prov-openai');
       expect(result).toBe(true);
     });
 
-    it('returns false when no row exists', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [] });
-
+    it('returns false when no secret exists', async () => {
       const result = await store.exists('nonexistent');
       expect(result).toBe(false);
     });

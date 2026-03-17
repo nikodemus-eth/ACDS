@@ -1,38 +1,67 @@
 // ---------------------------------------------------------------------------
-// Unit Tests – PgApprovalAuditEmitter & PgRollbackAuditEmitter
+// Integration Tests – PgApprovalAuditEmitter & PgRollbackAuditEmitter (PGlite, no mocks)
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PgApprovalAuditEmitter, PgRollbackAuditEmitter } from '@acds/persistence-pg';
 import type { ApprovalAuditEvent, RollbackAuditEvent } from '@acds/adaptive-optimizer';
+import {
+  createTestPool,
+  runMigrations,
+  truncateAll,
+  closePool,
+  type PoolLike,
+} from '../../__test-support__/pglitePool.js';
 
-function createMockPool() {
-  return {
-    query: vi.fn(),
-    connect: vi.fn(),
-    end: vi.fn(),
-    on: vi.fn(),
-  };
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+afterAll(async () => {
+  await closePool();
+});
+
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+async function waitForRow(
+  pool: PoolLike,
+  resourceId: string,
+  maxMs = 2000,
+): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    const result = await pool.query(
+      'SELECT * FROM audit_events WHERE resource_id = $1',
+      [resourceId],
+    );
+    if (result.rows.length > 0) return result.rows[0];
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`Row for resource_id=${resourceId} not found within ${maxMs}ms`);
 }
 
-// ── PgApprovalAuditEmitter ────────────────────────────────────────────────
+// ── Console capture (no vi.spyOn) ───────────────────────────────────────────
+
+let capturedErrors: string[] = [];
+const originalError = console.error;
+
+// ── PgApprovalAuditEmitter ──────────────────────────────────────────────────
 
 describe('PgApprovalAuditEmitter', () => {
-  let pool: ReturnType<typeof createMockPool>;
   let emitter: PgApprovalAuditEmitter;
 
   beforeEach(() => {
-    pool = createMockPool();
     emitter = new PgApprovalAuditEmitter(pool as any);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('inserts an approval audit event into audit_events table', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
+  it('inserts an approval audit event and the row is readable', async () => {
     const event: ApprovalAuditEvent = {
       type: 'approval_submitted',
       approvalId: 'apr-001',
@@ -42,25 +71,31 @@ describe('PgApprovalAuditEmitter', () => {
 
     emitter.emit(event);
 
-    // emit() is fire-and-forget, wait for the internal promise
-    await vi.waitFor(() => expect(pool.query).toHaveBeenCalledTimes(1));
+    const row = await waitForRow(pool, 'apr-001');
+    expect(row.event_type).toBe('approval_submitted');
+    expect(row.action).toBe('approval_submitted');
+    expect(row.resource_type).toBe('approval');
+    expect(row.resource_id).toBe('apr-001');
+  });
 
-    const call = pool.query.mock.calls[0];
-    expect(call[0]).toContain('INSERT INTO audit_events');
-    const params = call[1];
-    expect(params[0]).toBe('approval_submitted'); // event_type
-    expect(params[1]).toBe('system'); // actor defaults to 'system' when undefined
-    expect(params[2]).toBe('approval_submitted'); // action
-    expect(params[3]).toBe('approval'); // resource_type
-    expect(params[4]).toBe('apr-001'); // resource_id
+  it('defaults actor to "system" when not provided', async () => {
+    const event: ApprovalAuditEvent = {
+      type: 'approval_submitted',
+      approvalId: 'apr-sys',
+      familyKey: 'app/proc/step',
+      timestamp: '2026-03-16T12:00:00.000Z',
+    };
+
+    emitter.emit(event);
+
+    const row = await waitForRow(pool, 'apr-sys');
+    expect(row.actor).toBe('system');
   });
 
   it('uses the actor from the event when provided', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
     const event: ApprovalAuditEvent = {
       type: 'approval_approved',
-      approvalId: 'apr-002',
+      approvalId: 'apr-actor',
       familyKey: 'app/proc/step',
       actor: 'admin@example.com',
       reason: 'Looks good',
@@ -69,28 +104,28 @@ describe('PgApprovalAuditEmitter', () => {
 
     emitter.emit(event);
 
-    await vi.waitFor(() => expect(pool.query).toHaveBeenCalledTimes(1));
-
-    const params = pool.query.mock.calls[0][1];
-    expect(params[1]).toBe('admin@example.com');
-    const details = JSON.parse(params[5]);
-    expect(details.reason).toBe('Looks good');
-    expect(details.familyKey).toBe('app/proc/step');
+    const row = await waitForRow(pool, 'apr-actor');
+    expect(row.actor).toBe('admin@example.com');
   });
 
-  it('does not throw on database error (fire-and-forget)', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    pool.query.mockRejectedValueOnce(new Error('DB down'));
-
-    emitter.emit({
-      type: 'approval_rejected',
-      approvalId: 'apr-003',
+  it('stores details as JSON with familyKey, reason, and timestamp', async () => {
+    const event: ApprovalAuditEvent = {
+      type: 'approval_approved',
+      approvalId: 'apr-det',
       familyKey: 'app/proc/step',
-      timestamp: '2026-03-16T14:00:00.000Z',
-    });
+      actor: 'admin@example.com',
+      reason: 'Looks good',
+      timestamp: '2026-03-16T13:00:00.000Z',
+    };
 
-    await vi.waitFor(() => expect(consoleSpy).toHaveBeenCalled());
-    expect(consoleSpy.mock.calls[0][0]).toContain('[approval-audit]');
+    emitter.emit(event);
+
+    const row = await waitForRow(pool, 'apr-det');
+    const details =
+      typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+    expect(details.familyKey).toBe('app/proc/step');
+    expect(details.reason).toBe('Looks good');
+    expect(details.timestamp).toBe('2026-03-16T13:00:00.000Z');
   });
 
   it('handles all approval event types', async () => {
@@ -102,7 +137,6 @@ describe('PgApprovalAuditEmitter', () => {
     ];
 
     for (const type of types) {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       emitter.emit({
         type,
         approvalId: `apr-${type}`,
@@ -111,28 +145,75 @@ describe('PgApprovalAuditEmitter', () => {
       });
     }
 
-    await vi.waitFor(() => expect(pool.query).toHaveBeenCalledTimes(4));
+    // Wait for all rows
+    for (const type of types) {
+      const row = await waitForRow(pool, `apr-${type}`);
+      expect(row.event_type).toBe(type);
+    }
+  });
+
+  it('does not throw on database error (fire-and-forget)', async () => {
+    capturedErrors = [];
+    console.error = (...args: unknown[]) => {
+      capturedErrors.push(args.map(String).join(' '));
+    };
+
+    try {
+      // Drop the table so the INSERT fails
+      await pool.query('DROP TABLE audit_events CASCADE');
+
+      const event: ApprovalAuditEvent = {
+        type: 'approval_rejected',
+        approvalId: 'apr-err',
+        familyKey: 'app/proc/step',
+        timestamp: '2026-03-16T14:00:00.000Z',
+      };
+
+      // Should not throw
+      emitter.emit(event);
+
+      // Wait for the error to be caught and logged
+      const deadline = Date.now() + 2000;
+      while (Date.now() < deadline && capturedErrors.length === 0) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(capturedErrors.length).toBeGreaterThan(0);
+      expect(capturedErrors[0]).toContain('[approval-audit]');
+    } finally {
+      console.error = originalError;
+      // Recreate the audit_events table only (not full migrations which would fail on existing tables)
+      await pool.execSQL(`
+        CREATE TABLE IF NOT EXISTS audit_events (
+          id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+          event_type      VARCHAR     NOT NULL,
+          actor           VARCHAR,
+          action          VARCHAR     NOT NULL,
+          resource_type   VARCHAR,
+          resource_id     VARCHAR,
+          application     VARCHAR,
+          details         JSONB,
+          created_at      TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_application ON audit_events(application);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_resource ON audit_events(resource_type, resource_id);
+      `);
+    }
   });
 });
 
-// ── PgRollbackAuditEmitter ────────────────────────────────────────────────
+// ── PgRollbackAuditEmitter ──────────────────────────────────────────────────
 
 describe('PgRollbackAuditEmitter', () => {
-  let pool: ReturnType<typeof createMockPool>;
   let emitter: PgRollbackAuditEmitter;
 
   beforeEach(() => {
-    pool = createMockPool();
     emitter = new PgRollbackAuditEmitter(pool as any);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('inserts a rollback audit event into audit_events table', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
+  it('inserts a rollback audit event and the row is readable', async () => {
     const event: RollbackAuditEvent = {
       type: 'rollback_executed',
       rollbackId: 'rb-001',
@@ -145,53 +226,97 @@ describe('PgRollbackAuditEmitter', () => {
 
     emitter.emit(event);
 
-    await vi.waitFor(() => expect(pool.query).toHaveBeenCalledTimes(1));
+    const row = await waitForRow(pool, 'rb-001');
+    expect(row.event_type).toBe('rollback_executed');
+    expect(row.actor).toBe('admin@example.com');
+    expect(row.resource_type).toBe('rollback');
+    expect(row.resource_id).toBe('rb-001');
+  });
 
-    const call = pool.query.mock.calls[0];
-    expect(call[0]).toContain('INSERT INTO audit_events');
-    const params = call[1];
-    expect(params[0]).toBe('rollback_executed');
-    expect(params[1]).toBe('admin@example.com');
-    expect(params[3]).toBe('rollback');
-    expect(params[4]).toBe('rb-001');
+  it('stores targetAdaptationEventId and reason in details JSON', async () => {
+    const event: RollbackAuditEvent = {
+      type: 'rollback_executed',
+      rollbackId: 'rb-det',
+      familyKey: 'app/proc/step',
+      targetAdaptationEventId: 'ae-200',
+      actor: 'admin@example.com',
+      reason: 'Performance regression',
+      timestamp: '2026-03-16T12:00:00.000Z',
+    };
 
-    const details = JSON.parse(params[5]);
-    expect(details.targetAdaptationEventId).toBe('ae-100');
+    emitter.emit(event);
+
+    const row = await waitForRow(pool, 'rb-det');
+    const details =
+      typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+    expect(details.targetAdaptationEventId).toBe('ae-200');
     expect(details.reason).toBe('Performance regression');
+    expect(details.familyKey).toBe('app/proc/step');
   });
 
   it('handles rollback_previewed event type', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-
     emitter.emit({
       type: 'rollback_previewed',
-      rollbackId: 'rb-002',
+      rollbackId: 'rb-preview',
       familyKey: 'app/proc/step',
-      targetAdaptationEventId: 'ae-200',
+      targetAdaptationEventId: 'ae-300',
       actor: 'viewer@example.com',
       reason: 'Checking impact',
       timestamp: '2026-03-16T13:00:00.000Z',
     });
 
-    await vi.waitFor(() => expect(pool.query).toHaveBeenCalledTimes(1));
-    expect(pool.query.mock.calls[0][1][0]).toBe('rollback_previewed');
+    const row = await waitForRow(pool, 'rb-preview');
+    expect(row.event_type).toBe('rollback_previewed');
   });
 
   it('does not throw on database error (fire-and-forget)', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    pool.query.mockRejectedValueOnce(new Error('timeout'));
+    capturedErrors = [];
+    console.error = (...args: unknown[]) => {
+      capturedErrors.push(args.map(String).join(' '));
+    };
 
-    emitter.emit({
-      type: 'rollback_executed',
-      rollbackId: 'rb-003',
-      familyKey: 'app/proc/step',
-      targetAdaptationEventId: 'ae-300',
-      actor: 'admin',
-      reason: 'Emergency',
-      timestamp: '2026-03-16T14:00:00.000Z',
-    });
+    try {
+      // Drop the table so the INSERT fails
+      await pool.query('DROP TABLE audit_events CASCADE');
 
-    await vi.waitFor(() => expect(consoleSpy).toHaveBeenCalled());
-    expect(consoleSpy.mock.calls[0][0]).toContain('[rollback-audit]');
+      emitter.emit({
+        type: 'rollback_executed',
+        rollbackId: 'rb-err',
+        familyKey: 'app/proc/step',
+        targetAdaptationEventId: 'ae-fail',
+        actor: 'admin',
+        reason: 'Emergency',
+        timestamp: '2026-03-16T14:00:00.000Z',
+      });
+
+      // Wait for the error to be caught and logged
+      const deadline = Date.now() + 2000;
+      while (Date.now() < deadline && capturedErrors.length === 0) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(capturedErrors.length).toBeGreaterThan(0);
+      expect(capturedErrors[0]).toContain('[rollback-audit]');
+    } finally {
+      console.error = originalError;
+      // Recreate the audit_events table only
+      await pool.execSQL(`
+        CREATE TABLE IF NOT EXISTS audit_events (
+          id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+          event_type      VARCHAR     NOT NULL,
+          actor           VARCHAR,
+          action          VARCHAR     NOT NULL,
+          resource_type   VARCHAR,
+          resource_id     VARCHAR,
+          application     VARCHAR,
+          details         JSONB,
+          created_at      TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_application ON audit_events(application);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_resource ON audit_events(resource_type, resource_id);
+      `);
+    }
   });
 });

@@ -52,7 +52,7 @@ export class PgAdaptationApprovalRepository implements AdaptationApprovalReposit
        WHERE status = 'pending'
        ORDER BY created_at ASC`,
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async findByFamily(familyKey: string): Promise<AdaptationApproval[]> {
@@ -62,7 +62,7 @@ export class PgAdaptationApprovalRepository implements AdaptationApprovalReposit
        ORDER BY created_at DESC`,
       [familyKey],
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async updateStatus(

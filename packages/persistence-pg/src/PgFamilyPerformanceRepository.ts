@@ -29,7 +29,7 @@ export class PgFamilyPerformanceRepository implements FamilyPerformanceReader {
        GROUP BY fss.family_key, fss.rolling_score, fss.recent_trend, fss.last_adaptation_at
        ORDER BY fss.family_key`,
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async getByFamilyKey(familyKey: string): Promise<FamilyPerformanceSummary | null> {

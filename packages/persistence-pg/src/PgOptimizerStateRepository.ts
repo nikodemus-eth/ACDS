@@ -45,7 +45,7 @@ export class PgOptimizerStateRepository implements OptimizerStateRepository {
       'SELECT * FROM candidate_performance_states WHERE family_key = $1 ORDER BY rolling_score DESC',
       [familyKey],
     );
-    return result.rows.map(this.mapCandidateRow);
+    return result.rows.map((r) => this.mapCandidateRow(r));
   }
 
   async saveCandidateState(state: CandidatePerformanceState): Promise<void> {

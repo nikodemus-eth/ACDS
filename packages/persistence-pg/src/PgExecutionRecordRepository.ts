@@ -63,7 +63,7 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
        LIMIT $4`,
       [application, process, step, limit],
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async findRecent(limit = 50): Promise<ExecutionRecord[]> {
@@ -71,7 +71,7 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
       'SELECT * FROM execution_records ORDER BY created_at DESC LIMIT $1',
       [limit],
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]> {
@@ -110,7 +110,7 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
     `;
 
     const result = await this.pool.query(query, values);
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async update(

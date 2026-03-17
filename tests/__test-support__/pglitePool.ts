@@ -1,0 +1,87 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+let db: PGlite | null = null;
+
+/**
+ * pg.Pool-compatible wrapper around PGlite.
+ * Implements the `query(text, params?)` contract that all Pg repositories use.
+ */
+export interface PoolLike {
+  query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[]; rowCount: number }>;
+  /** Run multi-statement SQL (no params). PGlite query() only supports single statements. */
+  execSQL(sql: string): Promise<void>;
+  end(): Promise<void>;
+}
+
+class PglitePoolAdapter implements PoolLike {
+  constructor(private pglite: PGlite) {}
+
+  async query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[]; rowCount: number }> {
+    const result = await this.pglite.query(text, params as any[]);
+    // For INSERT/UPDATE/DELETE without RETURNING, rows is empty but affectedRows is set.
+    const rowCount = result.affectedRows ?? result.rows.length;
+    return { rows: result.rows as Record<string, unknown>[], rowCount };
+  }
+
+  async execSQL(sql: string): Promise<void> {
+    await this.pglite.exec(sql);
+  }
+
+  async end(): Promise<void> {
+    await this.pglite.close();
+  }
+}
+
+/** Create or return the shared PGlite-backed pool. */
+export async function createTestPool(): Promise<PoolLike> {
+  if (!db) {
+    db = new PGlite();
+  }
+  return new PglitePoolAdapter(db);
+}
+
+/** Run all migration SQL files against the pool. */
+export async function runMigrations(pool: PoolLike): Promise<void> {
+  const migrationsDir = join(process.cwd(), 'infra', 'db', 'migrations');
+  const files = [
+    '001_initial_core_tables.sql',
+    '002_provider_health.sql',
+    '003_profiles.sql',
+    '004_policies.sql',
+    '005_execution_records.sql',
+    '006_audit_events.sql',
+    '007_adaptation_state.sql',
+    '008_secret_store_and_rollback_snapshots.sql',
+  ];
+
+  for (const file of files) {
+    const sql = await readFile(join(migrationsDir, file), 'utf-8');
+    await pool.execSQL(sql);
+  }
+}
+
+/** Truncate all tables used by persistence tests. */
+export async function truncateAll(pool: PoolLike): Promise<void> {
+  await pool.query(`
+    TRUNCATE
+      auto_apply_decision_records,
+      audit_events,
+      adaptation_rollback_records,
+      provider_secrets,
+      adaptation_approval_records,
+      candidate_performance_states,
+      family_selection_states,
+      escalation_tuning_states
+    CASCADE
+  `);
+}
+
+/** Close the shared PGlite instance. */
+export async function closePool(): Promise<void> {
+  if (db) {
+    await db.close();
+    db = null;
+  }
+}

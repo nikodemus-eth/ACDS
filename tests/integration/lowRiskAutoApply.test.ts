@@ -412,3 +412,57 @@ describe('Low-Risk Auto-Apply – Audit Recording', () => {
     expect(decisionWriter.records).toHaveLength(0);
   });
 });
+
+// ===========================================================================
+// Config Validation
+// ===========================================================================
+
+describe('Low-Risk Auto-Apply – Config Validation', () => {
+  it('throws when rollingScoreThreshold is out of range (> 1)', () => {
+    expect(() =>
+      new LowRiskAutoApplyService(
+        new MockRiskProvider(),
+        new MockPostureProvider(),
+        new MockFailureCounter(),
+        new CollectingDecisionWriter(),
+        { rollingScoreThreshold: 1.5 },
+      ),
+    ).toThrow('rollingScoreThreshold must be between 0 and 1');
+  });
+
+  it('throws when rollingScoreThreshold is negative', () => {
+    expect(() =>
+      new LowRiskAutoApplyService(
+        new MockRiskProvider(),
+        new MockPostureProvider(),
+        new MockFailureCounter(),
+        new CollectingDecisionWriter(),
+        { rollingScoreThreshold: -0.1 },
+      ),
+    ).toThrow('rollingScoreThreshold must be between 0 and 1');
+  });
+
+  it('throws when maxRecentFailures is negative', () => {
+    expect(() =>
+      new LowRiskAutoApplyService(
+        new MockRiskProvider(),
+        new MockPostureProvider(),
+        new MockFailureCounter(),
+        new CollectingDecisionWriter(),
+        { maxRecentFailures: -1 },
+      ),
+    ).toThrow('maxRecentFailures must be a non-negative integer');
+  });
+
+  it('throws when maxRecentFailures is not an integer', () => {
+    expect(() =>
+      new LowRiskAutoApplyService(
+        new MockRiskProvider(),
+        new MockPostureProvider(),
+        new MockFailureCounter(),
+        new CollectingDecisionWriter(),
+        { maxRecentFailures: 1.5 },
+      ),
+    ).toThrow('maxRecentFailures must be a non-negative integer');
+  });
+});

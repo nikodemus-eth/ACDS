@@ -36,7 +36,7 @@ export class PgProviderRepository implements ProviderRepository {
     const result = await this.pool.query(
       'SELECT * FROM providers ORDER BY created_at DESC',
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async findByVendor(vendor: string): Promise<Provider[]> {
@@ -44,14 +44,14 @@ export class PgProviderRepository implements ProviderRepository {
       'SELECT * FROM providers WHERE vendor = $1 ORDER BY created_at DESC',
       [vendor],
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async findEnabled(): Promise<Provider[]> {
     const result = await this.pool.query(
       'SELECT * FROM providers WHERE enabled = true ORDER BY created_at DESC',
     );
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   async update(

@@ -83,7 +83,7 @@ export class PgAuditEventRepository implements AuditEventReader {
     params.push(limit, offset);
 
     const result = await this.pool.query(query, params);
-    return result.rows.map(this.mapRow);
+    return result.rows.map((r) => this.mapRow(r));
   }
 
   private mapRow(row: Record<string, unknown>): AuditEvent {

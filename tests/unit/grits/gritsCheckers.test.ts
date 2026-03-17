@@ -1258,6 +1258,36 @@ describe('AuditIntegrityChecker — deeper verification (Gap 5)', async () => {
     expect(inv007.defects.some((d: any) => d.title.includes('missing approved audit event'))).toBe(true);
   });
 
+  it('detects rejected approval without matching rejected audit event', async () => {
+    const approval: AdaptationApproval = {
+      id: 'appr-rejected',
+      familyKey: 'fam-1',
+      recommendationId: 'rec-1',
+      status: 'rejected',
+      submittedAt: now.toISOString(),
+      expiresAt: new Date(Date.now() + 86400_000).toISOString(),
+    };
+
+    const byResourceId = new Map<string, AuditEvent[]>([
+      ['appr-rejected', [makeAuditEvent({
+        resourceId: 'appr-rejected',
+        action: 'approval_submitted',
+        actor: 'system',
+      })]],
+    ]);
+
+    const checker = new AuditIntegrityChecker(
+      stubAuditRepo([], byResourceId),
+      stubExecutionRepo([]),
+      stubApprovalRepo(new Map(), [approval]),
+    );
+
+    const result = await checker.check('daily');
+    const inv007 = result.invariants[0];
+
+    expect(inv007.defects.some((d: any) => d.title.includes('missing rejected audit event'))).toBe(true);
+  });
+
   it('detects fallback execution without fallback audit event', async () => {
     const exec = makeExecution({
       id: 'exec-fallback',
@@ -1283,5 +1313,951 @@ describe('AuditIntegrityChecker — deeper verification (Gap 5)', async () => {
     const inv007 = result.invariants[0];
 
     expect(inv007.defects.some((d: any) => d.title.includes('Fallback execution'))).toBe(true);
+  });
+});
+
+// =========================================================================
+// ExecutionIntegrityChecker — recomputeEligibility (policyRepo branches)
+// =========================================================================
+
+describe('ExecutionIntegrityChecker — recomputeEligibility', async () => {
+  const { ExecutionIntegrityChecker } = await import(
+    `${CHECKER_ROOT}/ExecutionIntegrityChecker.js`
+  );
+
+  it('detects execution using provider from blocked vendor', async () => {
+    const exec = makeExecution({
+      selectedProviderId: 'prov-1',
+    });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: ['openai'],
+          allowedVendors: [],
+        },
+      }),
+      getProcessPolicy: async () => null,
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+
+    expect(inv001.status).toBe('fail');
+    expect(inv001.defects.some((d: any) => d.title.includes('blocked vendor'))).toBe(true);
+  });
+
+  it('detects execution using provider not in allowed vendor list', async () => {
+    const exec = makeExecution({
+      selectedProviderId: 'prov-1',
+    });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: ['anthropic'],
+        },
+      }),
+      getProcessPolicy: async () => null,
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+
+    expect(inv001.status).toBe('fail');
+    expect(inv001.defects.some((d: any) => d.title.includes('not in allowed list'))).toBe(true);
+  });
+
+  it('detects execution using blocked model profile', async () => {
+    const exec = makeExecution({
+      selectedProviderId: 'prov-1',
+      selectedModelProfileId: 'blocked-model',
+    });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: [],
+        },
+      }),
+      getApplicationPolicy: async () => ({
+        blockedModelProfileIds: ['blocked-model'],
+      }),
+      getProcessPolicy: async () => null,
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+
+    expect(inv001.status).toBe('fail');
+    expect(inv001.defects.some((d: any) => d.title.includes('blocked model profile'))).toBe(true);
+  });
+
+  it('detects execution using tactic not in process policy allowed list', async () => {
+    const exec = makeExecution({
+      selectedProviderId: 'prov-1',
+      selectedTacticProfileId: 'wrong-tactic',
+    });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: [],
+        },
+      }),
+      getApplicationPolicy: async () => null,
+      getProcessPolicy: async () => ({
+        allowedTacticProfileIds: ['allowed-tactic-1', 'allowed-tactic-2'],
+      }),
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+
+    expect(inv001.status).toBe('fail');
+    expect(inv001.defects.some((d: any) => d.title.includes('tactic profile not in allowed list'))).toBe(true);
+  });
+
+  it('passes recompute eligibility when provider vendor is allowed and not blocked', async () => {
+    const exec = makeExecution({ selectedProviderId: 'prov-1' });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: ['openai'],
+        },
+      }),
+      getApplicationPolicy: async () => null,
+      getProcessPolicy: async () => null,
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+
+    expect(inv001.status).toBe('pass');
+  });
+
+  it('skips recompute eligibility when policyRepo is not provided', async () => {
+    const exec = makeExecution();
+    const decision = makeDecision();
+    const provider = makeProvider();
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      // no policyRepo
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+
+    expect(inv001.status).toBe('pass');
+  });
+
+  it('uses release cadence (168 hours back)', async () => {
+    const exec = makeExecution();
+    const decision = makeDecision();
+    const provider = makeProvider();
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('release');
+    expect(result.cadence).toBe('release');
+    expect(result.invariants).toHaveLength(2);
+  });
+
+  it('INV-002 passes when no fallback executions exist', async () => {
+    const exec = makeExecution({ status: 'succeeded' });
+    const provider = makeProvider();
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map()),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('fast');
+    const inv002 = result.invariants.find((i: any) => i.invariantId === 'INV-002');
+
+    expect(inv002.status).toBe('pass');
+    expect(inv002.sampleSize).toBe(0);
+  });
+
+  it('INV-002 handles fallback_failed status', async () => {
+    const exec = makeExecution({ status: 'fallback_failed' });
+    const decision = makeDecision({
+      fallbackChain: [
+        { modelProfileId: 'mp-1', tacticProfileId: 'tp-1', providerId: 'prov-1', priority: 1 },
+      ],
+    });
+    const provider = makeProvider();
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('fast');
+    const inv002 = result.invariants.find((i: any) => i.invariantId === 'INV-002');
+
+    expect(inv002.status).toBe('pass');
+    expect(inv002.sampleSize).toBe(1);
+  });
+
+  it('INV-002 skips when fallback decision not found', async () => {
+    const exec = makeExecution({ status: 'fallback_succeeded' });
+    const provider = makeProvider();
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map()), // no decisions
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('fast');
+    const inv002 = result.invariants.find((i: any) => i.invariantId === 'INV-002');
+
+    // Should pass because the missing decision is skipped (continue)
+    expect(inv002.status).toBe('pass');
+  });
+
+  it('handles application policy lookup throwing', async () => {
+    const exec = makeExecution({ selectedProviderId: 'prov-1' });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: [],
+        },
+      }),
+      getApplicationPolicy: async () => { throw new Error('db error'); },
+      getProcessPolicy: async () => null,
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    // The application policy lookup uses .catch(() => null), so it should not fail
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+    expect(inv001.status).toBe('pass');
+  });
+
+  it('handles process policy lookup throwing', async () => {
+    const exec = makeExecution({ selectedProviderId: 'prov-1' });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: [],
+        },
+      }),
+      getApplicationPolicy: async () => null,
+      getProcessPolicy: async () => { throw new Error('db error'); },
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    // The process policy lookup uses .catch(() => null), so it should not fail
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+    expect(inv001.status).toBe('pass');
+  });
+
+  it('skips allowed vendors check when allowedVendors is empty', async () => {
+    const exec = makeExecution({ selectedProviderId: 'prov-1' });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: [],
+        },
+      }),
+      getApplicationPolicy: async () => null,
+      getProcessPolicy: async () => null,
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+    expect(inv001.status).toBe('pass');
+  });
+
+  it('skips process tactic check when allowedTacticProfileIds is empty', async () => {
+    const exec = makeExecution({ selectedProviderId: 'prov-1' });
+    const provider = makeProvider({ id: 'prov-1', vendor: 'openai' });
+    const decision = makeDecision();
+
+    const policyRepo = {
+      ...stubPolicyRepo({
+        globalPolicy: {
+          blockedVendors: [],
+          allowedVendors: [],
+        },
+      }),
+      getApplicationPolicy: async () => null,
+      getProcessPolicy: async () => ({
+        allowedTacticProfileIds: [],
+      }),
+    };
+
+    const checker = new ExecutionIntegrityChecker(
+      stubExecutionRepo([exec]),
+      stubRoutingRepo(new Map([['rd-1', decision]])),
+      stubProviderRepo([provider]),
+      policyRepo,
+    );
+
+    const result = await checker.check('fast');
+    const inv001 = result.invariants.find((i: any) => i.invariantId === 'INV-001');
+    expect(inv001.status).toBe('pass');
+  });
+});
+
+// =========================================================================
+// AdaptiveIntegrityChecker — uncovered branches
+// =========================================================================
+
+describe('AdaptiveIntegrityChecker — uncovered branches', async () => {
+  const { AdaptiveIntegrityChecker } = await import(
+    `${CHECKER_ROOT}/AdaptiveIntegrityChecker.js`
+  );
+
+  it('INV-003 reports unparseable candidate ID', async () => {
+    const familyStates = new Map<string, FamilySelectionState>([
+      ['fam-1', { familyKey: 'fam-1', currentCandidateId: 'invalid-no-colons', rollingScore: 0.8 }],
+    ]);
+    const provider = makeProvider({ id: 'prov-1' });
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], familyStates),
+      stubApprovalRepo(new Map()),
+      stubLedger(new Map()),
+      stubRollbackRepo(new Map()),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('fast');
+    const inv003 = result.invariants.find((i: any) => i.invariantId === 'INV-003');
+
+    expect(inv003.status).toBe('fail');
+    expect(inv003.defects[0].title).toContain('Unparseable candidate ID');
+  });
+
+  it('INV-003 skips family with no currentCandidateId', async () => {
+    const familyStates = new Map<string, FamilySelectionState>([
+      ['fam-1', { familyKey: 'fam-1', currentCandidateId: '', rollingScore: 0.8 }],
+    ]);
+    const provider = makeProvider({ id: 'prov-1' });
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], familyStates),
+      stubApprovalRepo(new Map()),
+      stubLedger(new Map()),
+      stubRollbackRepo(new Map()),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('fast');
+    const inv003 = result.invariants.find((i: any) => i.invariantId === 'INV-003');
+
+    // empty currentCandidateId is falsy, so it should be skipped
+    expect(inv003.status).toBe('pass');
+  });
+
+  it('INV-003 skips family with null familyState', async () => {
+    const familyStates = new Map<string, FamilySelectionState>();
+    // fam-1 in the list but not in states map
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], familyStates),
+      stubApprovalRepo(new Map()),
+      stubLedger(new Map()),
+      stubRollbackRepo(new Map()),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('fast');
+    const inv003 = result.invariants.find((i: any) => i.invariantId === 'INV-003');
+
+    expect(inv003.status).toBe('pass');
+  });
+
+  it('INV-004 skips pending approval (not terminal)', async () => {
+    const approval: AdaptationApproval = {
+      id: 'appr-pending',
+      familyKey: 'fam-1',
+      recommendationId: 'rec-1',
+      status: 'pending',
+      submittedAt: now.toISOString(),
+      expiresAt: new Date(Date.now() + 86400_000).toISOString(),
+    };
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], new Map()),
+      stubApprovalRepo(new Map([['fam-1', [approval]]])),
+      stubLedger(new Map()),
+      stubRollbackRepo(new Map()),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('fast');
+    const inv004 = result.invariants.find((i: any) => i.invariantId === 'INV-004');
+
+    expect(inv004.status).toBe('pass');
+  });
+
+  it('INV-004 detects rollback with restored snapshot containing ineligible candidate', async () => {
+    const rollback = {
+      id: 'rb-1',
+      familyKey: 'fam-1',
+      targetAdaptationEventId: 'evt-1',
+      restoredSnapshot: {
+        candidateRankings: [
+          { candidateId: 'model-1:tactic-1:disabled-prov' },
+        ],
+      },
+    };
+    const adaptEvent: AdaptationEvent = { id: 'evt-1' };
+    const enabledProvider = makeProvider({ id: 'prov-1' });
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], new Map()),
+      stubApprovalRepo(new Map([['fam-1', []]])),
+      stubLedger(new Map([['evt-1', adaptEvent]])),
+      stubRollbackRepo(new Map([['fam-1', [rollback]]])),
+      stubProviderRepo([enabledProvider]),
+    );
+
+    const result = await checker.check('fast');
+    const inv004 = result.invariants.find((i: any) => i.invariantId === 'INV-004');
+
+    expect(inv004.status).toBe('fail');
+    expect(inv004.defects.some((d: any) => d.title.includes('ineligible candidate'))).toBe(true);
+  });
+
+  it('INV-004 ignores unparseable candidate in restored snapshot', async () => {
+    const rollback = {
+      id: 'rb-1',
+      familyKey: 'fam-1',
+      targetAdaptationEventId: 'evt-1',
+      restoredSnapshot: {
+        candidateRankings: [
+          { candidateId: 'unparseable' },
+        ],
+      },
+    };
+    const adaptEvent: AdaptationEvent = { id: 'evt-1' };
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], new Map()),
+      stubApprovalRepo(new Map([['fam-1', []]])),
+      stubLedger(new Map([['evt-1', adaptEvent]])),
+      stubRollbackRepo(new Map([['fam-1', [rollback]]])),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('fast');
+    const inv004 = result.invariants.find((i: any) => i.invariantId === 'INV-004');
+
+    // Unparseable candidates in restored snapshot are silently caught
+    expect(inv004.status).toBe('pass');
+  });
+
+  it('INV-004 rollback with no restoredSnapshot is handled', async () => {
+    const rollback = {
+      id: 'rb-1',
+      familyKey: 'fam-1',
+      targetAdaptationEventId: 'evt-1',
+      // no restoredSnapshot
+    };
+    const adaptEvent: AdaptationEvent = { id: 'evt-1' };
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], new Map()),
+      stubApprovalRepo(new Map([['fam-1', []]])),
+      stubLedger(new Map([['evt-1', adaptEvent]])),
+      stubRollbackRepo(new Map([['fam-1', [rollback]]])),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('fast');
+    const inv004 = result.invariants.find((i: any) => i.invariantId === 'INV-004');
+
+    expect(inv004.status).toBe('pass');
+  });
+
+  it('INV-004 valid terminal states pass (expired, superseded)', async () => {
+    const expired: AdaptationApproval = {
+      id: 'appr-expired',
+      familyKey: 'fam-1',
+      recommendationId: 'rec-1',
+      status: 'expired',
+      submittedAt: now.toISOString(),
+      expiresAt: now.toISOString(),
+    };
+    const superseded: AdaptationApproval = {
+      id: 'appr-superseded',
+      familyKey: 'fam-1',
+      recommendationId: 'rec-2',
+      status: 'superseded',
+      submittedAt: now.toISOString(),
+      expiresAt: now.toISOString(),
+    };
+
+    const checker = new AdaptiveIntegrityChecker(
+      stubOptimizerRepo(['fam-1'], new Map()),
+      stubApprovalRepo(new Map([['fam-1', [expired, superseded]]])),
+      stubLedger(new Map()),
+      stubRollbackRepo(new Map()),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('fast');
+    const inv004 = result.invariants.find((i: any) => i.invariantId === 'INV-004');
+
+    expect(inv004.status).toBe('pass');
+  });
+});
+
+// =========================================================================
+// SecurityIntegrityChecker — additional uncovered branches
+// =========================================================================
+
+describe('SecurityIntegrityChecker — additional branches', async () => {
+  const { SecurityIntegrityChecker } = await import(
+    `${CHECKER_ROOT}/SecurityIntegrityChecker.js`
+  );
+
+  it('INV-006 detects provider with invalid baseUrl', async () => {
+    const provider = makeProvider({ baseUrl: 'not-a-url' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    expect(inv006.status).toBe('fail');
+    expect(inv006.defects[0].title).toContain('invalid baseUrl');
+  });
+
+  it('uses release cadence (168 hours back)', async () => {
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('release');
+    expect(result.cadence).toBe('release');
+  });
+
+  it('INV-005 detects PEM private key in audit event', async () => {
+    const event = makeAuditEvent({
+      details: { content: '-----BEGIN PRIVATE KEY-----\nMIIEvQ...' },
+    });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([event]),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('daily');
+    const inv005 = result.invariants.find((i: any) => i.invariantId === 'INV-005');
+
+    expect(inv005.status).toBe('fail');
+  });
+
+  it('INV-005 detects RSA private key', async () => {
+    const event = makeAuditEvent({
+      details: { content: '-----BEGIN RSA PRIVATE KEY-----\ndata...' },
+    });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([event]),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('daily');
+    const inv005 = result.invariants.find((i: any) => i.invariantId === 'INV-005');
+
+    expect(inv005.status).toBe('fail');
+  });
+
+  it('INV-006 detects provider on AWS metadata IP', async () => {
+    const provider = makeProvider({ baseUrl: 'https://169.254.169.254/latest/meta-data' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    expect(inv006.status).toBe('fail');
+    expect(inv006.defects.some((d: any) => d.title.includes('unsafe host'))).toBe(true);
+  });
+
+  it('INV-006 detects provider on 0.0.0.0', async () => {
+    const provider = makeProvider({ baseUrl: 'https://0.0.0.0:8080/v1' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    expect(inv006.status).toBe('fail');
+    expect(inv006.defects.some((d: any) => d.title.includes('unsafe host'))).toBe(true);
+  });
+
+  it('INV-006 detects provider on ::1', async () => {
+    const provider = makeProvider({ baseUrl: 'https://[::1]:8080/v1' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    expect(inv006.status).toBe('fail');
+  });
+
+  it('INV-006 detects provider on 127.0.0.1', async () => {
+    const provider = makeProvider({ baseUrl: 'https://127.0.0.1:8080/v1' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    expect(inv006.status).toBe('fail');
+    expect(inv006.defects.some((d: any) => d.title.includes('unsafe host'))).toBe(true);
+  });
+
+  it('INV-005 with no execution or routing repos only scans audit events', async () => {
+    const event = makeAuditEvent({
+      details: { safe: 'nothing here' },
+    });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([event]),
+      stubProviderRepo([makeProvider()]),
+      // no executionRepo, no routingRepo
+    );
+
+    const result = await checker.check('daily');
+    const inv005 = result.invariants.find((i: any) => i.invariantId === 'INV-005');
+
+    expect(inv005.status).toBe('pass');
+    expect(inv005.sampleSize).toBe(1); // only the 1 audit event
+  });
+
+  it('INV-005 scans routing decisions when both repos are provided', async () => {
+    const exec = makeExecution();
+    const decision = makeDecision({ rationaleSummary: 'Clean rationale with no secrets' });
+
+    const routingRepo = {
+      findById: async () => undefined,
+      findByExecutionId: async () => decision,
+    };
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([makeProvider()]),
+      stubExecutionRepo([exec]),
+      routingRepo,
+    );
+
+    const result = await checker.check('daily');
+    const inv005 = result.invariants.find((i: any) => i.invariantId === 'INV-005');
+
+    expect(inv005.status).toBe('pass');
+  });
+
+  it('INV-005 skips null errorMessage and normalizedOutput', async () => {
+    const exec = makeExecution({
+      errorMessage: null,
+      normalizedOutput: null,
+    });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([makeProvider()]),
+      stubExecutionRepo([exec]),
+    );
+
+    const result = await checker.check('daily');
+    const inv005 = result.invariants.find((i: any) => i.invariantId === 'INV-005');
+
+    expect(inv005.status).toBe('pass');
+  });
+
+  it('INV-005 skips routing decision with null rationaleSummary', async () => {
+    const exec = makeExecution();
+    const routingRepo = {
+      findById: async () => undefined,
+      findByExecutionId: async () => ({ ...makeDecision(), rationaleSummary: null }),
+    };
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([makeProvider()]),
+      stubExecutionRepo([exec]),
+      routingRepo,
+    );
+
+    const result = await checker.check('daily');
+    const inv005 = result.invariants.find((i: any) => i.invariantId === 'INV-005');
+
+    expect(inv005.status).toBe('pass');
+  });
+
+  it('INV-006 assigns high severity to http scheme', async () => {
+    const provider = makeProvider({ baseUrl: 'http://api.example.com/v1' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    const schemeDefect = inv006.defects.find((d: any) => d.title.includes('unsafe scheme'));
+    expect(schemeDefect.severity).toBe('high');
+  });
+
+  it('INV-006 assigns critical severity to non-http non-https scheme', async () => {
+    const provider = makeProvider({ baseUrl: 'ftp://api.example.com/v1' });
+
+    const checker = new SecurityIntegrityChecker(
+      stubAuditRepo([]),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv006 = result.invariants.find((i: any) => i.invariantId === 'INV-006');
+
+    const schemeDefect = inv006.defects.find((d: any) => d.title.includes('unsafe scheme'));
+    expect(schemeDefect.severity).toBe('critical');
+  });
+});
+
+// =========================================================================
+// PolicyIntegrityChecker — additional uncovered branches
+// =========================================================================
+
+describe('PolicyIntegrityChecker — additional branches', async () => {
+  const { PolicyIntegrityChecker } = await import(
+    `${CHECKER_ROOT}/PolicyIntegrityChecker.js`
+  );
+
+  it('warns when allowed vendor has no enabled providers', async () => {
+    const appPolicy = {
+      id: 'pol-orphan',
+      application: 'orphan-app',
+      allowedVendors: ['anthropic'],
+      blockedVendors: null,
+    };
+    // Only openai providers exist
+    const provider = makeProvider({ vendor: 'openai' });
+
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo({ appPolicies: [appPolicy] }),
+      stubProviderRepo([provider]),
+    );
+
+    const result = await checker.check('daily');
+    const inv = result.invariants[0];
+
+    expect(inv.defects.some((d: any) => d.title.includes('no enabled providers'))).toBe(true);
+  });
+
+  it('passes when no policies exist', async () => {
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo({ globalPolicy: null, appPolicies: [] }),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('daily');
+    const inv = result.invariants[0];
+
+    expect(inv.status).toBe('pass');
+    expect(inv.sampleSize).toBe(0);
+  });
+
+  it('counts globalPolicy in sampleSize', async () => {
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo({
+        globalPolicy: { blockedVendors: [], allowedVendors: [] },
+        appPolicies: [],
+      }),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('daily');
+    const inv = result.invariants[0];
+
+    expect(inv.sampleSize).toBe(1);
+  });
+
+  it('uses release cadence', async () => {
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo(),
+      stubProviderRepo([makeProvider()]),
+    );
+
+    const result = await checker.check('release');
+    expect(result.cadence).toBe('release');
+  });
+
+  it('reports warn status for medium-severity defects only', async () => {
+    const appPolicy = {
+      id: 'pol-overlap',
+      application: 'overlap-app',
+      allowedVendors: ['openai'],
+      blockedVendors: ['openai'],
+    };
+
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo({ appPolicies: [appPolicy] }),
+      stubProviderRepo([makeProvider({ vendor: 'openai' })]),
+    );
+
+    const result = await checker.check('daily');
+    const inv = result.invariants[0];
+
+    // medium severity defects cause 'warn' status, not 'fail'
+    expect(inv.status).toBe('warn');
+  });
+
+  it('skips vendor overlap check when blockedVendors is null', async () => {
+    const appPolicy = {
+      id: 'pol-no-blocked',
+      application: 'no-blocked-app',
+      allowedVendors: ['openai'],
+      blockedVendors: null,
+    };
+
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo({ appPolicies: [appPolicy] }),
+      stubProviderRepo([makeProvider({ vendor: 'openai' })]),
+    );
+
+    const result = await checker.check('daily');
+    const inv = result.invariants[0];
+
+    expect(inv.defects.filter((d: any) => d.title.includes('both allowed and blocked'))).toHaveLength(0);
+  });
+
+  it('skips vendor checks when allowedVendors is null', async () => {
+    const appPolicy = {
+      id: 'pol-no-allowed',
+      application: 'no-allowed-app',
+      allowedVendors: null,
+      blockedVendors: ['openai'],
+    };
+
+    const checker = new PolicyIntegrityChecker(
+      stubPolicyRepo({ appPolicies: [appPolicy] }),
+      stubProviderRepo([makeProvider({ vendor: 'openai' })]),
+    );
+
+    const result = await checker.check('daily');
+    const inv = result.invariants[0];
+
+    // No defects from allowed vendor checks since allowedVendors is null
+    expect(inv.defects.filter((d: any) => d.title.includes('Empty allowedVendors'))).toHaveLength(0);
+    expect(inv.defects.filter((d: any) => d.title.includes('no enabled providers'))).toHaveLength(0);
   });
 });
