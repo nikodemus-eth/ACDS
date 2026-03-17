@@ -116,14 +116,14 @@ class TestSourceCollector:
 
         adapter = SourceCollectorAdapter()
         assert adapter.tool_name == "source_collector"
-        result = adapter.execute(_make_ctx(tmp_path))
+        result = adapter.execute(_make_ctx(tmp_path, config={"feeds": []}))
         assert result.success
         assert result.output_data["source_count"] >= 1
 
     def test_empty_collection(self, tmp_path):
         (tmp_path / "sources").mkdir()
         adapter = SourceCollectorAdapter()
-        result = adapter.execute(_make_ctx(tmp_path))
+        result = adapter.execute(_make_ctx(tmp_path, config={"feeds": []}))
         assert result.success
         assert result.output_data["source_count"] == 0
 

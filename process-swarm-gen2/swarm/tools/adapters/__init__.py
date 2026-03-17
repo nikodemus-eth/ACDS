@@ -16,6 +16,13 @@ from swarm.tools.adapters.source_normalizer import SourceNormalizerAdapter
 from swarm.tools.adapters.synthesis_brief_builder import SynthesisBriefBuilderAdapter
 from swarm.tools.adapters.url_validator import UrlValidatorAdapter
 
+# Context Report inference-routed adapters
+from swarm.tools.adapters.cr_extraction import CRExtractionAdapter
+from swarm.tools.adapters.cr_clustering import CRClusteringAdapter
+from swarm.tools.adapters.cr_prioritization import CRPrioritizationAdapter
+from swarm.tools.adapters.cr_synthesis import CRSynthesisAdapter
+from swarm.tools.adapters.cr_validation import CRValidationAdapter
+
 ALL_ADAPTERS = [
     RunManagerAdapter,
     PolicyLoaderAdapter,
@@ -32,4 +39,10 @@ ALL_ADAPTERS = [
     RuleValidatorAdapter,
     DecisionEngineAdapter,
     DeliveryEngineAdapter,
+    # Context Report pipeline adapters
+    CRExtractionAdapter,
+    CRClusteringAdapter,
+    CRPrioritizationAdapter,
+    CRSynthesisAdapter,
+    CRValidationAdapter,
 ]

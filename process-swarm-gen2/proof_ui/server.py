@@ -149,6 +149,20 @@ class SwarmPlatform:
         self.repo = SwarmRepository(self.db)
         self.events = EventRecorder(self.repo)
         self.lifecycle = LifecycleManager(self.repo, self.events)
+        self.openclaw_root = openclaw_root
+
+    def execute_run(self, run_id: str) -> dict:
+        """Execute a queued run through the adapter pipeline.
+
+        Creates a SwarmRunner with its own DB connection (WAL mode allows
+        concurrent readers) and delegates execution to it.
+        """
+        from swarm.runner import SwarmRunner
+        runner = SwarmRunner(str(self.openclaw_root))
+        try:
+            return runner.execute_run(run_id)
+        finally:
+            runner.close()
 
 
 # ──────────────────────────────────────────────────────────────
@@ -298,6 +312,9 @@ tr:hover td { background: rgba(0,188,212,0.03); }
         <a class="nav-item" href="#events">Events</a>
         <a class="nav-item" href="#tools">Tools</a>
         <a class="nav-item" href="#settings">Settings</a>
+        <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+        <a class="nav-item" href="#acds-admin" style="color:var(--accent)">ACDS Admin</a>
+        </div>
     </nav>
     <main class="main" id="content"></main>
 </div>
@@ -425,7 +442,7 @@ function runsTable(runs) {
             h('th', null, 'Run ID'), h('th', null, 'Swarm'), h('th', null, 'Status'), h('th', null, 'Triggered'),
         ])),
         h('tbody', null, runs.map(function(r) {
-            return h('tr', null, [
+            return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#run/' + r.run_id; }}, [
                 h('td', null, truncId(r.run_id)),
                 h('td', null, truncId(r.swarm_id)),
                 h('td', null, statusBadge(r.run_status)),
@@ -433,6 +450,147 @@ function runsTable(runs) {
             ]);
         })),
     ]);
+}
+
+async function renderRunDetail(container, runId) {
+    container.appendChild(h('div', {className: 'page-title'}, 'Run Detail'));
+    try {
+        var data = await apiGet('run/' + runId);
+        var run = data.run;
+
+        // Header panel
+        var panel = h('div', {className: 'detail-panel'}, [
+            detailRow('Run ID', run.run_id),
+            detailRow('Swarm', data.swarm_name || run.swarm_id),
+            detailRow('Status', null, statusBadge(run.run_status)),
+            detailRow('Trigger', run.trigger_source || '-'),
+            detailRow('Created By', run.created_by_trigger || '-'),
+            detailRow('Triggered', formatTime(run.triggered_at)),
+            detailRow('Execution ID', run.runtime_execution_id || '-'),
+            detailRow('Delivery', run.delivery_status || '-'),
+        ]);
+        if (run.error_summary) {
+            panel.appendChild(detailRow('Error', run.error_summary));
+        }
+        container.appendChild(panel);
+
+        // Stats
+        var stats = h('div', {className: 'stat-grid'}, [
+            statCard('Artifacts', String(data.artifact_files.length)),
+            statCard('Steps', String(data.action_results.length)),
+            statCard('Events', String(data.events.length)),
+        ]);
+        container.appendChild(stats);
+
+        // Pipeline Steps (action results)
+        if (data.action_results.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Pipeline Steps'));
+            var stepsTbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, '#'), h('th', null, 'Action'), h('th', null, 'Tool'),
+                    h('th', null, 'Status'), h('th', null, 'Started'), h('th', null, 'Completed'),
+                    h('th', null, 'Artifact'),
+                ])),
+                h('tbody', null, data.action_results.map(function(ar) {
+                    var artifactCell = '-';
+                    if (ar.artifact_ref) {
+                        artifactCell = h('a', {
+                            href: '/api/artifact/' + runId + '/' + ar.artifact_ref,
+                            target: '_blank',
+                            style: 'color:var(--accent)',
+                        }, ar.artifact_ref);
+                    }
+                    return h('tr', null, [
+                        h('td', null, String(ar.step_order || '')),
+                        h('td', null, ar.action_id || '-'),
+                        h('td', null, ar.tool_id || '-'),
+                        h('td', null, statusBadge(ar.execution_status)),
+                        h('td', null, ar.started_at ? formatTime(ar.started_at) : '-'),
+                        h('td', null, ar.completed_at ? formatTime(ar.completed_at) : '-'),
+                        h('td', null, typeof artifactCell === 'string' ? artifactCell : artifactCell),
+                    ]);
+                })),
+            ]);
+            container.appendChild(stepsTbl);
+        }
+
+        // Artifacts
+        if (data.artifact_files.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Artifacts'));
+            var artifactPanel = h('div', {className: 'detail-panel'});
+            data.artifact_files.forEach(function(af) {
+                var ext = af.path.split('.').pop().toLowerCase();
+                var icon = ext === 'json' ? 'JSON' : ext === 'md' ? 'MD' : ext === 'txt' ? 'TXT' : 'FILE';
+                var sizeStr = af.size < 1024 ? af.size + ' B' : (af.size / 1024).toFixed(1) + ' KB';
+
+                var row = h('div', {style: 'display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)'}, [
+                    h('span', {className: 'badge badge-blue', style: 'min-width:40px;text-align:center'}, icon),
+                    h('a', {
+                        href: '/api/artifact/' + runId + '/' + af.path,
+                        target: '_blank',
+                        style: 'color:var(--accent);flex:1;font-size:13px',
+                    }, af.path),
+                    h('span', {style: 'color:var(--text-dim);font-size:12px'}, sizeStr),
+                    h('button', {
+                        className: 'btn',
+                        style: 'padding:4px 10px;font-size:11px',
+                        onClick: function() { viewArtifact(runId, af.path); },
+                    }, 'View'),
+                ]);
+                artifactPanel.appendChild(row);
+            });
+            container.appendChild(artifactPanel);
+
+            // Inline viewer
+            container.appendChild(h('div', {id: 'artifact-viewer'}));
+        }
+
+        // Events
+        if (data.events.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Run Events'));
+            var evtTbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, 'Type'), h('th', null, 'Summary'), h('th', null, 'Time'),
+                ])),
+                h('tbody', null, data.events.map(function(ev) {
+                    return h('tr', null, [
+                        h('td', null, ev.event_type),
+                        h('td', null, ev.summary || '-'),
+                        h('td', null, formatTime(ev.event_time)),
+                    ]);
+                })),
+            ]);
+            container.appendChild(evtTbl);
+        }
+
+    } catch(e) {
+        container.appendChild(h('div', {className: 'empty-state'}, 'Error: ' + e.message));
+    }
+}
+
+async function viewArtifact(runId, filePath) {
+    var viewer = document.getElementById('artifact-viewer');
+    if (!viewer) return;
+    while (viewer.firstChild) viewer.removeChild(viewer.firstChild);
+
+    try {
+        var resp = await fetch('/api/artifact/' + runId + '/' + filePath);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var text = await resp.text();
+
+        var panel = h('div', {className: 'detail-panel', style: 'margin-top:12px'}, [
+            h('div', {style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'}, [
+                h('div', {className: 'label'}, filePath),
+                h('button', {className: 'btn', style: 'padding:4px 10px;font-size:11px', onClick: function() {
+                    while (viewer.firstChild) viewer.removeChild(viewer.firstChild);
+                }}, 'Close'),
+            ]),
+            h('pre', {style: 'white-space:pre-wrap;font-size:12px;max-height:500px;overflow-y:auto;color:var(--text);background:var(--bg);padding:12px;border-radius:4px;border:1px solid var(--border)'}, text),
+        ]);
+        viewer.appendChild(panel);
+    } catch(e) {
+        viewer.appendChild(h('div', {className: 'detail-panel', style: 'border-color:var(--red)'}, 'Error loading artifact: ' + e.message));
+    }
 }
 
 async function renderSwarms(container) {
@@ -465,6 +623,22 @@ async function renderSwarmDetail(container, swarmId) {
         var data = await apiGet('swarm/' + swarmId);
         if (!data.swarm) { container.appendChild(h('div', {className: 'empty-state'}, 'Swarm not found')); return; }
         var s = data.swarm;
+        var runBtn = h('button', {className: 'btn', style: 'margin-top:12px;padding:8px 20px',
+            onClick: async function() {
+                runBtn.disabled = true;
+                runBtn.textContent = 'Running...';
+                try {
+                    var result = await apiPost('swarm/run', {swarm_id: s.swarm_id});
+                    runBtn.textContent = 'Run Started: ' + (result.run_id || '').substring(0, 12);
+                    // Refresh after a moment
+                    setTimeout(function() { location.hash = '#runs'; }, 1500);
+                } catch(e) {
+                    runBtn.textContent = 'Failed: ' + e.message;
+                    setTimeout(function() { runBtn.textContent = 'Run Now'; runBtn.disabled = false; }, 3000);
+                }
+            }
+        }, 'Run Now');
+
         var panel = h('div', {className: 'detail-panel'}, [
             detailRow('Name', s.swarm_name),
             detailRow('ID', s.swarm_id),
@@ -472,6 +646,7 @@ async function renderSwarmDetail(container, swarmId) {
             detailRow('Description', s.description || '-'),
             detailRow('Created', formatTime(s.created_at)),
             detailRow('Created By', s.created_by),
+            runBtn,
         ]);
         container.appendChild(panel);
 
@@ -557,7 +732,7 @@ async function renderTools(container) {
                 h('th', null, 'Name'), h('th', null, 'Family'), h('th', null, 'Status'), h('th', null, 'Dry Run'),
             ])),
             h('tbody', null, tools.map(function(t) {
-                return h('tr', null, [
+                return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#tool/' + t.tool_name; }}, [
                     h('td', null, t.tool_name),
                     h('td', null, t.tool_family || '-'),
                     h('td', null, statusBadge(t.maturity_status)),
@@ -566,6 +741,59 @@ async function renderTools(container) {
             })),
         ]);
         container.appendChild(tbl);
+    } catch(e) {
+        container.appendChild(h('div', {className: 'empty-state'}, 'Error: ' + e.message));
+    }
+}
+
+async function renderToolDetail(container, toolName) {
+    container.appendChild(h('div', {className: 'page-title'}, 'Tool Detail'));
+    try {
+        var data = await apiGet('tool/' + encodeURIComponent(toolName));
+        var tool = data.tool;
+
+        // Tool info panel
+        var panel = h('div', {className: 'detail-panel'}, [
+            detailRow('Name', tool.tool_name),
+            detailRow('ID', tool.tool_id),
+            detailRow('Family', tool.tool_family || '-'),
+            detailRow('Description', tool.description || '-'),
+            detailRow('Execution Class', tool.execution_class || '-'),
+            detailRow('Status', null, statusBadge(tool.maturity_status)),
+            detailRow('Dry Run', tool.supports_dry_run ? 'Yes' : 'No'),
+            detailRow('Created', formatTime(tool.created_at)),
+        ]);
+        container.appendChild(panel);
+
+        // Swarms using this tool
+        container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Swarms Using This Tool'));
+        if (!data.swarms.length) {
+            container.appendChild(h('div', {className: 'empty-state'}, 'No swarms reference this tool'));
+        } else {
+            var tbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, 'Name'), h('th', null, 'ID'), h('th', null, 'Status'),
+                    h('th', null, 'Stage'), h('th', null, 'Engine'),
+                ])),
+                h('tbody', null, data.swarms.map(function(s) {
+                    return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#swarm/' + s.swarm_id; }}, [
+                        h('td', null, s.swarm_name),
+                        h('td', null, truncId(s.swarm_id)),
+                        h('td', null, statusBadge(s.lifecycle_status)),
+                        h('td', null, s.step_id || '-'),
+                        h('td', null, s.engine || '-'),
+                    ]);
+                })),
+            ]);
+            container.appendChild(tbl);
+        }
+
+        // Recent runs where this tool was invoked
+        if (data.recent_runs && data.recent_runs.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Recent Runs'));
+            container.appendChild(runsTable(data.recent_runs));
+        }
+
     } catch(e) {
         container.appendChild(h('div', {className: 'empty-state'}, 'Error: ' + e.message));
     }
@@ -588,6 +816,56 @@ async function renderSettings(container) {
     }
 }
 
+// -- Context Report Page --
+async function renderACDSAdmin(container) {
+    container.appendChild(h('div', {className: 'page-title'}, 'ACDS Admin'));
+
+    // Health status bar
+    var healthPanel = h('div', {className: 'detail-panel'}, [
+        h('div', {className: 'detail-row'}, [
+            h('div', {className: 'detail-label'}, 'ACDS API'),
+            h('div', {className: 'detail-value', id: 'acds-status'}, 'Checking...'),
+        ]),
+        h('div', {className: 'detail-row'}, [
+            h('div', {className: 'detail-label'}, 'Apple Intelligence'),
+            h('div', {className: 'detail-value', id: 'apple-status'}, 'Checking...'),
+        ]),
+        h('div', {className: 'detail-row'}, [
+            h('div', {className: 'detail-label'}, 'Admin Web'),
+            h('div', {className: 'detail-value'}, [
+                h('a', {href: 'http://localhost:4173', target: '_blank',
+                    style: 'color:var(--accent);text-decoration:none'},
+                    'http://localhost:4173 \u2197'),
+            ]),
+        ]),
+    ]);
+    container.appendChild(healthPanel);
+
+    // Check health
+    try {
+        var health = await apiGet('context-report/health');
+        var acdsEl = document.getElementById('acds-status');
+        while (acdsEl.firstChild) acdsEl.removeChild(acdsEl.firstChild);
+        acdsEl.appendChild(statusBadge(health.acds_healthy ? 'active' : 'error'));
+        var appleEl = document.getElementById('apple-status');
+        while (appleEl.firstChild) appleEl.removeChild(appleEl.firstChild);
+        appleEl.appendChild(statusBadge(health.apple_bridge_healthy ? 'active' : 'error'));
+    } catch(e) {
+        var acdsEl2 = document.getElementById('acds-status');
+        acdsEl2.textContent = 'Unreachable';
+        var appleEl2 = document.getElementById('apple-status');
+        appleEl2.textContent = 'Unknown';
+    }
+
+    // Embedded ACDS Admin Web
+    var iframe = h('iframe', {
+        src: 'http://localhost:4173',
+        style: 'width:100%;height:calc(100vh - 220px);border:1px solid var(--border);border-radius:6px;background:var(--bg)',
+        id: 'acds-admin-frame',
+    });
+    container.appendChild(iframe);
+}
+
 // -- Router --
 function route() {
     var hash = location.hash.slice(1) || 'dashboard';
@@ -605,10 +883,13 @@ function route() {
     if (hash === 'dashboard') renderDashboard(content);
     else if (hash === 'swarms') renderSwarms(content);
     else if (hash.indexOf('swarm/') === 0) renderSwarmDetail(content, hash.slice(6));
+    else if (hash.indexOf('run/') === 0) renderRunDetail(content, hash.slice(4));
     else if (hash === 'runs') renderRuns(content);
     else if (hash === 'events') renderEvents(content);
+    else if (hash.indexOf('tool/') === 0) renderToolDetail(content, decodeURIComponent(hash.slice(5)));
     else if (hash === 'tools') renderTools(content);
     else if (hash === 'settings') renderSettings(content);
+    else if (hash === 'acds-admin') renderACDSAdmin(content);
     else renderDashboard(content);
 }
 
@@ -754,6 +1035,13 @@ def _make_handler(
 
             # Swarm platform API endpoints
             if path == "/api/swarms":
+                # Auto-register Nik's Context Report if not present
+                try:
+                    from swarm.definitions.niks_context_report import find_or_register
+                    find_or_register(swarm_platform.repo)
+                except Exception:
+                    pass  # Non-fatal — swarm list still works
+
                 status_filter = params.get("status")
                 self._json_response(
                     swarm_platform.repo.list_swarms(status=status_filter)
@@ -803,11 +1091,45 @@ def _make_handler(
 
             m = _RUN_DETAIL_RE.match(path)
             if m:
-                run = swarm_platform.repo.get_run(m.group(1))
+                run_id = m.group(1)
+                run = swarm_platform.repo.get_run(run_id)
                 if not run:
                     self._error_response(404, "Run not found")
                     return
-                self._json_response(run)
+                # Enrich with action results, artifacts, events
+                action_results = swarm_platform.repo.get_run_action_results(run_id)
+                swarm = swarm_platform.repo.get_swarm(run.get("swarm_id", ""))
+                swarm_name = ""
+                if swarm:
+                    swarm_name = swarm.get("swarm_name") or swarm.get("name", "")
+                events = swarm_platform.repo.list_all_events(limit=200)
+                run_events = [e for e in events if run_id in (e.get("summary") or "")]
+                # Scan workspace for artifact files
+                workspace_dir = swarm_platform.openclaw_root / "workspace" / run_id
+                artifact_files = []
+                if workspace_dir.exists():
+                    for f in sorted(workspace_dir.rglob("*")):
+                        if f.is_file():
+                            rel = str(f.relative_to(workspace_dir))
+                            artifact_files.append({
+                                "path": rel,
+                                "size": f.stat().st_size,
+                            })
+                artifact_refs = []
+                refs_json = run.get("artifact_refs_json")
+                if refs_json:
+                    try:
+                        artifact_refs = json.loads(refs_json)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                self._json_response({
+                    "run": run,
+                    "swarm_name": swarm_name,
+                    "action_results": action_results,
+                    "artifact_refs": artifact_refs,
+                    "artifact_files": artifact_files,
+                    "events": run_events,
+                })
                 return
 
             if path == "/api/tools":
@@ -833,6 +1155,89 @@ def _make_handler(
 
             if path == "/api/settings/identity":
                 self._json_response(state.get_identity())
+                return
+
+            # Tool detail with swarm cross-references
+            if path.startswith("/api/tool/"):
+                import urllib.parse as _up
+                tool_name = _up.unquote(path[len("/api/tool/"):])
+                tool = swarm_platform.repo.get_tool_by_name(tool_name)
+                if not tool:
+                    self._error_response(404, "Tool not found")
+                    return
+                # Find swarms that use this tool in their behavior sequence
+                all_swarms = swarm_platform.repo.list_swarms()
+                using_swarms = []
+                for swarm in all_swarms:
+                    sid = swarm.get("swarm_id", "")
+                    bs = swarm_platform.repo.get_behavior_sequence_by_swarm(sid)
+                    if not bs:
+                        continue
+                    raw = bs.get("ordered_steps_json", "[]")
+                    try:
+                        steps = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    for step in steps:
+                        if step.get("tool_name") == tool_name:
+                            using_swarms.append({
+                                "swarm_id": sid,
+                                "swarm_name": swarm.get("swarm_name", ""),
+                                "lifecycle_status": swarm.get("lifecycle_status", ""),
+                                "step_id": step.get("step_id", ""),
+                                "engine": step.get("engine") or "none",
+                            })
+                # Recent runs for swarms using this tool
+                recent_runs = []
+                seen_swarm_ids = set(s["swarm_id"] for s in using_swarms)
+                if seen_swarm_ids:
+                    all_runs = swarm_platform.repo.list_all_runs(limit=50)
+                    recent_runs = [
+                        r for r in all_runs
+                        if r.get("swarm_id") in seen_swarm_ids
+                    ][:10]
+                self._json_response({
+                    "tool": tool,
+                    "swarms": using_swarms,
+                    "recent_runs": recent_runs,
+                })
+                return
+
+            # Serve artifact file content
+            if path.startswith("/api/artifact/"):
+                rest = path[len("/api/artifact/"):]
+                slash_idx = rest.find("/")
+                if slash_idx < 0:
+                    self._error_response(400, "Missing file path")
+                    return
+                run_id = rest[:slash_idx]
+                file_rel = rest[slash_idx + 1:]
+                workspace_dir = swarm_platform.openclaw_root / "workspace" / run_id
+                target = (workspace_dir / file_rel).resolve()
+                if not str(target).startswith(str(workspace_dir.resolve())):
+                    self._error_response(403, "Access denied")
+                    return
+                if not target.exists() or not target.is_file():
+                    self._error_response(404, "File not found")
+                    return
+                content = target.read_bytes()
+                content_type = "application/octet-stream"
+                if target.suffix in (".json",):
+                    content_type = "application/json"
+                elif target.suffix in (".md", ".txt"):
+                    content_type = "text/plain; charset=utf-8"
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(content)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(content)
+                return
+
+            # Context Report health
+            if path == "/api/context-report/health":
+                from proof_ui.context_report import check_health
+                self._json_response(check_health())
                 return
 
             self._error_response(404, "Not found")
@@ -896,13 +1301,27 @@ def _make_handler(
                 swarm_id = body.get("swarm_id", "")
                 trigger_source = body.get("trigger_source", "manual_proof_ui")
                 created_by = body.get("created_by", "proof_ui")
+                execute = body.get("execute", True)
                 if not swarm_id:
                     self._error_response(400, "swarm_id required")
                     return
                 run_id = swarm_platform.repo.create_run(
                     swarm_id, trigger_source, created_by_trigger=created_by,
                 )
-                self._json_response({"run_id": run_id}, status=201)
+                if execute:
+                    try:
+                        exec_result = swarm_platform.execute_run(run_id)
+                        exec_result["run_id"] = run_id
+                        self._json_response(exec_result)
+                    except Exception as exc:
+                        logger.exception("Swarm execution failed for run %s", run_id)
+                        self._json_response({
+                            "run_id": run_id,
+                            "execution_status": "failed",
+                            "error": str(exc),
+                        }, status=500)
+                else:
+                    self._json_response({"run_id": run_id}, status=201)
                 return
 
             if path == "/api/swarm/schedule":
@@ -933,6 +1352,23 @@ def _make_handler(
                 )
                 delivery_id = abi.configure_delivery(swarm_id, body)
                 self._json_response({"delivery_id": delivery_id}, status=201)
+                return
+
+            # Nik's Context Report — register + run as swarm
+            if path == "/api/context-report/run":
+                from swarm.definitions.niks_context_report import find_or_register
+                try:
+                    swarm_id = find_or_register(swarm_platform.repo)
+                    run_id = swarm_platform.repo.create_run(
+                        swarm_id, "manual_proof_ui", created_by_trigger="proof_ui",
+                    )
+                    result = swarm_platform.execute_run(run_id)
+                    result["swarm_id"] = swarm_id
+                    result["run_id"] = run_id
+                    self._json_response(result)
+                except Exception as exc:
+                    logger.exception("Context report swarm execution failed")
+                    self._json_response({"error": str(exc)}, status=500)
                 return
 
             self._error_response(404, "Not found")

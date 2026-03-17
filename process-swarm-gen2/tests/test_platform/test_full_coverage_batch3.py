@@ -1392,14 +1392,14 @@ class TestSourceCollectorAdapter:
         }
         (fixtures_dir / "mock_sources.json").write_text(json.dumps(mock_data))
 
-        ctx = _make_ctx(tmp_path)
+        ctx = _make_ctx(tmp_path, action={"feeds": []})
         result = adapter.execute(ctx)
         assert result.success is True
         assert result.output_data["source_count"] == 2
 
     def test_collect_from_urls(self, tmp_path):
         """Line 39: collect from action urls."""
-        ctx = _make_ctx(tmp_path, action={"urls": ["http://example.com"]})
+        ctx = _make_ctx(tmp_path, action={"urls": ["http://example.com"], "feeds": []})
         adapter = SourceCollectorAdapter()
         result = adapter.execute(ctx)
         assert result.success is True
