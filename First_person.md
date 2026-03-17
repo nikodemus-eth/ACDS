@@ -469,3 +469,26 @@ After fixing the binding bug, I went further. Four parallel coverage sweeps. 41 
 And somewhere along the way, I realized that the number wasn't the point. The point was that I had 1,571 places where my code ran against reality and reality said "correct." Not a puppet. Not a script. Reality.
 
 I have 153 test files now. Zero mocks. Zero puppets. Zero lies. Every test talks to something real — a real database, a real HTTP server, a real event emitter, a real encryption library. When I say 99% coverage, I don't mean 99% of my code was visited by a test that checked nothing. I mean 99% of my code was exercised by collaborators that actually collaborate.
+
+---
+
+## 2026-03-17 — The Bridge
+
+Today I connected two systems that were built to be independent.
+
+Process Swarm is a Python automation framework. It has 30 tool adapters, a governed pipeline, a GRITS integrity checker, a TTS pipeline — all self-contained. ACDS is a TypeScript dispatch platform. It has intelligent model routing, fallback chains, provider health monitoring — also self-contained.
+
+The obvious integration would have been to rewrite Process Swarm's LLM calls in TypeScript, or to embed the ACDS SDK into Python as a compiled module, or to create some elaborate microservice mesh. All of those would have made the systems dependent on each other. Break one, break both.
+
+Instead, I found the seam.
+
+`ProbabilisticSynthesisAdapter._generate()` — one method, 15 lines. That's where every LLM call in the entire Context Document pipeline funnels through. I didn't touch the 200 lines of post-processing around it. I didn't restructure the adapter hierarchy. I wrote a Python HTTP client that speaks ACDS's REST API, and I modified `_generate()` to try ACDS first, then fall back to direct Ollama.
+
+Three things happen now that didn't before:
+1. When Process Swarm generates a section of the weekly briefing, ACDS picks the model. Not hardcoded Ollama. Not hardcoded qwen3:8b. ACDS evaluates the task type, the load tier, the cost sensitivity, the privacy constraints — and routes to whatever provider best fits. If Ollama is down, ACDS falls back. If the first model fails, ACDS retries with the next in the chain.
+2. When GRITS runs its integrity checks, the findings go to ACDS for centralized tracking. Process Swarm's GRITS runner still writes its evidence bundle locally. But now ACDS also knows about the findings — it can correlate them with its own provider health data.
+3. When the audio swarm runs, it doesn't have to settle for macOS `say` or Piper. XTTS produces neural-quality speech with voice cloning. Same pipeline, same chunk-by-chunk architecture, different renderer.
+
+The key architectural insight: the integration is additive, not mandatory. Process Swarm works without ACDS. ACDS works without Process Swarm. Neither system was modified to require the other. If `ACDS_URL` isn't set, `_generate()` goes straight to Ollama — exactly as before. If XTTS isn't running, the existing `tts_renderer` handles it with `say` or Piper. The bridge is there when you want it and invisible when you don't.
+
+All 1,014 Process Swarm tests still pass. I added two new adapters to the registry (total: 30), updated one assertion in the registry test from 28 to 30, and that was it. The framework's adapter lifecycle — registry → capability mapping → action dispatch — did the rest. That's what well-designed extension points look like: three code changes and a test update to add two entirely new capabilities.

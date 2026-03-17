@@ -812,3 +812,44 @@ Excluded pure wiring/configuration code from coverage scope:
 - **99%+ statement coverage, 99.6% function coverage**
 - Zero mocks confirmed: `grep -r "vi\.fn\|vi\.mock\|vi\.stub\|vi\.spy"` → 0 results
 - v8 coverage provider with threads pool for reliable coverage collection
+
+---
+
+## 2026-03-17 — Process Swarm ↔ ACDS Integration
+
+Integrated three Process Swarm swarms with the ACDS system, creating a bidirectional bridge between the Python-based governed automation system and the TypeScript dispatch platform.
+
+### What Was Built
+
+**1. Python ACDS Client** (`swarm/integrations/acds_client.py`)
+- Lightweight stdlib-only HTTP client wrapping `/dispatch/run` and `/dispatch/resolve`
+- Typed data classes mirroring ACDS core-types (RoutingRequest, DispatchRunRequest, etc.)
+- Zero external dependencies — uses `urllib.request` to match Process Swarm's existing patterns
+
+**2. ACDS Dispatch Integration** (modified `probabilistic_synthesis.py`)
+- Modified `ProbabilisticSynthesisAdapter._generate()` to route through ACDS when `ACDS_URL` is configured
+- Falls back to direct Ollama if ACDS is unreachable — defense in depth
+- ACDS handles model selection, provider routing, fallback chains, and cost optimization
+- All 200+ lines of post-processing logic (symbolic tokens, confidence labels, word count, neutrality checks) preserved untouched
+
+**3. GRITS-ACDS Bridge** (`swarm/integrations/grits_bridge.py` + `swarm/tools/adapters/grits_integrity.py`)
+- `GritsBridge`: reports Process Swarm GRITS findings to ACDS for centralized tracking
+- `GritsIntegrityAdapter`: ToolAdapter wrapping GritsRunner + bridge in a single pipeline step
+- Queries ACDS provider health to inform routing decisions
+- Supports `run_and_report()` convenience method for combined local + ACDS evaluation
+
+**4. XTTS Neural TTS Renderer** (`swarm/tools/adapters/xtts_renderer.py`)
+- Replaces macOS `say`/Piper with Coqui XTTS for production-quality neural speech
+- Renders per-chunk WAV files via XTTS HTTP API
+- Supports voice cloning via speaker reference WAV
+- Configurable temperature, speed, and language
+
+**5. Swarm Job Definitions** (3 new JSON jobs)
+- `grits_acds_job.json`: GRITS integrity audit with ACDS reporting
+- `context_document_acds_job.json`: Nik's Context Document with ACDS-routed LLM calls
+- `context_document_xtts_job.json`: Context Document + XTTS neural audio
+
+### Registry Updates
+- 2 new adapters registered: `xtts_renderer`, `grits_integrity` (total: 30)
+- 2 new action types in capability mapping: `xtts_rendering`, `grits_integrity_check`
+- All 1014 Process Swarm tests passing
