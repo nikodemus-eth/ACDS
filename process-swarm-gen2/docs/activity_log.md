@@ -190,21 +190,21 @@ Timestamped record of what was done and when during the rebuild.
 | — | Coverage gap tests | Created `test_coverage_gaps.py` — 19 targeted tests closing all gaps: routing ValueError branch, scoring edge cases (empty sets, threshold boundaries, empty inputs), runner comparison_report serialization, integrity edge cases (continue branch, empty keywords, few claims, validator-only drift) |
 | — | **100% Coverage Achieved** | **198 evaluation tests, 1904 total tests passing. 729/729 statements = 100% coverage on evaluation module.** |
 
-### Session 20: OpenShell Layer — Governed Execution Gateway
+### Session 20: ARGUS-Hold Layer — Governed Execution Gateway
 
 | Time | Activity | Details |
 |------|----------|---------|
 | Start | Architecture design | Designed 8-stage governed pipeline: normalize → validate → policy → scope → plan → execute → emit → ledger |
-| — | Phase O1: Models & errors | Created `models.py` (9 dataclasses, 2 enums, 2 helpers), `errors.py` (6 exception classes), `config.py` (`OpenShellConfig` with `for_run()` factory) |
+| — | Phase O1: Models & errors | Created `models.py` (9 dataclasses, 2 enums, 2 helpers), `errors.py` (6 exception classes), `config.py` (`ARGUSHoldConfig` with `for_run()` factory) |
 | — | Phase O2: Registry & specs | Created `registry.py` (`CommandRegistry` loading versioned JSON specs), 6 command spec JSONs: `filesystem.read_file`, `filesystem.write_file`, `filesystem.list_dir`, `report.render_markdown`, `http.fetch_whitelisted`, `tts.generate` |
 | — | Phase O3: Pipeline stages | Created `normalizer.py`, `validator.py` (jsonschema Draft7), `policy_engine.py` (default-deny, 4 rules), `scope_guard.py` (filesystem + network), `execution_planner.py` |
 | — | Phase O4: Adapters | Created `adapters/filesystem.py` (read/write/list), `adapters/report.py` (markdown), `adapters/http.py` (whitelisted fetch), `adapters/tts.py` (honest stub) |
 | — | Phase O5: Emitter & ledger | Created `artifact_emitter.py` (per-stage JSON + summary), `ledger_writer.py` (append-only JSONL, SHA-256 hash chain, `verify_chain()`) |
-| — | Phase O6: Dispatcher | Created `dispatcher.py` (8-stage orchestrator, `handles()`, `execute()`, `to_tool_result()`). Integrated into `swarm/runner.py` with lazy `openshell` property |
+| — | Phase O6: Dispatcher | Created `dispatcher.py` (8-stage orchestrator, `handles()`, `execute()`, `to_tool_result()`). Integrated into `swarm/runner.py` with lazy `argus_hold` property |
 | — | Smoke test | End-to-end `filesystem.read_file`: 8 stages PASSED, 7 artifacts, ledger chain verified |
-| — | **OpenShell Layer Complete** | **19 source files, 559 statements, 6 command specs, 4 adapters, hash-chained ledger** |
+| — | **ARGUS-Hold Layer Complete** | **19 source files, 559 statements, 6 command specs, 4 adapters, hash-chained ledger** |
 
-### Session 21: OpenShell Test Coverage — No Mocks, 100%
+### Session 21: ARGUS-Hold Test Coverage — No Mocks, 100%
 
 | Time | Activity | Details |
 |------|----------|---------|

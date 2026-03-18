@@ -1,0 +1,1 @@
+"""ARGUS-Hold adapter tests."""

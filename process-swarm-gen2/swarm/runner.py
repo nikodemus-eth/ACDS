@@ -68,25 +68,25 @@ class SwarmRunner:
         config = inference_config or load_inference_config()
         self.inference: InferenceProvider = create_inference_provider(config)
 
-        # OpenShell governed execution layer (optional)
-        self._openshell = None
+        # ARGUS-Hold governed execution layer (optional)
+        self._argus_hold = None
 
         # Lazy pipeline runner
         self._pipeline_runner = None
 
     @property
-    def openshell(self):
-        """Lazy-init OpenShell dispatcher, scoped per workspace."""
-        if self._openshell is None:
+    def argus_hold(self):
+        """Lazy-init ARGUS-Hold dispatcher, scoped per workspace."""
+        if self._argus_hold is None:
             try:
-                from swarm.openshell import OpenShellConfig, OpenShellDispatcher
+                from swarm.argus_hold import ARGUSHoldConfig, ARGUSHoldDispatcher
                 # Default config — scoped to workspace root
-                config = OpenShellConfig.for_run(self.openclaw_root, "_shared")
-                self._openshell = OpenShellDispatcher(config)
+                config = ARGUSHoldConfig.for_run(self.openclaw_root, "_shared")
+                self._argus_hold = ARGUSHoldDispatcher(config)
             except Exception:
-                logger.debug("OpenShell layer not available", exc_info=True)
-                self._openshell = False  # Sentinel: don't retry
-        return self._openshell if self._openshell is not False else None
+                logger.debug("ARGUS-Hold layer not available", exc_info=True)
+                self._argus_hold = False  # Sentinel: don't retry
+        return self._argus_hold if self._argus_hold is not False else None
 
     @property
     def pipeline_runner(self):
@@ -244,15 +244,15 @@ class SwarmRunner:
         for action in actions:
             tool_name = action.get("tool_name", "")
 
-            # Route through OpenShell if it handles this command
-            openshell = self.openshell
-            if openshell and openshell.handles(tool_name):
+            # Route through ARGUS-Hold if it handles this command
+            argus_hold = self.argus_hold
+            if argus_hold and argus_hold.handles(tool_name):
                 t0 = _time.monotonic()
                 # Create per-run config scoped to this workspace
-                from swarm.openshell import OpenShellConfig
-                run_config = OpenShellConfig.for_run(self.openclaw_root, run_id)
-                from swarm.openshell import OpenShellDispatcher
-                run_dispatcher = OpenShellDispatcher(run_config)
+                from swarm.argus_hold import ARGUSHoldConfig
+                run_config = ARGUSHoldConfig.for_run(self.openclaw_root, run_id)
+                from swarm.argus_hold import ARGUSHoldDispatcher
+                run_dispatcher = ARGUSHoldDispatcher(run_config)
                 cmd_result = run_dispatcher.execute(
                     run_id=run_id,
                     swarm_id=swarm_id,
@@ -260,7 +260,7 @@ class SwarmRunner:
                     workspace_root=workspace,
                     prior_results=prior_results,
                 )
-                result = OpenShellDispatcher.to_tool_result(cmd_result)
+                result = ARGUSHoldDispatcher.to_tool_result(cmd_result)
                 wall_ms = int((_time.monotonic() - t0) * 1000)
             else:
                 adapter = self.adapter_registry.get_adapter(tool_name)

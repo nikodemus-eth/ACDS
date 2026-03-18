@@ -148,9 +148,9 @@ These lessons were documented in the original Process Swarm and are being applie
 
 64. **100% coverage gap tests reveal no dead code when the architecture is clean** — All 19 uncovered lines in the evaluation module were real code paths: ValueError branches, empty-input guards, scoring threshold boundaries, loop-skip conditions. None were dead code requiring removal. This validates the architecture — every line serves a purpose.
 
-### OpenShell Layer
+### ARGUS-Hold Layer
 
-65. **Default-deny is an architecture, not a feature flag** — The OpenShell policy engine doesn't have an "enable default-deny" toggle. The structure itself is default-deny: nothing executes unless the registry has the command, the policy allows the side-effect level, and the scope guard approves every path and host. Three independent gates, all must pass. This makes accidental permission expansion structurally impossible.
+65. **Default-deny is an architecture, not a feature flag** — The ARGUS-Hold policy engine doesn't have an "enable default-deny" toggle. The structure itself is default-deny: nothing executes unless the registry has the command, the policy allows the side-effect level, and the scope guard approves every path and host. Three independent gates, all must pass. This makes accidental permission expansion structurally impossible.
 
 66. **Hash-chained ledgers make denial auditable** — Denied commands get the same ledger treatment as executed ones: full entry with stage summary, outcome, content hash, and chain hash. An invisible denial is an invisible security hole. The `_build_denied` path in the dispatcher still calls `emitter.emit()` and `ledger.append()` before returning failure.
 
@@ -164,6 +164,6 @@ These lessons were documented in the original Process Swarm and are being applie
 
 71. **TTS honesty over convenience** — When a capability isn't available, return `{implemented: false}` with the full request metadata. Don't stub success. Don't skip the ledger entry. The system records what it was asked to do, acknowledges it can't, and ledgers the gap as `stub_not_implemented`. This makes capability gaps discoverable, not hidden.
 
-72. **Pipeline stages as near-pure functions simplify testing** — Each OpenShell stage (normalize, validate, policy, scope, plan) is a function from typed input to typed output with no hidden state. The dispatcher is the only stateful component, and its state is just the wiring. This means each stage can be tested in isolation with real objects — no mocking needed.
+72. **Pipeline stages as near-pure functions simplify testing** — Each ARGUS-Hold stage (normalize, validate, policy, scope, plan) is a function from typed input to typed output with no hidden state. The dispatcher is the only stateful component, and its state is just the wiring. This means each stage can be tested in isolation with real objects — no mocking needed.
 
 73. **Bogus command specs test adapter routing gaps** — To test the "no adapter for namespace" branch, copy real specs to a temp dir and add a `bogus.do_thing.v1.json`. The command passes normalize, validate, policy, and scope — but the dispatcher has no adapter for the `"bogus"` namespace. This tests the exact failure path without any mocking.

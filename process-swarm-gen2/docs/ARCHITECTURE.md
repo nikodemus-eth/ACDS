@@ -1,6 +1,6 @@
 # Process Swarm Gen 2 -- Architecture Document
 
-**Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema / ACDS Dispatch / OpenShell**
+**Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema / ACDS Dispatch / ARGUS-Hold**
 **148 source files, 2090+ tests (100% coverage), 24 JSON schemas**
 
 ---
@@ -14,7 +14,7 @@
 5. [Job Authoring (`process_swarm/`)](#job-authoring)
 6. [GRITS Observability (`grits/`)](#grits-observability)
 7. [ProofUI Admin Console (`proof_ui/`)](#proofui-admin-console)
-8. [OpenShell Layer (`swarm/openshell/`)](#openshell-layer)
+8. [ARGUS-Hold Layer (`swarm/argus_hold/`)](#argus_hold-layer)
 9. [Core Invariant](#core-invariant)
 9. [7-Stage Runtime Pipeline](#7-stage-runtime-pipeline)
 10. [DSL-to-BSC-to-Bridge Translation Chain](#dsl-to-bsc-to-bridge-translation-chain)
@@ -484,11 +484,11 @@ content-type enforcement.
 
 ---
 
-## OpenShell Layer
+## ARGUS-Hold Layer
 
-**Module:** `swarm/openshell/` (19 files, 559 statements, 186 tests, 100% coverage)
+**Module:** `swarm/argus_hold/` (19 files, 559 statements, 186 tests, 100% coverage)
 
-The OpenShell Layer is the governed execution membrane between planner
+The ARGUS-Hold Layer is the governed execution membrane between planner
 output and real execution. It replaces the unsafe pattern:
 
 ```
@@ -535,18 +535,18 @@ is blocked at the schema level.
 
 ### Integration with SwarmRunner
 
-The `OpenShellDispatcher` provides `handles(tool_name) → bool`. The
+The `ARGUSHoldDispatcher` provides `handles(tool_name) → bool`. The
 runner checks this before the existing adapter path:
 
 ```python
-if self.openshell and self.openshell.handles(tool_name):
+if self.argus_hold and self.argus_hold.handles(tool_name):
     cmd_result = run_dispatcher.execute(...)
-    result = OpenShellDispatcher.to_tool_result(cmd_result)
+    result = ARGUSHoldDispatcher.to_tool_result(cmd_result)
 else:
     # existing ToolAdapter path unchanged
 ```
 
-Existing swarms are unaffected — `openshell` is `None` when not
+Existing swarms are unaffected — `argus_hold` is `None` when not
 configured.
 
 ### Audit Trail

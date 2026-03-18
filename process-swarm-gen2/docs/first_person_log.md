@@ -462,11 +462,11 @@ The red-team harness tests 29 adversarial scenarios across 7 phases. The philoso
 
 Closing the final 19 coverage gaps required targeted edge-case tests: unknown cognitive grade strings, empty token sets, scoring threshold boundaries, empty/untokenizable inputs, and integrity component edge cases. Every gap represented a real code path — no dead code was found. The evaluation module now has 100% statement coverage across all 729 statements with 198 tests.
 
-## 2026-03-18 — OpenShell Layer: Governed Execution Gateway
+## 2026-03-18 — ARGUS-Hold Layer: Governed Execution Gateway
 
 ### Phase O1: Architecture & Models (Session 20)
 
-The OpenShell Layer replaces the unsafe pattern `LLM output → tool call → side effect` with an 8-stage governed pipeline: normalize → validate → policy → scope → plan → execute → emit → ledger. Every command passes through schema validation, default-deny policy, explicit scope enforcement, artifact emission, and hash-chained ledger recording before anything touches the filesystem or network.
+The ARGUS-Hold Layer replaces the unsafe pattern `LLM output → tool call → side effect` with an 8-stage governed pipeline: normalize → validate → policy → scope → plan → execute → emit → ledger. Every command passes through schema validation, default-deny policy, explicit scope enforcement, artifact emission, and hash-chained ledger recording before anything touches the filesystem or network.
 
 **Decision: Pipeline-of-stages with typed models.** Each stage is a near-pure function returning a `StageResult`. The `CommandEnvelope` is the canonical request format — no freeform natural language reaches any executor. This makes the pipeline deterministic and replayable.
 
@@ -490,7 +490,7 @@ Every command attempt — even denied ones — produces artifacts and a ledger e
 
 ### Phase O5: Dispatcher & Runner Integration (Session 20)
 
-The `OpenShellDispatcher` wires all 8 stages and provides `handles(tool_name) → bool` for the runner to check before dispatching. Integration into `SwarmRunner._execute_via_adapters()` is a minimal `if/else` — existing ToolAdapters keep working untouched. The `openshell` property is lazy-initialized and returns `None` if the module isn't available, ensuring zero behavior change for existing swarms.
+The `ARGUSHoldDispatcher` wires all 8 stages and provides `handles(tool_name) → bool` for the runner to check before dispatching. Integration into `SwarmRunner._execute_via_adapters()` is a minimal `if/else` — existing ToolAdapters keep working untouched. The `argus_hold` property is lazy-initialized and returns `None` if the module isn't available, ensuring zero behavior change for existing swarms.
 
 **Result:** End-to-end smoke test: `filesystem.read_file` through all 8 stages — 8 stages PASSED, 7 artifacts emitted, ledger chain verified. 0ms per stage.
 

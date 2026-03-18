@@ -21,7 +21,7 @@ guarantees.
    - [Layer 6: Governance Lifecycle](#layer-6-governance-lifecycle)
    - [Layer 7: Governance Warning Policy Engine](#layer-7-governance-warning-policy-engine)
    - [Layer 8: Delivery Security](#layer-8-delivery-security)
-   - [Layer 9: OpenShell Governed Execution](#layer-9-openshell-governed-execution)
+   - [Layer 9: ARGUS-Hold Governed Execution](#layer-9-argus_hold-governed-execution)
 5. [ARGUS-9 Red Team Test Suite](#argus-9-red-team-test-suite)
 6. [Key File Reference](#key-file-reference)
 
@@ -406,11 +406,11 @@ and event recording are committed together or not at all.
 - Attachment policy (configurable allow/deny).
 - SMTP credentials resolved from environment variables only (never stored in config).
 
-### Layer 9: OpenShell Governed Execution
+### Layer 9: ARGUS-Hold Governed Execution
 
-**Module:** `swarm/openshell/` (559 statements, 186 tests, 100% coverage)
+**Module:** `swarm/argus_hold/` (559 statements, 186 tests, 100% coverage)
 
-The OpenShell Layer is the governed execution membrane between planner
+The ARGUS-Hold Layer is the governed execution membrane between planner
 output and tool execution. It implements a strict 8-stage pipeline:
 normalize → validate → policy → scope → plan → execute → emit → ledger.
 
@@ -439,7 +439,7 @@ normalize → validate → policy → scope → plan → execute → emit → le
 5. **Artifact-based proof.** Each pipeline stage emits a JSON artifact.
    Denied commands produce artifacts proving what was refused and why.
 
-**Red team coverage:** 17 tests in `tests/redteam/test_rt_openshell.py`
+**Red team coverage:** 17 tests in `tests/redteam/test_rt_argus_hold.py`
 covering path traversal (dotdot, null byte, absolute, URL-encoded),
 parameter smuggling, SSRF blocklist bypass, privilege escalation, newline
 injection, and ledger tampering detection.
