@@ -1086,8 +1086,12 @@ class SwarmRepository:
         action_name: str,
         action_text: str,
         action_type: Optional[str] = None,
+        operation_type: Optional[str] = None,
         target_path: Optional[str] = None,
         output_artifact_type: Optional[str] = None,
+        inference_engine: Optional[str] = None,
+        inference_model: Optional[str] = None,
+        fallback_engine: Optional[str] = None,
         action_status: str = "draft",
     ) -> str:
         action_id = _new_id("act")
@@ -1095,12 +1099,14 @@ class SwarmRepository:
         self.conn.execute(
             """INSERT INTO swarm_actions
                 (action_id, swarm_id, step_order, action_name, action_text,
-                 action_type, target_path, output_artifact_type,
+                 action_type, operation_type, target_path, output_artifact_type,
+                 inference_engine, inference_model, fallback_engine,
                  action_status, requires_user_confirmation,
                  created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
             (action_id, swarm_id, step_order, action_name, action_text,
-             action_type, target_path, output_artifact_type,
+             action_type, operation_type, target_path, output_artifact_type,
+             inference_engine, inference_model, fallback_engine,
              action_status, now, now),
         )
         self._commit()

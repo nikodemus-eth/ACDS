@@ -1,0 +1,41 @@
+{
+  "command_name": "filesystem.write_file",
+  "version": "v1",
+  "description": "Write content to a file on the local filesystem.",
+  "side_effect_level": "local_mutation",
+  "supports_dry_run": true,
+  "reversible": false,
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Absolute or relative path to the file to write."
+      },
+      "content": {
+        "type": "string",
+        "description": "The content to write to the file."
+      },
+      "encoding": {
+        "type": "string",
+        "default": "utf-8",
+        "description": "Character encoding to use when writing the file."
+      },
+      "overwrite": {
+        "type": "boolean",
+        "default": false,
+        "description": "Whether to overwrite an existing file."
+      }
+    },
+    "required": ["path", "content"],
+    "additionalProperties": false
+  },
+  "scope_requirements": {
+    "filesystem": true,
+    "network": false
+  },
+  "constraints": {
+    "max_bytes": 10485760
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,1 @@
+"""OpenShell adapter tests."""

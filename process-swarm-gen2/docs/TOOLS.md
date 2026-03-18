@@ -109,6 +109,45 @@ result = adapter.execute(ctx)
 
 ---
 
+## OpenShell Governed Commands
+
+Commands registered in the OpenShell layer (`swarm/openshell/`) bypass
+the `ToolAdapter` pipeline and instead pass through the 8-stage governed
+execution pipeline: normalize → validate → policy → scope → plan →
+execute → emit → ledger.
+
+OpenShell commands are **not** `ToolAdapter` subclasses. They use their
+own adapter interface (`execute_command(envelope, workspace, prior)`)
+and are dispatched by the `OpenShellDispatcher`.
+
+The `SwarmRunner` checks `openshell.handles(tool_name)` before falling
+through to the standard `AdapterRegistry`:
+
+```python
+if self.openshell and self.openshell.handles(tool_name):
+    cmd_result = dispatcher.execute(...)
+    result = OpenShellDispatcher.to_tool_result(cmd_result)
+else:
+    adapter = self.adapter_registry.get_adapter(tool_name)
+    result = adapter.execute(ctx)
+```
+
+### Registered OpenShell Commands
+
+| Command | Side Effect | Adapter |
+|---------|-------------|---------|
+| `filesystem.read_file` | read_only | `FilesystemAdapter` |
+| `filesystem.write_file` | local_mutation | `FilesystemAdapter` |
+| `filesystem.list_dir` | read_only | `FilesystemAdapter` |
+| `report.render_markdown` | controlled_generation | `ReportAdapter` |
+| `http.fetch_whitelisted` | external_action | `HttpAdapter` |
+| `tts.generate` | controlled_generation | `TtsAdapter` (stub) |
+
+Command specs live in `swarm/openshell/command_specs/*.json` with
+versioned JSON Schema validation (`additionalProperties: false`).
+
+---
+
 ## The 15 Built-in Adapters
 
 The adapters are listed here in pipeline execution order, which matches the

@@ -269,8 +269,12 @@ class RegistryDatabase:
                 action_name         TEXT NOT NULL,
                 action_text         TEXT NOT NULL,
                 action_type         TEXT,
+                operation_type      TEXT,
                 target_path         TEXT,
                 output_artifact_type TEXT,
+                inference_engine    TEXT,
+                inference_model     TEXT,
+                fallback_engine     TEXT,
                 action_status       TEXT NOT NULL DEFAULT 'draft'
                     CHECK (action_status IN (
                         'draft', 'defined', 'supported',
@@ -285,6 +289,11 @@ class RegistryDatabase:
                 UNIQUE (swarm_id, step_order)
             )
         """)
+        # Migration: add inference columns to swarm_actions
+        self._ensure_column("swarm_actions", "operation_type", "TEXT")
+        self._ensure_column("swarm_actions", "inference_engine", "TEXT")
+        self._ensure_column("swarm_actions", "inference_model", "TEXT")
+        self._ensure_column("swarm_actions", "fallback_engine", "TEXT")
 
         # Table 13: swarm_action_dependencies
         cursor.execute("""

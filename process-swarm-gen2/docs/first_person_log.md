@@ -461,3 +461,52 @@ The red-team harness tests 29 adversarial scenarios across 7 phases. The philoso
 ### Coverage Completion (Session 19)
 
 Closing the final 19 coverage gaps required targeted edge-case tests: unknown cognitive grade strings, empty token sets, scoring threshold boundaries, empty/untokenizable inputs, and integrity component edge cases. Every gap represented a real code path — no dead code was found. The evaluation module now has 100% statement coverage across all 729 statements with 198 tests.
+
+## 2026-03-18 — OpenShell Layer: Governed Execution Gateway
+
+### Phase O1: Architecture & Models (Session 20)
+
+The OpenShell Layer replaces the unsafe pattern `LLM output → tool call → side effect` with an 8-stage governed pipeline: normalize → validate → policy → scope → plan → execute → emit → ledger. Every command passes through schema validation, default-deny policy, explicit scope enforcement, artifact emission, and hash-chained ledger recording before anything touches the filesystem or network.
+
+**Decision: Pipeline-of-stages with typed models.** Each stage is a near-pure function returning a `StageResult`. The `CommandEnvelope` is the canonical request format — no freeform natural language reaches any executor. This makes the pipeline deterministic and replayable.
+
+**Decision: Default-deny policy.** The `PolicyEngine` evaluates side-effect levels against a configurable ceiling. `PRIVILEGED` commands are unconditionally denied. `EXTERNAL_ACTION` requires an explicit host allowlist. Nothing executes unless the registry, policy, and scope all agree.
+
+### Phase O2: Command Registry & Specs (Session 20)
+
+Six MVP commands implemented as versioned JSON specs with full JSON Schema validation: `filesystem.read_file`, `filesystem.write_file`, `filesystem.list_dir`, `report.render_markdown`, `http.fetch_whitelisted`, `tts.generate`. Each spec declares `additionalProperties: false` — parameter smuggling is blocked at the schema level.
+
+### Phase O3: Adapters & Execution (Session 20)
+
+Four adapter namespaces: `filesystem` (read/write/list), `report` (markdown rendering), `http` (whitelisted fetch with size caps), `tts` (honest stub returning `implemented: false`). The TTS adapter never fakes success — it records the intent and reports the limitation.
+
+**Decision: TTS honesty over convenience.** The spec says "do not fake TTS success." The adapter returns a structured result with `implemented: false`, `text_length`, `voice_profile`, and `message`. This is ledgered as `stub_not_implemented` — proving the system knows what it can't do.
+
+### Phase O4: Artifact Emitter & Hash-Chained Ledger (Session 20)
+
+Every command attempt — even denied ones — produces artifacts and a ledger entry. The `ArtifactEmitter` writes per-stage JSON files (`01_normalize.json` through `06_execute.json`) plus a `pipeline_result.json` summary. The `LedgerWriter` maintains an append-only JSONL file with SHA-256 hash chaining: `chain_hash = SHA-256(prev_hash + content_hash)`, starting from a genesis hash of 64 zeros.
+
+**Decision: Denied commands get artifacts and ledger entries.** The spec states "the runtime must prove not only what it did, but also what it refused to do." A denial without a ledger entry is an invisible decision.
+
+### Phase O5: Dispatcher & Runner Integration (Session 20)
+
+The `OpenShellDispatcher` wires all 8 stages and provides `handles(tool_name) → bool` for the runner to check before dispatching. Integration into `SwarmRunner._execute_via_adapters()` is a minimal `if/else` — existing ToolAdapters keep working untouched. The `openshell` property is lazy-initialized and returns `None` if the module isn't available, ensuring zero behavior change for existing swarms.
+
+**Result:** End-to-end smoke test: `filesystem.read_file` through all 8 stages — 8 stages PASSED, 7 artifacts emitted, ledger chain verified. 0ms per stage.
+
+### Phase O6: Test Coverage — No Mocks (Session 21)
+
+The constraint was absolute: no stubs, no monkeypatches, no mocks. 174 existing tests at 97% coverage had 18 missing lines and 5 tests using `@patch`/`MagicMock` for HTTP.
+
+**Decision: Real HTTPServer over mocks.** Replaced all mocked HTTP tests with a real `http.server.HTTPServer` running in a daemon thread on port 0 (OS-assigned). The `/echo-ua` endpoint pattern — server echoes the User-Agent header as the response body — verifies request construction without any mocking.
+
+**Decision: Remove dead code over testing it.** The `scope_guard.py` had a Python <3.9 fallback for `Path.is_relative_to()`. On Python 3.14, this is unreachable. Rather than monkeypatching to test dead code, removed the 5-line fallback. Statement count dropped from 565 to 559, making 100% achievable cleanly.
+
+**Coverage gaps closed:**
+- `errors.py`: Constructed all error subclasses directly, verified attributes
+- `adapters/filesystem.py`: Recursive `list_dir` truncation (the `break` in `rglob` loop)
+- `dispatcher.py`: `adapter is None` branch via bogus command spec; `ExecutionError` catch via `write_file` with `overwrite=False` on existing file
+- `scope_guard.py`: `denied_fs_patterns` violation via `.git/config` path; write outside narrowed write root
+- `ledger_writer.py`: Blank lines in `verify_chain` JSONL parsing
+
+**Result:** 186 tests, 559/559 statements = 100% coverage, 0 mocks, 0.75s runtime.

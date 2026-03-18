@@ -21,6 +21,7 @@ guarantees.
    - [Layer 6: Governance Lifecycle](#layer-6-governance-lifecycle)
    - [Layer 7: Governance Warning Policy Engine](#layer-7-governance-warning-policy-engine)
    - [Layer 8: Delivery Security](#layer-8-delivery-security)
+   - [Layer 9: OpenShell Governed Execution](#layer-9-openshell-governed-execution)
 5. [ARGUS-9 Red Team Test Suite](#argus-9-red-team-test-suite)
 6. [Key File Reference](#key-file-reference)
 
@@ -404,6 +405,44 @@ and event recording are committed together or not at all.
 - Body size limits (default: 100KB).
 - Attachment policy (configurable allow/deny).
 - SMTP credentials resolved from environment variables only (never stored in config).
+
+### Layer 9: OpenShell Governed Execution
+
+**Module:** `swarm/openshell/` (559 statements, 186 tests, 100% coverage)
+
+The OpenShell Layer is the governed execution membrane between planner
+output and tool execution. It implements a strict 8-stage pipeline:
+normalize → validate → policy → scope → plan → execute → emit → ledger.
+
+**Security properties:**
+
+1. **Default-deny policy.** Nothing executes unless the command is in
+   the registry, the policy allows its side-effect level, and the scope
+   guard approves every path and host. `PRIVILEGED` commands (level 5)
+   are unconditionally denied.
+
+2. **Schema-enforced parameter validation.** Every command spec declares
+   `additionalProperties: false` in its JSON Schema. Parameter smuggling
+   is blocked before policy evaluation.
+
+3. **Explicit scope boundaries.** Filesystem access is confined to
+   declared read/write roots. HTTP access requires an explicit host
+   allowlist. Loopback addresses (127.0.0.1, ::1, 0.0.0.0) and cloud
+   metadata endpoints (169.254.169.254) are blocked by default.
+   Denied filesystem patterns block `.git/`, `__pycache__/`, and
+   `node_modules/` by default.
+
+4. **Hash-chained audit ledger.** Every command attempt — including
+   denials — is recorded in an append-only JSONL ledger with SHA-256
+   hash chaining. `LedgerWriter.verify_chain()` detects tampering.
+
+5. **Artifact-based proof.** Each pipeline stage emits a JSON artifact.
+   Denied commands produce artifacts proving what was refused and why.
+
+**Red team coverage:** 17 tests in `tests/redteam/test_rt_openshell.py`
+covering path traversal (dotdot, null byte, absolute, URL-encoded),
+parameter smuggling, SSRF blocklist bypass, privilege escalation, newline
+injection, and ledger tampering detection.
 
 ---
 

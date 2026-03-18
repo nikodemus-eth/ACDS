@@ -1,0 +1,45 @@
+{
+  "command_name": "http.fetch_whitelisted",
+  "version": "v1",
+  "description": "Fetch a resource from a whitelisted HTTPS URL.",
+  "side_effect_level": "external_action",
+  "supports_dry_run": true,
+  "reversible": true,
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "The HTTPS URL to fetch."
+      },
+      "method": {
+        "type": "string",
+        "default": "GET",
+        "enum": ["GET", "HEAD"],
+        "description": "HTTP method to use for the request."
+      },
+      "max_bytes": {
+        "type": "integer",
+        "default": 5242880,
+        "description": "Maximum number of bytes to read from the response."
+      },
+      "timeout_ms": {
+        "type": "integer",
+        "default": 30000,
+        "maximum": 60000,
+        "description": "Request timeout in milliseconds."
+      }
+    },
+    "required": ["url"],
+    "additionalProperties": false
+  },
+  "scope_requirements": {
+    "filesystem": false,
+    "network": true
+  },
+  "constraints": {
+    "max_bytes": 5242880,
+    "https_only": true
+  },
+  "timeout_seconds": 60
+}

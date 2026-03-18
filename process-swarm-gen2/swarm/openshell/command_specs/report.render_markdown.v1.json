@@ -1,0 +1,37 @@
+{
+  "command_name": "report.render_markdown",
+  "version": "v1",
+  "description": "Render markdown content to a file with optional title and metadata.",
+  "side_effect_level": "controlled_generation",
+  "supports_dry_run": true,
+  "reversible": false,
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "The markdown content to render."
+      },
+      "output_path": {
+        "type": "string",
+        "description": "Path where the rendered output will be written."
+      },
+      "title": {
+        "type": "string",
+        "description": "Optional title for the rendered document."
+      },
+      "metadata": {
+        "type": "object",
+        "description": "Optional metadata to attach to the rendered document."
+      }
+    },
+    "required": ["content", "output_path"],
+    "additionalProperties": false
+  },
+  "scope_requirements": {
+    "filesystem": true,
+    "network": false
+  },
+  "constraints": {},
+  "timeout_seconds": 30
+}

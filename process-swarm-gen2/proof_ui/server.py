@@ -9,6 +9,7 @@ import json
 import logging
 import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -379,6 +380,73 @@ function clearContent() {
     return content;
 }
 
+// -- Engine Selector Popup --
+function showEngineSelector(badge, actionId, field, currentEngine) {
+    // Remove any existing selector
+    var old = document.getElementById('engine-selector');
+    if (old) old.remove();
+
+    var engines = [
+        {value: '', label: '- None -', cls: 'badge-dim'},
+        {value: 'ollama', label: 'Ollama', cls: 'badge-blue', models: ['qwen3:8b', 'llama3.3']},
+        {value: 'apple_intelligence', label: 'Apple Intelligence', cls: 'badge-green', models: ['apple-fm-on-device']},
+    ];
+
+    var popup = h('div', {
+        id: 'engine-selector',
+        style: 'position:fixed;z-index:1000;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:8px;min-width:200px;box-shadow:0 4px 16px rgba(0,0,0,0.4)',
+    });
+
+    engines.forEach(function(eng) {
+        var isActive = (eng.value === (currentEngine || ''));
+        var item = h('div', {
+            style: 'padding:8px 12px;cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:8px' + (isActive ? ';background:rgba(0,188,212,0.15)' : ''),
+            onClick: function() {
+                var updates = {};
+                updates[field] = eng.value;
+                if (field === 'inference_engine' && eng.models) {
+                    updates['inference_model'] = eng.models[0];
+                } else if (field === 'inference_engine' && !eng.value) {
+                    updates['inference_model'] = '';
+                }
+                updates['action_id'] = actionId;
+                apiPost('action/update-inference', updates).then(function() {
+                    popup.remove();
+                    route(); // refresh page
+                }).catch(function(err) {
+                    alert('Failed: ' + err.message);
+                });
+            },
+        }, [
+            h('span', {className: 'badge ' + eng.cls, style: 'min-width:60px;text-align:center'}, eng.label),
+            isActive ? h('span', {style: 'color:var(--accent);font-size:11px'}, '(current)') : null,
+        ]);
+        popup.appendChild(item);
+    });
+
+    // Close button
+    popup.appendChild(h('div', {
+        style: 'padding:6px 12px;cursor:pointer;text-align:center;color:var(--text-dim);font-size:11px;margin-top:4px;border-top:1px solid var(--border)',
+        onClick: function() { popup.remove(); },
+    }, 'Cancel'));
+
+    // Position near the badge
+    var rect = badge.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 4) + 'px';
+    popup.style.left = rect.left + 'px';
+    document.body.appendChild(popup);
+
+    // Close on outside click
+    setTimeout(function() {
+        document.addEventListener('click', function closer(e) {
+            if (!popup.contains(e.target) && e.target !== badge) {
+                popup.remove();
+                document.removeEventListener('click', closer);
+            }
+        });
+    }, 50);
+}
+
 // -- Pages --
 async function renderDashboard(container) {
     container.appendChild(h('div', {className: 'page-title'}, 'Dashboard'));
@@ -395,8 +463,7 @@ async function renderDashboard(container) {
         container.appendChild(grid);
 
         try {
-            var swarms = await apiGet('swarms');
-            var runs = await apiGet('runs?limit=10');
+            var [swarms, runs] = await Promise.all([apiGet('swarms'), apiGet('runs?limit=10')]);
             var sg = h('div', {className: 'stat-grid'}, [
                 statCard('Swarms', swarms.length),
                 statCard('Recent Runs', runs.length),
@@ -481,6 +548,55 @@ async function renderRunDetail(container, runId) {
             statCard('Events', String(data.events.length)),
         ]);
         container.appendChild(stats);
+
+        // Inference Trace
+        if (data.inference_trace && data.inference_trace.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Inference Trace'));
+            var totalLatency = data.inference_trace.reduce(function(sum, t) { return sum + (t.latency_ms || 0); }, 0);
+            var engines = {};
+            data.inference_trace.forEach(function(t) {
+                if (t.engine) engines[t.engine] = (engines[t.engine] || 0) + 1;
+            });
+            var engineSummary = Object.keys(engines).map(function(e) { return e + ': ' + engines[e]; }).join(', ');
+            var traceStats = h('div', {className: 'stat-grid'}, [
+                statCard('Total Latency', (totalLatency / 1000).toFixed(1) + 's'),
+                statCard('Stages', String(data.inference_trace.length)),
+                statCard('Engines', engineSummary || 'none'),
+            ]);
+            container.appendChild(traceStats);
+
+            var traceTbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, 'Stage'),
+                    h('th', null, 'Tool'),
+                    h('th', null, 'Engine'),
+                    h('th', null, 'Model'),
+                    h('th', null, 'Latency'),
+                    h('th', null, 'Status'),
+                ])),
+                h('tbody', null, data.inference_trace.map(function(t) {
+                    var engineBadge = '-';
+                    if (t.engine === 'ollama') {
+                        engineBadge = h('span', {className: 'badge badge-blue'}, 'Ollama');
+                    } else if (t.engine === 'apple_intelligence') {
+                        engineBadge = h('span', {className: 'badge badge-green'}, 'Apple AI');
+                    } else if (t.engine) {
+                        engineBadge = h('span', {className: 'badge'}, t.engine);
+                    }
+                    var latencyStr = t.latency_ms != null ? (t.latency_ms < 1000 ? t.latency_ms + 'ms' : (t.latency_ms / 1000).toFixed(1) + 's') : '-';
+                    var fallbackNote = t.fallback_engine ? ' \u2192 ' + t.fallback_engine : '';
+                    return h('tr', null, [
+                        h('td', {style: 'font-weight:500'}, t.step || '-'),
+                        h('td', null, t.tool || '-'),
+                        h('td', null, typeof engineBadge === 'string' ? engineBadge : engineBadge),
+                        h('td', {style: 'font-family:monospace;font-size:12px'}, (t.model || '-') + fallbackNote),
+                        h('td', {style: 'font-family:monospace'}, latencyStr),
+                        h('td', null, t.success ? statusBadge('succeeded') : statusBadge('failed')),
+                    ]);
+                })),
+            ]);
+            container.appendChild(traceTbl);
+        }
 
         // Pipeline Steps (action results)
         if (data.action_results.length) {
@@ -623,15 +739,16 @@ async function renderSwarmDetail(container, swarmId) {
         var data = await apiGet('swarm/' + swarmId);
         if (!data.swarm) { container.appendChild(h('div', {className: 'empty-state'}, 'Swarm not found')); return; }
         var s = data.swarm;
-        var runBtn = h('button', {className: 'btn', style: 'margin-top:12px;padding:8px 20px',
+
+        // Run button
+        var runBtn = h('button', {className: 'btn', style: 'padding:8px 20px',
             onClick: async function() {
                 runBtn.disabled = true;
                 runBtn.textContent = 'Running...';
                 try {
                     var result = await apiPost('swarm/run', {swarm_id: s.swarm_id});
-                    runBtn.textContent = 'Run Started: ' + (result.run_id || '').substring(0, 12);
-                    // Refresh after a moment
-                    setTimeout(function() { location.hash = '#runs'; }, 1500);
+                    runBtn.textContent = 'Done: ' + (result.run_id || '').substring(0, 16);
+                    setTimeout(function() { location.hash = '#run/' + result.run_id; }, 1200);
                 } catch(e) {
                     runBtn.textContent = 'Failed: ' + e.message;
                     setTimeout(function() { runBtn.textContent = 'Run Now'; runBtn.disabled = false; }, 3000);
@@ -639,6 +756,7 @@ async function renderSwarmDetail(container, swarmId) {
             }
         }, 'Run Now');
 
+        // Header panel
         var panel = h('div', {className: 'detail-panel'}, [
             detailRow('Name', s.swarm_name),
             detailRow('ID', s.swarm_id),
@@ -646,12 +764,113 @@ async function renderSwarmDetail(container, swarmId) {
             detailRow('Description', s.description || '-'),
             detailRow('Created', formatTime(s.created_at)),
             detailRow('Created By', s.created_by),
-            runBtn,
         ]);
         container.appendChild(panel);
 
+        // Stats row
+        var stats = h('div', {className: 'stat-grid'}, [
+            statCard('Pipeline Stages', String((data.pipeline_steps || []).length)),
+            statCard('Tools', String((data.tools || []).length)),
+            statCard('Runs', String((data.runs || []).length)),
+        ]);
+        container.appendChild(stats);
+
+        // Action bar
+        container.appendChild(h('div', {style: 'margin-bottom:24px'}, runBtn));
+
+        // Pipeline Actions table with clickable engine badges
+        var actions = data.actions || [];
+        if (actions.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:8px'}, 'Pipeline'));
+            var actTbody = h('tbody');
+            actions.forEach(function(act) {
+                function makeEngineBadge(engine, model, field, actionId) {
+                    var label = '-';
+                    var cls = 'badge badge-dim';
+                    if (engine === 'ollama') { label = 'Ollama'; cls = 'badge badge-blue'; if (model) label += '\\n' + model; }
+                    else if (engine === 'apple_intelligence') { label = 'Apple\\nIntelligence'; cls = 'badge badge-green'; }
+                    var badge = h('span', {
+                        className: cls,
+                        style: 'cursor:pointer;white-space:pre-line;line-height:1.3;text-align:center;min-width:70px;display:inline-block',
+                        onClick: function(e) {
+                            e.stopPropagation();
+                            showEngineSelector(badge, actionId, field, engine);
+                        },
+                    }, label);
+                    return badge;
+                }
+                var row = h('tr', null, [
+                    h('td', {style: 'font-weight:500'}, act.action_name || '-'),
+                    h('td', {style: 'font-size:11px;color:var(--text-dim);font-family:monospace'}, (act.action_id || '').substring(0, 16) + '...'),
+                    h('td', null, act.operation_type || '-'),
+                    h('td', null, makeEngineBadge(act.inference_engine, act.inference_model, 'inference_engine', act.action_id)),
+                    h('td', null, makeEngineBadge(act.fallback_engine, null, 'fallback_engine', act.action_id)),
+                ]);
+                actTbody.appendChild(row);
+            });
+            var actTbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, 'Action'), h('th', null, 'ID'), h('th', null, 'Type'),
+                    h('th', null, 'Engine'), h('th', null, 'Fallback'),
+                ])),
+                actTbody,
+            ]);
+            container.appendChild(actTbl);
+        } else if (data.pipeline_steps && data.pipeline_steps.length) {
+            // Fallback: show pipeline steps if no actions yet
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:8px'}, 'Pipeline'));
+            var pipeTbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, '#'), h('th', null, 'Step'), h('th', null, 'Tool'),
+                    h('th', null, 'Engine'), h('th', null, 'Description'),
+                ])),
+                h('tbody', null, data.pipeline_steps.map(function(step, i) {
+                    function engineBadge(eng) {
+                        if (!eng) return h('span', {className: 'badge badge-dim'}, '-');
+                        if (eng === 'ollama') return h('span', {className: 'badge badge-blue'}, 'Ollama');
+                        if (eng === 'apple_intelligence') return h('span', {className: 'badge badge-green'}, 'Apple AI');
+                        return h('span', {className: 'badge'}, eng);
+                    }
+                    return h('tr', null, [
+                        h('td', null, String(i + 1)),
+                        h('td', {style: 'font-weight:500'}, step.step_id || '-'),
+                        h('td', null, step.tool_name || '-'),
+                        h('td', null, engineBadge(step.engine)),
+                        h('td', {style: 'font-size:12px;color:var(--text-dim)'}, step.description || '-'),
+                    ]);
+                })),
+            ]);
+            container.appendChild(pipeTbl);
+        }
+
+        // Tools table
+        if (data.tools && data.tools.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Tools'));
+            var toolsTbl = h('table', null, [
+                h('thead', null, h('tr', null, [
+                    h('th', null, 'Name'), h('th', null, 'Family'), h('th', null, 'Execution Class'), h('th', null, 'Status'),
+                ])),
+                h('tbody', null, data.tools.map(function(t) {
+                    return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#tool/' + t.tool_name; }}, [
+                        h('td', null, t.tool_name),
+                        h('td', null, t.tool_family || '-'),
+                        h('td', {style: 'font-family:monospace;font-size:12px'}, t.execution_class || '-'),
+                        h('td', null, statusBadge(t.maturity_status)),
+                    ]);
+                })),
+            ]);
+            container.appendChild(toolsTbl);
+        }
+
+        // Recent Runs
+        if (data.runs && data.runs.length) {
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Runs'));
+            container.appendChild(runsTable(data.runs.slice(0, 10)));
+        }
+
+        // Warnings
         if (data.warnings && data.warnings.length) {
-            container.appendChild(h('div', {className: 'page-title'}, 'Warnings'));
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Warnings'));
             data.warnings.forEach(function(w) {
                 container.appendChild(h('div', {className: 'detail-panel'}, [
                     detailRow('Severity', w.severity),
@@ -661,11 +880,12 @@ async function renderSwarmDetail(container, swarmId) {
             });
         }
 
+        // Events
         if (data.events && data.events.length) {
-            container.appendChild(h('div', {className: 'page-title'}, 'Events'));
-            var tbl = h('table', null, [
+            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Events'));
+            var evtTbl = h('table', null, [
                 h('thead', null, h('tr', null, [h('th', null, 'Type'), h('th', null, 'Summary'), h('th', null, 'Time')])),
-                h('tbody', null, data.events.map(function(ev) {
+                h('tbody', null, data.events.slice(0, 20).map(function(ev) {
                     return h('tr', null, [
                         h('td', null, ev.event_type),
                         h('td', null, ev.summary || '-'),
@@ -673,7 +893,7 @@ async function renderSwarmDetail(container, swarmId) {
                     ]);
                 })),
             ]);
-            container.appendChild(tbl);
+            container.appendChild(evtTbl);
         }
     } catch(e) {
         container.appendChild(h('div', {className: 'empty-state'}, 'Error: ' + e.message));
@@ -1060,10 +1280,33 @@ def _make_handler(
                     swarm_id=swarm_id,
                 )
                 events = swarm_platform.repo.list_events(swarm_id)
+                runs = swarm_platform.repo.list_runs(swarm_id)
+                # Get behavior sequence with pipeline steps
+                bs = swarm_platform.repo.get_behavior_sequence_by_swarm(swarm_id)
+                pipeline_steps = []
+                if bs:
+                    steps_raw = bs.get("ordered_steps_json", "[]")
+                    try:
+                        pipeline_steps = json.loads(steps_raw) if isinstance(steps_raw, str) else steps_raw
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                # Get tools used by this swarm
+                tool_names = list({s.get("tool_name") for s in pipeline_steps if s.get("tool_name")})
+                swarm_tools = []
+                for tn in tool_names:
+                    t = swarm_platform.repo.get_tool_by_name(tn)
+                    if t:
+                        swarm_tools.append(t)
+                # Get swarm actions with inference assignments
+                actions = swarm_platform.repo.list_actions(swarm_id)
                 self._json_response({
                     "swarm": swarm,
                     "warnings": warnings,
                     "events": events,
+                    "runs": runs,
+                    "pipeline_steps": pipeline_steps,
+                    "actions": actions,
+                    "tools": swarm_tools,
                 })
                 return
 
@@ -1122,12 +1365,21 @@ def _make_handler(
                         artifact_refs = json.loads(refs_json)
                     except (json.JSONDecodeError, TypeError):
                         pass
+                # Load inference trace if available
+                inference_trace = []
+                trace_path = workspace_dir / "inference_trace.json"
+                if trace_path.exists():
+                    try:
+                        inference_trace = json.loads(trace_path.read_text())
+                    except (json.JSONDecodeError, OSError):
+                        pass
                 self._json_response({
                     "run": run,
                     "swarm_name": swarm_name,
                     "action_results": action_results,
                     "artifact_refs": artifact_refs,
                     "artifact_files": artifact_files,
+                    "inference_trace": inference_trace,
                     "events": run_events,
                 })
                 return
@@ -1354,6 +1606,30 @@ def _make_handler(
                 self._json_response({"delivery_id": delivery_id}, status=201)
                 return
 
+            # Update inference engine for a swarm action
+            if path == "/api/action/update-inference":
+                action_id = body.get("action_id", "")
+                if not action_id:
+                    self._error_response(400, "action_id required")
+                    return
+                action = swarm_platform.repo.get_action(action_id)
+                if not action:
+                    self._error_response(404, "Action not found")
+                    return
+                updates = {}
+                if "inference_engine" in body:
+                    eng = body["inference_engine"]
+                    updates["inference_engine"] = eng if eng else None
+                if "inference_model" in body:
+                    updates["inference_model"] = body["inference_model"] or None
+                if "fallback_engine" in body:
+                    updates["fallback_engine"] = body["fallback_engine"] or None
+                if updates:
+                    swarm_platform.repo.update_action(action_id, **updates)
+                updated = swarm_platform.repo.get_action(action_id)
+                self._json_response(updated)
+                return
+
             # Nik's Context Report — register + run as swarm
             if path == "/api/context-report/run":
                 from swarm.definitions.niks_context_report import find_or_register
@@ -1391,7 +1667,10 @@ def start_server(root: str, port: int = 18790) -> HTTPServer:
     swarm_plat = SwarmPlatform(openclaw_root)
     handler_cls = _make_handler(ui_state, swarm_plat)
 
-    server = HTTPServer(("0.0.0.0", port), handler_cls)
+    class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
+
+    server = ThreadedHTTPServer(("0.0.0.0", port), handler_cls)
     logger.info("ProofUI listening on http://0.0.0.0:%d", port)
     print(f"ProofUI listening on http://0.0.0.0:{port}")
     try:

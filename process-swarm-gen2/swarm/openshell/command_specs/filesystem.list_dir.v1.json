@@ -1,0 +1,38 @@
+{
+  "command_name": "filesystem.list_dir",
+  "version": "v1",
+  "description": "List the contents of a directory on the local filesystem.",
+  "side_effect_level": "read_only",
+  "supports_dry_run": true,
+  "reversible": true,
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "default": ".",
+        "description": "Absolute or relative path to the directory to list."
+      },
+      "recursive": {
+        "type": "boolean",
+        "default": false,
+        "description": "Whether to list directory contents recursively."
+      },
+      "max_entries": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10000,
+        "default": 1000,
+        "description": "Maximum number of directory entries to return."
+      }
+    },
+    "required": ["path"],
+    "additionalProperties": false
+  },
+  "scope_requirements": {
+    "filesystem": true,
+    "network": false
+  },
+  "constraints": {},
+  "timeout_seconds": 30
+}

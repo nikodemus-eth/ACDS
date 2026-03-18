@@ -1,0 +1,41 @@
+{
+  "command_name": "tts.generate",
+  "version": "v1",
+  "description": "Generate text-to-speech audio from input text.",
+  "side_effect_level": "controlled_generation",
+  "supports_dry_run": true,
+  "reversible": false,
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000,
+        "description": "The text content to convert to speech."
+      },
+      "voice_profile": {
+        "type": "string",
+        "description": "Identifier for the voice profile to use."
+      },
+      "output_path": {
+        "type": "string",
+        "description": "Path where the generated audio file will be written."
+      },
+      "format": {
+        "type": "string",
+        "enum": ["mp3", "wav"],
+        "default": "mp3",
+        "description": "Output audio format."
+      }
+    },
+    "required": ["text", "voice_profile", "output_path"],
+    "additionalProperties": false
+  },
+  "scope_requirements": {
+    "filesystem": true,
+    "network": false
+  },
+  "constraints": {},
+  "timeout_seconds": 120
+}

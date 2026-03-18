@@ -214,6 +214,9 @@ def register_context_report_swarm(repo: Any) -> dict:
     # Register all adapter tools referenced in the pipeline
     _register_pipeline_tools(repo)
 
+    # Create swarm_actions with inference assignments (clickable in UI)
+    _register_pipeline_actions(repo, swarm_id)
+
     return {
         "swarm_id": swarm_id,
         "name": "Nik's Context Report",
@@ -258,6 +261,35 @@ def _register_pipeline_tools(repo: Any) -> None:
         )
 
 
+_ENGINE_MODELS = {
+    "ollama": "qwen3:8b",
+    "apple_intelligence": "apple-fm-on-device",
+}
+
+
+def _register_pipeline_actions(repo: Any, swarm_id: str) -> None:
+    """Create swarm_actions with inference engine/model assignments."""
+    # Don't duplicate if actions already exist
+    existing = repo.list_actions(swarm_id)
+    if existing:
+        return
+    for i, step in enumerate(CONTEXT_REPORT_STEPS):
+        engine = step.get("engine")
+        model = step.get("parameters", {}).get("model") or _ENGINE_MODELS.get(engine)
+        repo.create_action(
+            swarm_id=swarm_id,
+            step_order=i + 1,
+            action_name=step.get("tool_name", step.get("step_id", f"step_{i}")),
+            action_text=step.get("description", ""),
+            action_type=step.get("tool_name"),
+            operation_type=step.get("operation_type", "invoke_capability"),
+            inference_engine=engine,
+            inference_model=model,
+            fallback_engine=step.get("fallback_engine"),
+            action_status="approved",
+        )
+
+
 def find_or_register(repo: Any) -> str:
     """Find existing Context Report swarm or register a new one.
 
@@ -269,7 +301,10 @@ def find_or_register(repo: Any) -> str:
         if isinstance(swarm, dict):
             name = swarm.get("swarm_name") or swarm.get("name", "")
             if name == "Nik's Context Report":
-                return swarm["swarm_id"]
+                swarm_id = swarm["swarm_id"]
+                # Ensure actions exist (idempotent)
+                _register_pipeline_actions(repo, swarm_id)
+                return swarm_id
 
     # Register
     result = register_context_report_swarm(repo)

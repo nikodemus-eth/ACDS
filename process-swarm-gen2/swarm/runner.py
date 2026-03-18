@@ -68,8 +68,25 @@ class SwarmRunner:
         config = inference_config or load_inference_config()
         self.inference: InferenceProvider = create_inference_provider(config)
 
+        # OpenShell governed execution layer (optional)
+        self._openshell = None
+
         # Lazy pipeline runner
         self._pipeline_runner = None
+
+    @property
+    def openshell(self):
+        """Lazy-init OpenShell dispatcher, scoped per workspace."""
+        if self._openshell is None:
+            try:
+                from swarm.openshell import OpenShellConfig, OpenShellDispatcher
+                # Default config — scoped to workspace root
+                config = OpenShellConfig.for_run(self.openclaw_root, "_shared")
+                self._openshell = OpenShellDispatcher(config)
+            except Exception:
+                logger.debug("OpenShell layer not available", exc_info=True)
+                self._openshell = False  # Sentinel: don't retry
+        return self._openshell if self._openshell is not False else None
 
     @property
     def pipeline_runner(self):
@@ -213,52 +230,101 @@ class SwarmRunner:
     def _execute_via_adapters(
         self, run_id: str, swarm_id: str, actions: list[dict]
     ) -> dict:
+        import time as _time
         from swarm.tools.base import ToolContext
 
         prior_results: dict = {}
         all_artifacts: list[str] = []
         warnings: list[str] = []
+        inference_trace: list[dict] = []
 
         workspace = self.openclaw_root / "workspace" / run_id
         workspace.mkdir(parents=True, exist_ok=True)
 
         for action in actions:
             tool_name = action.get("tool_name", "")
-            adapter = self.adapter_registry.get_adapter(tool_name)
-            if not adapter:
-                logger.warning("No adapter for tool: %s", tool_name)
-                continue
 
-            ctx = ToolContext(
-                run_id=run_id,
-                swarm_id=swarm_id,
-                action=action,
-                workspace_root=workspace,
-                repo=self.repo,
-                prior_results=prior_results,
-                config=action.get("config", {}),
-            )
-            result = adapter.execute(ctx)
+            # Route through OpenShell if it handles this command
+            openshell = self.openshell
+            if openshell and openshell.handles(tool_name):
+                t0 = _time.monotonic()
+                # Create per-run config scoped to this workspace
+                from swarm.openshell import OpenShellConfig
+                run_config = OpenShellConfig.for_run(self.openclaw_root, run_id)
+                from swarm.openshell import OpenShellDispatcher
+                run_dispatcher = OpenShellDispatcher(run_config)
+                cmd_result = run_dispatcher.execute(
+                    run_id=run_id,
+                    swarm_id=swarm_id,
+                    action=action,
+                    workspace_root=workspace,
+                    prior_results=prior_results,
+                )
+                result = OpenShellDispatcher.to_tool_result(cmd_result)
+                wall_ms = int((_time.monotonic() - t0) * 1000)
+            else:
+                adapter = self.adapter_registry.get_adapter(tool_name)
+                if not adapter:
+                    logger.warning("No adapter for tool: %s", tool_name)
+                    continue
+
+                ctx = ToolContext(
+                    run_id=run_id,
+                    swarm_id=swarm_id,
+                    action=action,
+                    workspace_root=workspace,
+                    repo=self.repo,
+                    prior_results=prior_results,
+                    config=action.get("config", {}),
+                )
+                t0 = _time.monotonic()
+                result = adapter.execute(ctx)
+                wall_ms = int((_time.monotonic() - t0) * 1000)
 
             prior_results[tool_name] = result.output_data
             all_artifacts.extend(result.artifacts)
             warnings.extend(result.warnings)
 
+            # Build inference trace entry
+            trace_entry = {
+                "step": action.get("step_id", tool_name),
+                "tool": tool_name,
+                "engine": result.metadata.get("engine") if result.metadata else None,
+                "model": result.metadata.get("model") if result.metadata else None,
+                "latency_ms": result.metadata.get("duration_ms", wall_ms) if result.metadata else wall_ms,
+                "success": result.success,
+                "description": action.get("description", ""),
+            }
+            if result.metadata:
+                trace_entry["fallback_engine"] = result.metadata.get("fallback_engine")
+            inference_trace.append(trace_entry)
+
             if not result.success:
+                self._write_inference_trace(workspace, inference_trace)
                 return {
                     "execution_status": "failed",
                     "artifacts": all_artifacts,
                     "adapter_results": prior_results,
+                    "inference_trace": inference_trace,
                     "warnings": warnings,
                     "error": result.error,
                 }
 
+        self._write_inference_trace(workspace, inference_trace)
         return {
             "execution_status": "succeeded",
             "artifacts": all_artifacts,
             "adapter_results": prior_results,
+            "inference_trace": inference_trace,
             "warnings": warnings,
         }
+
+    @staticmethod
+    def _write_inference_trace(workspace, trace: list[dict]) -> None:
+        """Write inference trace to workspace as a JSON artifact."""
+        import json as _json
+        trace_path = workspace / "inference_trace.json"
+        trace_path.write_text(_json.dumps(trace, indent=2))
 
     def _execute_via_pipeline(self, run_id: str, proposal: dict) -> dict:
         tmp_path = self._write_temp_proposal(proposal)

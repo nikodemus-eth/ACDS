@@ -1,7 +1,7 @@
 # Process Swarm Gen 2 -- Architecture Document
 
-**Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema / ACDS Dispatch**
-**129 source files, 1904 tests (100% coverage), 18 JSON schemas**
+**Python 3.9+ / Ed25519 / SQLite WAL / JSON Schema / ACDS Dispatch / OpenShell**
+**148 source files, 2090+ tests (100% coverage), 24 JSON schemas**
 
 ---
 
@@ -14,7 +14,8 @@
 5. [Job Authoring (`process_swarm/`)](#job-authoring)
 6. [GRITS Observability (`grits/`)](#grits-observability)
 7. [ProofUI Admin Console (`proof_ui/`)](#proofui-admin-console)
-8. [Core Invariant](#core-invariant)
+8. [OpenShell Layer (`swarm/openshell/`)](#openshell-layer)
+9. [Core Invariant](#core-invariant)
 9. [7-Stage Runtime Pipeline](#7-stage-runtime-pipeline)
 10. [DSL-to-BSC-to-Bridge Translation Chain](#dsl-to-bsc-to-bridge-translation-chain)
 11. [8-Stage Definer Pipeline](#8-stage-definer-pipeline)
@@ -480,6 +481,85 @@ API endpoints:
 
 Security: path traversal protection on file serving, CORS headers,
 content-type enforcement.
+
+---
+
+## OpenShell Layer
+
+**Module:** `swarm/openshell/` (19 files, 559 statements, 186 tests, 100% coverage)
+
+The OpenShell Layer is the governed execution membrane between planner
+output and real execution. It replaces the unsafe pattern:
+
+```
+LLM output → tool call → side effect
+```
+
+With a governed 8-stage pipeline:
+
+```
+LLM output → normalize → validate → policy → scope → plan → execute → emit → ledger
+```
+
+### Pipeline Stages
+
+| Stage | Module | Purpose |
+|-------|--------|---------|
+| 1. Normalize | `normalizer.py` | Convert action dict → typed `CommandEnvelope` |
+| 2. Validate | `validator.py` | JSON Schema validation via `jsonschema.Draft7Validator` |
+| 3. Policy | `policy_engine.py` | Default-deny authorization by side-effect level |
+| 4. Scope | `scope_guard.py` | Filesystem path + network host boundary enforcement |
+| 5. Plan | `execution_planner.py` | Build concrete `ExecutionPlan` with adapter + timeout |
+| 6. Execute | `dispatcher.py` | Route to adapter, capture output |
+| 7. Emit | `artifact_emitter.py` | Per-stage JSON artifacts + pipeline summary |
+| 8. Ledger | `ledger_writer.py` | Append-only JSONL with SHA-256 hash chain |
+
+### Side-Effect Classification
+
+| Level | Name | Policy |
+|-------|------|--------|
+| 1 | `read_only` | Broadly automatable |
+| 2 | `controlled_generation` | Allowed if output path valid |
+| 3 | `local_mutation` | Requires explicit write-root scope |
+| 4 | `external_action` | Requires host allowlist |
+| 5 | `privileged` | **Always denied** |
+
+### MVP Commands
+
+Six commands implemented as versioned JSON specs in `command_specs/`:
+`filesystem.read_file`, `filesystem.write_file`, `filesystem.list_dir`,
+`report.render_markdown`, `http.fetch_whitelisted`, `tts.generate`.
+
+Each spec declares `additionalProperties: false` — parameter smuggling
+is blocked at the schema level.
+
+### Integration with SwarmRunner
+
+The `OpenShellDispatcher` provides `handles(tool_name) → bool`. The
+runner checks this before the existing adapter path:
+
+```python
+if self.openshell and self.openshell.handles(tool_name):
+    cmd_result = run_dispatcher.execute(...)
+    result = OpenShellDispatcher.to_tool_result(cmd_result)
+else:
+    # existing ToolAdapter path unchanged
+```
+
+Existing swarms are unaffected — `openshell` is `None` when not
+configured.
+
+### Audit Trail
+
+Every command attempt produces:
+- **Artifacts:** `{envelope_id}/01_normalize.json` through
+  `06_execute.json`, plus `pipeline_result.json`
+- **Ledger:** Append-only JSONL with `content_hash`, `prev_hash`,
+  `chain_hash` (SHA-256). Genesis hash: `"0" * 64`.
+  `LedgerWriter.verify_chain()` validates integrity.
+
+Denied commands get the same artifact and ledger treatment as executed
+ones. A denial without a ledger entry is an invisible decision.
 
 ---
 

@@ -147,3 +147,23 @@ These lessons were documented in the original Process Swarm and are being applie
 63. **Red-team tests should exercise exact adversarial inputs** — Generic tests miss edge cases. The filler detection test uses "This section contains the summary of the summary" — a real adversarial pattern. The citation test uses `[Source 7]` against known sources `["Source 1", "Source 2", "Source 3"]`. Specific, realistic adversarial inputs catch threshold bugs that synthetic tests miss.
 
 64. **100% coverage gap tests reveal no dead code when the architecture is clean** — All 19 uncovered lines in the evaluation module were real code paths: ValueError branches, empty-input guards, scoring threshold boundaries, loop-skip conditions. None were dead code requiring removal. This validates the architecture — every line serves a purpose.
+
+### OpenShell Layer
+
+65. **Default-deny is an architecture, not a feature flag** — The OpenShell policy engine doesn't have an "enable default-deny" toggle. The structure itself is default-deny: nothing executes unless the registry has the command, the policy allows the side-effect level, and the scope guard approves every path and host. Three independent gates, all must pass. This makes accidental permission expansion structurally impossible.
+
+66. **Hash-chained ledgers make denial auditable** — Denied commands get the same ledger treatment as executed ones: full entry with stage summary, outcome, content hash, and chain hash. An invisible denial is an invisible security hole. The `_build_denied` path in the dispatcher still calls `emitter.emit()` and `ledger.append()` before returning failure.
+
+67. **Dead code that requires monkeypatching to test should be removed** — The `scope_guard.py` Python <3.9 fallback for `Path.is_relative_to()` was 5 lines of unreachable code on Python 3.14. Testing it would require monkeypatching `hasattr` — violating the "no mocks" constraint. Removing it dropped statement count from 565 to 559 and made 100% coverage achievable cleanly. Dead compatibility shims are technical debt, not safety nets.
+
+68. **Real HTTP servers beat mocked ones for adapter tests** — A `http.server.HTTPServer` on port 0 in a daemon thread adds ~0.6s but provides real TCP confidence. The `/echo-ua` endpoint pattern — server echoes request metadata as response body — verifies request construction without mocking. Port 0 eliminates conflicts. Module-scoped fixtures amortize startup across all tests.
+
+69. **Canonical command envelopes prevent freeform execution** — The `Normalizer` converts upstream action dicts to typed `CommandEnvelope` objects. No executor consumes freeform natural language. The envelope carries `command_name`, `version`, `parameters`, `side_effect_level`, `run_id`, `swarm_id`, and `dry_run` — all typed, all validated. This is the "Intentional Interface made operational."
+
+70. **Artifact emission proves what the system refused, not just what it did** — The spec requirement "prove not only what it did, but also what it refused to do" means denied commands must produce artifacts. A validation failure emits `validation-report.json`. A policy denial emits `policy-decision.json`. A scope violation emits `scope-check.json`. The artifacts are the proof.
+
+71. **TTS honesty over convenience** — When a capability isn't available, return `{implemented: false}` with the full request metadata. Don't stub success. Don't skip the ledger entry. The system records what it was asked to do, acknowledges it can't, and ledgers the gap as `stub_not_implemented`. This makes capability gaps discoverable, not hidden.
+
+72. **Pipeline stages as near-pure functions simplify testing** — Each OpenShell stage (normalize, validate, policy, scope, plan) is a function from typed input to typed output with no hidden state. The dispatcher is the only stateful component, and its state is just the wiring. This means each stage can be tested in isolation with real objects — no mocking needed.
+
+73. **Bogus command specs test adapter routing gaps** — To test the "no adapter for namespace" branch, copy real specs to a temp dir and add a `bogus.do_thing.v1.json`. The command passes normalize, validate, policy, and scope — but the dispatcher has no adapter for the `"bogus"` namespace. This tests the exact failure path without any mocking.
