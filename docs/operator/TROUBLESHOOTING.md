@@ -169,3 +169,64 @@ If you are redirected to login or receive 401 errors in the admin UI:
 - Sessions expire after `ADMIN_SESSION_TTL_HOURS` (default: 8 hours).
 - Log in again.
 - If sessions are expiring too quickly, increase `ADMIN_SESSION_TTL_HOURS` in `.env`.
+
+---
+
+## launchd Service Issues
+
+### API Crash-Looping (Missing Environment Variables)
+
+**Symptoms:**
+- `launchctl list | grep acds-api` shows exit code 1 or rapidly changing PIDs
+- Error log (`~/Library/Logs/acds-api.error.log`) shows `Missing required environment variable: DATABASE_URL`
+
+**Diagnosis:**
+1. Check that `apps/api/.env` exists and contains `DATABASE_URL`, `MASTER_KEY_PATH`, and `ADMIN_SESSION_SECRET`.
+2. Check that PostgreSQL is running: `brew services list | grep postgresql`.
+3. Check that the master key file exists: `ls -la /Users/m4/.acds/master.key` (should be 32 bytes, mode 600).
+4. Check that the `infra` symlink exists: `ls -la apps/api/infra` (should point to `../../infra`).
+
+**Resolution:**
+- Create the `.env` file with required variables (see `Deployment_Topology.md` for values).
+- If PostgreSQL is not running: `brew services start postgresql@16`.
+- If the symlink is missing: `ln -s "../../infra" "apps/api/infra"`.
+- After fixing, unload and reload the agent to reset throttle state:
+  ```bash
+  launchctl unload ~/Library/LaunchAgents/com.m4.acds-api.plist
+  launchctl load ~/Library/LaunchAgents/com.m4.acds-api.plist
+  ```
+
+### launchd Restart Throttling
+
+**Symptoms:**
+- Service shows exit code `-15` (SIGTERM) or exit code `1` despite the root cause being fixed.
+- `launchctl start` does not immediately restart the process.
+
+**Cause:** launchd throttles restarts for services that crash repeatedly. After fixing the root cause, the throttle state persists until the agent is fully unloaded.
+
+**Resolution:**
+```bash
+launchctl unload ~/Library/LaunchAgents/com.m4.<service>.plist
+launchctl load ~/Library/LaunchAgents/com.m4.<service>.plist
+```
+
+### Config File Not Found (ENOENT for infra/config/...)
+
+**Symptoms:**
+- API crashes with `ENOENT: no such file or directory, open '.../apps/api/infra/config/profiles/modelProfiles.json'`
+
+**Cause:** The DI container's `loadJson()` resolves paths relative to `process.cwd()`. When launched via launchd, `WorkingDirectory` is `apps/api/`, but config files live at the repo root's `infra/config/`.
+
+**Resolution:** Create a symlink: `ln -s "../../infra" "apps/api/infra"`
+
+### Checking All Services
+
+```bash
+# Quick status of all ACDS + Process Swarm services
+launchctl list | grep -E "m4\.|homebrew"
+
+# Expected: all PIDs present, exit codes 0 or -
+# PID present + exit 0 = running
+# No PID + exit 1 = crash-looping
+# No PID + exit -15 = stopped/throttled
+```

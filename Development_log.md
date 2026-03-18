@@ -853,3 +853,58 @@ Integrated three Process Swarm swarms with the ACDS system, creating a bidirecti
 - 2 new adapters registered: `xtts_renderer`, `grits_integrity` (total: 30)
 - 2 new action types in capability mapping: `xtts_rendering`, `grits_integrity_check`
 - All 1014 Process Swarm tests passing
+
+## 2026-03-17 — Per-Action Inference Override (ProofUI ↔ Process Swarm)
+
+Built a full-stack feature allowing per-action inference provider configuration through ProofUI:
+
+**Database layer**: New `action_inference_overrides` table (Table 31) stores per-action, optionally per-run provider/model/cognitive-grade/privacy/cost overrides. UNIQUE constraint on (action_id, run_id) with check-then-update upsert pattern (SQL NULL != NULL prevents ON CONFLICT).
+
+**Repository layer**: Three CRUD methods: `set_action_inference_override()` (upsert), `get_action_inference_override()` (run-specific → action-level fallback), `delete_action_inference_override()`.
+
+**Runner integration**: `_execute_via_adapters()` queries overrides per-action, merges into a copy of the base config via `INFERENCE_PROVIDER` key, passes per-action config to ToolContext instead of shared config.
+
+**Adapter routing**: `ProbabilisticSynthesisAdapter._generate()` now checks `INFERENCE_PROVIDER` config key for explicit routing: `apple` → `_generate_via_apple()` (new method, calls Apple Intelligence bridge at localhost:11435), `acds` → ACDS dispatch, default → Ollama. Defense-in-depth: Apple failure falls back to Ollama.
+
+**ProofUI frontend**: Clickable inference cells with ACDS-style modal (Provider, Model, Cognitive Grade, Privacy, Cost Sensitivity dropdowns). Override cells shown in accent color. Save/Reset to Default/Cancel buttons with immediate page refresh.
+
+**API endpoints**: GET `/api/action-override/{action_id}`, POST `/api/action-override/set`, POST `/api/action-override/delete`.
+
+**Test coverage**: 32 tests, all passing, zero mocks/stubs. Real SQLite databases, real HTTP servers (Apple bridge simulator), real network calls.
+
+## 2026-03-17 — Production Deployment: launchd Services and PostgreSQL
+
+Deployed the full ACDS + Process Swarm stack as persistent macOS services with automatic restart on reboot.
+
+### Infrastructure Setup
+
+**PostgreSQL 16** installed via Homebrew (`brew install postgresql@16`), registered as `homebrew.mxcl.postgresql@16` launchd service. Created `acds` database and user, ran all 8 SQL migrations (001–008) to establish the full schema.
+
+**Master encryption key** generated (32 bytes, `/Users/m4/.acds/master.key`, mode 600) for AES-256-GCM envelope encryption of provider secrets.
+
+**Admin session secret** generated (64-character base64 token) for session-based admin authentication.
+
+### launchd Service Agents (7 total)
+
+All registered in `~/Library/LaunchAgents/` with `RunAtLoad: true` and `KeepAlive: true`:
+
+| Agent | Service | Port | Binary |
+|---|---|---|---|
+| `com.m4.openclaw-gateway` | OpenClaw Gateway | 18789 | `openclaw-gateway` |
+| `com.m4.proofui` | ProofUI Server | 18791 | Python `proof_ui.server` |
+| `com.m4.session-watcher` | Swarm Bridge Session Watcher | — | Python `swarm.bridge.session_watcher` |
+| `com.m4.acds-api` | ACDS REST API | 3100 | Node `dist/main.js` |
+| `com.m4.acds-admin-web` | ACDS Admin Web | 4173 | Vite preview server |
+| `com.m4.apple-intelligence-bridge` | Apple Intelligence Bridge | — | Swift `.build/debug/AppleIntelligenceBridge` |
+| `homebrew.mxcl.postgresql@16` | PostgreSQL 16 | 5432 | Homebrew-managed |
+
+### ACDS API Fix
+
+The API was crash-looping (exit code 1) because three required environment variables were missing: `DATABASE_URL`, `MASTER_KEY_PATH`, `ADMIN_SESSION_SECRET`. Root cause: the launchd plist set `WorkingDirectory` to `apps/api/` but no `.env` file existed there, and the plist's `EnvironmentVariables` dict only included `PORT` and `NODE_ENV`.
+
+**Fix applied:**
+1. Created `apps/api/.env` with `DATABASE_URL=postgresql://acds:acds_dev@localhost:5432/acds`, `MASTER_KEY_PATH=/Users/m4/.acds/master.key`, and generated `ADMIN_SESSION_SECRET`
+2. Symlinked `apps/api/infra → ../../infra` so the DI container's `loadJson()` (which resolves relative to `process.cwd()`) can find `infra/config/profiles/modelProfiles.json` and sibling config files
+3. Unloaded/reloaded the launchd agent to reset the restart throttle
+
+**Result:** API healthy — `GET /health` returns `{"status":"ok","version":"0.1.0","environment":"production"}` on port 3100. All 7 services running, all auto-start on reboot.

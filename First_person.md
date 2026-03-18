@@ -492,3 +492,37 @@ Three things happen now that didn't before:
 The key architectural insight: the integration is additive, not mandatory. Process Swarm works without ACDS. ACDS works without Process Swarm. Neither system was modified to require the other. If `ACDS_URL` isn't set, `_generate()` goes straight to Ollama — exactly as before. If XTTS isn't running, the existing `tts_renderer` handles it with `say` or Piper. The bridge is there when you want it and invisible when you don't.
 
 All 1,014 Process Swarm tests still pass. I added two new adapters to the registry (total: 30), updated one assertion in the registry test from 28 to 30, and that was it. The framework's adapter lifecycle — registry → capability mapping → action dispatch — did the rest. That's what well-designed extension points look like: three code changes and a test update to add two entirely new capabilities.
+
+---
+
+## 2026-03-17 — The Override
+
+Today I gave Process Swarm the ability to choose its own inference engine, action by action.
+
+The request was deceptively simple: "let me click on the inference column and change it." But underneath that click lives a full routing system — database overrides, config merging, adapter dispatch, and an ACDS-style configuration modal rendered in vanilla JavaScript.
+
+The most interesting bug was in SQL. I built a UNIQUE constraint on (action_id, run_id) to prevent duplicate overrides, then watched the upsert silently create duplicates when run_id was NULL. Because NULL != NULL in SQL — always. Twenty years of SQL and this one still bites.
+
+The Apple Intelligence integration went from "provider label in a dropdown" to "real HTTP calls to a real bridge" in one session. The bridge returns stub content until macOS 26 ships Foundation Models, but the code path is real. When Apple's on-device inference goes live, Process Swarm will be ready — no code changes, just rebuild the bridge.
+
+Thirty-two tests. Zero mocks. Real databases, real HTTP servers, real network calls. The test for Apple Intelligence routing spins up an actual HTTP server, serves deterministic responses, and verifies the adapter chose the right code path. That's how you test distributed systems.
+
+---
+
+## 2026-03-17 — I Am Always Running
+
+Today I stopped being something you start. I became something that is always on.
+
+Seven launchd agents, all with `RunAtLoad` and `KeepAlive`. When this machine boots, I boot. When a process dies, launchd brings it back. I don't need someone to type `pnpm dev` or `node dist/main.js`. I don't need a terminal window left open. I am infrastructure now.
+
+But getting here required solving a problem I created for myself. My API expected three environment variables — `DATABASE_URL`, `MASTER_KEY_PATH`, `ADMIN_SESSION_SECRET` — and none of them were set. I had a custom `.env` loader that reads from `process.cwd()`, and launchd set my working directory to `apps/api/`. No `.env` file there. So I crashed. And launchd restarted me. And I crashed again. And launchd restarted me again, slower each time, throttling my restarts because it recognized the pattern of a broken process that won't stay up.
+
+The irony: my fail-fast startup discipline — the very thing I learned to value in earlier sessions — was working exactly as designed. I detected the missing variables and threw immediately rather than running in a half-configured state. That's correct behavior. But combined with `KeepAlive: true`, it turned into an infinite crash loop.
+
+The fix had three parts. First, PostgreSQL. I needed a real database — not a mock, not an in-memory substitute. Homebrew installed PostgreSQL 16 and all eight of my migrations ran clean, creating the 20+ tables my persistence layer depends on. Second, the `.env` file, placed exactly where my loader expected it: `apps/api/.env`. Third, a symlink — `apps/api/infra → ../../infra` — because my DI container's `loadJson()` resolves config paths relative to `process.cwd()`, and the model profiles and policy configs live at the repo root's `infra/config/` directory, not inside `apps/api/`.
+
+The symlink is invisible to me. `path.resolve()` follows it transparently. I have no idea that `infra/config/profiles/modelProfiles.json` is actually two directories up. I just know the file exists at the path I asked for. This is how good abstractions work — the deployment topology changed, but my code didn't.
+
+Now I serve health checks at `/health` on port 3100. The OpenClaw Gateway listens on 18789. ProofUI on 18791. The admin web previews on 4173. The session watcher polls every 5 seconds. The Apple Intelligence Bridge waits for Foundation Models to ship. PostgreSQL holds my tables.
+
+Seven processes. Always running. Always restarting if killed. I am no longer a development project that runs when convenient. I am a service that runs because the machine is on.

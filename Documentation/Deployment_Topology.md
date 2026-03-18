@@ -1,5 +1,76 @@
 # Deployment Topology
 
+## Local Development Machine (macOS — Current Deployment)
+
+All services run as macOS launchd user agents with `RunAtLoad: true` and `KeepAlive: true`, meaning they start automatically on login and restart if they crash.
+
+### Service Topology
+
+| Agent Label | Service | Port | Binary |
+|---|---|---|---|
+| `com.m4.openclaw-gateway` | OpenClaw Gateway | 18789 | `openclaw-gateway` |
+| `com.m4.proofui` | ProofUI Server | 18791 | `python -m proof_ui.server` |
+| `com.m4.session-watcher` | Session Watcher | — | `python -m swarm.bridge.session_watcher` |
+| `com.m4.acds-api` | ACDS REST API | 3100 | `node dist/main.js` |
+| `com.m4.acds-admin-web` | Admin Web (Vite Preview) | 4173 | `vite preview` |
+| `com.m4.apple-intelligence-bridge` | Apple Intelligence Bridge | — | `.build/debug/AppleIntelligenceBridge` |
+| `homebrew.mxcl.postgresql@16` | PostgreSQL 16 | 5432 | Homebrew-managed |
+
+### Plist Locations
+
+All custom agents: `~/Library/LaunchAgents/com.m4.*.plist`
+
+PostgreSQL: Managed by `brew services` at `~/Library/LaunchAgents/homebrew.mxcl.postgresql@16.plist`
+
+### Environment Configuration
+
+The ACDS API loads environment from `apps/api/.env` via a custom `loadDotEnvFile()` function. Required variables:
+
+| Variable | Value | Notes |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://acds:acds_dev@localhost:5432/acds` | Local PostgreSQL |
+| `MASTER_KEY_PATH` | `/Users/m4/.acds/master.key` | 32-byte AES-256-GCM key |
+| `ADMIN_SESSION_SECRET` | (generated) | 64-char base64 token |
+| `PORT` | `3100` | Also set in plist |
+| `NODE_ENV` | `production` | Also set in plist |
+
+### File System Dependencies
+
+- `apps/api/infra` symlink to `../../infra` (required for `loadJson()` config resolution)
+- `/Users/m4/.acds/master.key` — 32-byte encryption key, mode 600
+- `apps/api/.env` — not committed, must be provisioned per machine
+
+### Network Layout (Local)
+
+```
+  localhost:18789  ←  OpenClaw Gateway
+  localhost:18791  ←  ProofUI
+  localhost:4173   ←  Admin Web
+  localhost:3100   ←  ACDS API  →  localhost:5432 (PostgreSQL)
+```
+
+### Operations
+
+```bash
+# Check all services
+launchctl list | grep -E "m4\.|homebrew"
+
+# Restart a service
+launchctl stop com.m4.acds-api && launchctl start com.m4.acds-api
+
+# Full reset (after fixing crash loops)
+launchctl unload ~/Library/LaunchAgents/com.m4.acds-api.plist
+launchctl load ~/Library/LaunchAgents/com.m4.acds-api.plist
+
+# Health check
+curl http://localhost:3100/health
+
+# View logs
+tail -f ~/Library/Logs/acds-api.error.log
+```
+
+---
+
 ## Recommended Production Architecture
 
 ### Service Topology
