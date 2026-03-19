@@ -179,3 +179,9 @@ These lessons were documented in the original Process Swarm and are being applie
 78. **Environment variables for secrets, profiles for config** — SMTP credentials use env vars (`SMTP_USERNAME`, `SMTP_PASSWORD`) referenced by name in `smtp_relay_profile.json`. Telegram uses `TELEGRAM_BOT_TOKEN`. The profile file is safe to commit; the secrets never touch disk.
 
 79. **Fresh SwarmRunner per execution solves DB connection isolation** — `SwarmPlatform.execute_run()` creates a new `SwarmRunner` each time with its own DB connection. This avoids WAL locking issues and ensures each run picks up current env vars (like `TELEGRAM_BOT_TOKEN`).
+
+80. **Red team tests must cover the spec exhaustively, not just what's convenient** — The ARGUS-Hold spec listed 10 red team scenarios (A-J). Only 7 were covered. The missing 3 — unregistered commands, dry-run drift, timeout boundaries — were the hardest to test without mocks. The solution: test the execution plan determinism (dry-run drift), test the spec's timeout propagation (timeout boundary), and test at multiple layers (registry, normalizer, dispatcher) for unregistered commands.
+
+81. **TTS shell injection defense is architectural, not code** — The `say -f tempfile` pattern prevents shell injection by design. Text never passes through a shell — it's written to a file, and `subprocess.run` with a list argument bypasses shell interpretation entirely. The red team tests confirm this with `$(rm -rf /)`, semicolons, backticks, and pipes — all produce valid audio.
+
+82. **Credential leakage tests must check error paths, not just success paths** — A Telegram adapter that fails with `"Telegram API 401: unauthorized"` is safe. One that fails with `"Telegram API 401: token 8565259183:AAG... unauthorized"` leaks the token. The red team tests verify the token never appears in any response field — success or failure.

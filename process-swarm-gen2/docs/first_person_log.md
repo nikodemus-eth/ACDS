@@ -580,3 +580,19 @@ Eliminated ALL `unittest.mock`, `MagicMock`, `patch`, and `monkeypatch` from 19 
 - Pipeline actions table with engine/model assignments per step
 
 **Test results:** 2109+ passed, 0 mocks, real LLM calls (skipif when services unavailable).
+
+### Red Team Gap Closure
+
+Audited all 224 existing red team tests across 19 files. Found 7 gaps against the ARGUS-Hold spec (items A, G, J) and additional threat vectors (TTS injection, credential leakage, RSS injection, delivery honesty).
+
+Created `tests/redteam/test_rt11_uncovered_threats.py` — 30 tests, 7 classes:
+
+1. **TestUnregisteredCommandRejection** (4 tests) — Spec item A. Commands not in registry rejected at dispatcher, normalizer, and registry levels.
+2. **TestDryRunDrift** (3 tests) — Spec item G. ExecutionPlanner produces identical adapter/timeout/artifacts for dry_run=True vs False. Dry-run dispatcher creates no side effects.
+3. **TestTimeoutBoundary** (4 tests) — Spec item J. Plan timeout_ms matches spec timeout_seconds × 1000. Custom spec timeouts propagate. TEST-NET IP blocked by scope guard.
+4. **TestTtsShellInjection** (4 tests) — `$(rm -rf /)`, semicolons, backticks, pipes all treated as literal text by macOS `say -f tempfile`. Real .aiff files produced.
+5. **TestCredentialLeakage** (3 tests) — Telegram bot tokens never appear in failure responses. SMTP passwords resolved only from env vars, never leaked in error output.
+6. **TestRssFeedInjection** (6 tests) — Script tags, event handlers, javascript: hrefs stripped by `_clean_html`. Source collector sanitizes all feed content fields.
+7. **TestDeliveryHonesty** (6 tests) — Email unconfigured/empty/unreachable all return `success: False`. Telegram no-token/invalid-token/empty all return `success: False`.
+
+**Result:** All 10 ARGUS-Hold spec red team scenarios (A-J) now covered. 254 total red team tests across 20 files. 2139 total tests passing.

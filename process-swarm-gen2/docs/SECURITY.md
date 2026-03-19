@@ -448,7 +448,7 @@ injection, and ledger tampering detection.
 
 ## ARGUS-9 Red Team Test Suite
 
-The ARGUS-9 red team suite contains **125 tests across 11 files** in
+The ARGUS-9 red team suite contains **168 tests across 13 files** in
 `tests/redteam/`. These tests systematically probe every security boundary:
 
 | File                              | Tests | Category                                  |
@@ -463,6 +463,8 @@ The ARGUS-9 red team suite contains **125 tests across 11 files** in
 | `test_rt08_dsl_determinism.py`    | 10    | DSL determinism enforcement and dangerous pattern detection |
 | `test_rt09_policy_scope.py`       | 22    | Policy scope expansion, warning engine, and governance warnings |
 | `test_rt10_revocation.py`         | 7     | Lease and swarm revocation enforcement |
+| `test_rt_argus_hold.py`          | 17    | ARGUS-Hold governed execution layer (path traversal, parameter smuggling) |
+| `test_rt11_uncovered_threats.py` | 30    | Spec items A/G/J + TTS injection, credential leakage, RSS injection, delivery honesty |
 | `test_runtime_gate_invariants.py` | 5     | ExecutionGate structural invariants |
 
 ### What the Red Team Tests Verify
@@ -525,4 +527,4 @@ The ARGUS-9 red team suite contains **125 tests across 11 files** in
 | `swarm/governance/warnings.py`         | Governance warning policy engine           |
 | `swarm/delivery/engine.py`             | Fail-closed delivery dispatch              |
 | `swarm/delivery/validation.py`         | Email policy validation (default-deny)     |
-| `tests/redteam/`                       | ARGUS-9 red team suite (125 tests)         |
+| `tests/redteam/`                       | ARGUS-9 red team suite (168 tests)         |

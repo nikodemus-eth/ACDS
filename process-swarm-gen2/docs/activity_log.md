@@ -233,3 +233,6 @@ Timestamped record of what was done and when during the rebuild.
 | — | ProofUI names | All pages show swarm names instead of IDs. Clickable links |
 | — | Inference trace | Runner emits `inference_trace.json`. Run detail page shows engine/model/latency per stage |
 | — | **Result** | **2109+ tests, 0 mocks, real TTS/Telegram/LLM, 4 swarms registered** |
+| — | Red team gap audit | Audited 224 existing red team tests across 19 files. Found 7 gaps (spec A, G, J + TTS/creds/RSS/delivery) |
+| — | `test_rt11_uncovered_threats.py` | 30 new red team tests: unregistered commands, dry-run drift, timeout, TTS injection, credential leakage, RSS injection, delivery honesty |
+| — | **Result** | **All 10 ARGUS-Hold spec items (A-J) covered. 254 red team tests. 2139 total tests** |
