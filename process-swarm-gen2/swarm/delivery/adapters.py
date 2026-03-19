@@ -160,6 +160,8 @@ class TelegramAdapter(DeliveryAdapter):
         body = message.get("body", "")
         text = f"*{subject}*\n\n{body}" if body else subject
 
+        # Token must be in URL path per Telegram Bot API design.
+        # Never log this URL directly — use _safe_url() for log output.
         url = f"https://api.telegram.org/bot{self._token}/sendMessage"
         payload = json.dumps({
             "chat_id": destination,
@@ -189,15 +191,24 @@ class TelegramAdapter(DeliveryAdapter):
                 }
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode(errors="replace")
-            logger.error("Telegram API error %s: %s", exc.code, error_body)
+            # Log full error at DEBUG only; never expose raw API response
+            logger.debug("Telegram API error body: %s", error_body)
+            logger.error(
+                "Telegram API error %s for chat_id=%s run=%s",
+                exc.code, destination, run_id,
+            )
             return {
                 "success": False,
                 "provider_message_id": None,
-                "provider_response": f"Telegram API {exc.code}: {error_body[:200]}",
+                "provider_response": f"Telegram API error {exc.code}",
             }
         except OSError as exc:
+            # Sanitize: str(exc) could contain the URL with token
+            safe_msg = str(exc)
+            if self._token and self._token in safe_msg:
+                safe_msg = safe_msg.replace(self._token, "***")
             return {
                 "success": False,
                 "provider_message_id": None,
-                "provider_response": f"TRANSPORT_FAILED: {exc}",
+                "provider_response": f"TRANSPORT_FAILED: {safe_msg}",
             }

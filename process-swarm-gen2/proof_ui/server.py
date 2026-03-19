@@ -141,7 +141,9 @@ class SwarmPlatform:
 
         db_path = str(openclaw_root / "platform.db")
         self.db = RegistryDatabase(db_path)
-        # Connect with check_same_thread=False for HTTP server threading
+        # Threading: HTTPServer dispatches to handler threads. SQLite requires
+        # check_same_thread=False for multi-thread access. Safe with WAL mode
+        # (enabled by RegistryDatabase.migrate) which allows concurrent reads.
         self.db.conn = _sqlite3.connect(db_path, check_same_thread=False)
         self.db.conn.row_factory = _sqlite3.Row
         self.db.conn.execute("PRAGMA journal_mode=WAL")
@@ -1301,20 +1303,20 @@ def _make_handler(
                 try:
                     from swarm.definitions.niks_context_report import find_or_register
                     find_or_register(swarm_platform.repo)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to register Nik's Context Report: %s", exc)
                 try:
                     from swarm.definitions.grits_audit import find_or_register as grits_register
                     grits_register(swarm_platform.repo)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to register GRITS Audit: %s", exc)
                 try:
                     from swarm.definitions.oregon_ai_brief import find_or_register as oregon_register
                     from swarm.definitions.oregon_ai_brief import find_or_register_audio as oregon_audio_register
                     oregon_register(swarm_platform.repo)
                     oregon_audio_register(swarm_platform.repo)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to register Oregon AI Brief: %s", exc)
 
                 status_filter = params.get("status")
                 self._json_response(

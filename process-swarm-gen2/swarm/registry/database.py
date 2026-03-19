@@ -107,11 +107,16 @@ class RegistryDatabase:
                 structured_steps_json   TEXT,
                 expected_outputs_json   TEXT,
                 inferred_constraints_json TEXT,
+                extracted_actions_json   TEXT,
+                dependency_graph_json    TEXT,
+                unresolved_issues_json   TEXT,
+                clarification_history_json TEXT,
                 status                  TEXT NOT NULL DEFAULT 'proposed',
                 generated_at            TEXT NOT NULL,
                 FOREIGN KEY (draft_id) REFERENCES intent_drafts(draft_id)
             )
         """)
+        # Legacy migration support for existing databases
         self._ensure_column("intent_restatements", "extracted_actions_json", "TEXT")
         self._ensure_column("intent_restatements", "dependency_graph_json", "TEXT")
         self._ensure_column("intent_restatements", "unresolved_issues_json", "TEXT")
@@ -126,9 +131,15 @@ class RegistryDatabase:
                 accepted_at     TEXT NOT NULL,
                 acceptance_mode TEXT NOT NULL DEFAULT 'explicit_button',
                 acceptance_note TEXT,
+                accepted_actions_json    TEXT,
+                action_count             INTEGER,
+                dependency_graph_json    TEXT,
+                clarification_history_json TEXT,
+                user_confirmation        TEXT,
                 FOREIGN KEY (restatement_id) REFERENCES intent_restatements(restatement_id)
             )
         """)
+        # Legacy migration support for existing databases
         self._ensure_column("intent_acceptances", "accepted_actions_json", "TEXT")
         self._ensure_column("intent_acceptances", "action_count", "INTEGER")
         self._ensure_column("intent_acceptances", "dependency_graph_json", "TEXT")
@@ -438,14 +449,23 @@ class RegistryDatabase:
         # Table 20: constraint_sets
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS constraint_sets (
-                constraint_set_id   TEXT PRIMARY KEY,
-                intent_id           TEXT NOT NULL,
-                constraints_json    TEXT NOT NULL,
-                extraction_notes    TEXT,
-                created_at          TEXT NOT NULL,
+                constraint_set_id        TEXT PRIMARY KEY,
+                intent_id                TEXT NOT NULL,
+                constraints_json         TEXT NOT NULL,
+                extraction_notes         TEXT,
+                action_table_ref         TEXT,
+                archetype_ref            TEXT,
+                artifact_type            TEXT,
+                missing_required_json    TEXT,
+                ambiguous_fields_json    TEXT,
+                clarification_questions_json TEXT,
+                extraction_method        TEXT,
+                resolution_state         TEXT,
+                created_at               TEXT NOT NULL,
                 FOREIGN KEY (intent_id) REFERENCES intent_drafts(draft_id)
             )
         """)
+        # Legacy migration support for existing databases
         self._ensure_column("constraint_sets", "action_table_ref", "TEXT")
         self._ensure_column("constraint_sets", "archetype_ref", "TEXT")
         self._ensure_column("constraint_sets", "artifact_type", "TEXT")
@@ -466,9 +486,12 @@ class RegistryDatabase:
                 action_count        INTEGER NOT NULL,
                 tool_readiness_summary TEXT,
                 notes               TEXT,
+                action_table_ref    TEXT,
+                tool_match_set_ref  TEXT,
                 FOREIGN KEY (swarm_id) REFERENCES swarms(swarm_id)
             )
         """)
+        # Legacy migration support for existing databases
         self._ensure_column("action_table_acceptances", "action_table_ref", "TEXT")
         self._ensure_column("action_table_acceptances", "tool_match_set_ref", "TEXT")
 
@@ -711,6 +734,9 @@ class RegistryDatabase:
             "CREATE INDEX IF NOT EXISTS idx_recipient_profiles_name ON recipient_profiles(profile_name)",
             "CREATE INDEX IF NOT EXISTS idx_recipient_profiles_enabled ON recipient_profiles(enabled)",
             "CREATE INDEX IF NOT EXISTS idx_deliveries_profile ON swarm_deliveries(recipient_profile_id)",
+            # Performance indexes for time-based and kind-based queries
+            "CREATE INDEX IF NOT EXISTS idx_warnings_created_at ON governance_warning_records(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_artifacts_kind ON artifact_refs(artifact_kind)",
         ]
         for idx_sql in _indexes:
             cursor.execute(idx_sql)

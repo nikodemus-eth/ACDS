@@ -1126,6 +1126,12 @@ class SwarmRepository:
         return [dict(r) for r in rows]
 
     def update_action(self, action_id: str, **fields: Any) -> None:
+        """Update action fields by keyword.
+
+        Column names in SET clause come from internal callers only (ProofUI
+        API, swarm definitions), never from user input. Values are always
+        parameterized via ``?`` placeholders.
+        """
         if not fields:
             return
         fields["updated_at"] = _now()
