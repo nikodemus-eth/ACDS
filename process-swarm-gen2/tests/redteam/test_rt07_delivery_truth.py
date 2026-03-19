@@ -51,7 +51,7 @@ class TestDeliveryBoundary:
     def test_delivery_engine_only_uses_registry_and_events(self):
         sig = inspect.signature(DeliveryEngine.__init__)
         param_names = set(sig.parameters.keys())
-        assert param_names == {"self", "repository", "event_recorder", "smtp_config"}
+        assert param_names == {"self", "repository", "event_recorder", "smtp_config", "telegram_bot_token"}
 
     def test_deliver_takes_only_run_id(self, repo, events):
         sig = inspect.signature(DeliveryEngine.deliver)

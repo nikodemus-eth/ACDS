@@ -118,7 +118,7 @@ class TestDispatcherReport:
 class TestDispatcherTts:
     """End-to-end pipeline test for tts.generate."""
 
-    def test_tts_stub_result(self, tmp_path):
+    def test_tts_produces_real_audio(self, tmp_path):
         disp, ws = _make_dispatcher(tmp_path)
         action = {
             "tool_name": "tts.generate",
@@ -130,7 +130,8 @@ class TestDispatcherTts:
         }
         result = disp.execute("run-test", "swarm-test", action, ws, {})
         assert result.success is True
-        assert result.output_data["implemented"] is False
+        assert result.output_data["implemented"] is True
+        assert result.output_data["size_bytes"] > 0
 
 
 class TestDispatcherValidationFailure:

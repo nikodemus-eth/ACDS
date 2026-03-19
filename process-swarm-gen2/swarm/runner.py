@@ -60,7 +60,14 @@ class SwarmRunner:
         self.compiler = BehaviorSequenceCompiler(
             workspace_root=self.openclaw_root / "workspace"
         )
-        self.delivery = DeliveryEngine(self.repo, self.events)
+        import os as _os
+        from swarm.delivery.validation import load_smtp_profile
+        smtp_profile = load_smtp_profile(self.openclaw_root)
+        self.delivery = DeliveryEngine(
+            self.repo, self.events,
+            smtp_config=smtp_profile,
+            telegram_bot_token=_os.environ.get("TELEGRAM_BOT_TOKEN"),
+        )
         self.scheduler = ScheduleEvaluator(self.repo, self.events)
         self.adapter_registry = AdapterRegistry.create_default()
 

@@ -510,3 +510,73 @@ The constraint was absolute: no stubs, no monkeypatches, no mocks. 174 existing 
 - `ledger_writer.py`: Blank lines in `verify_chain` JSONL parsing
 
 **Result:** 186 tests, 559/559 statements = 100% coverage, 0 mocks, 0.75s runtime.
+
+---
+
+## 2026-03-18 — TTS Pipeline, Delivery Wiring, Swarm Registration, Mock Purge
+
+### Re-registering Lost Swarms
+
+The GRITS Audit and Oregon AI Brief swarms were missing from ProofUI because the platform.db had been recreated fresh. I found the original swarm data in `/Users/m4/openclaw/platform.db` and `~/Documents/development/ServerSetup/Process-Swarm/platform.db` — including full behavior sequences with step definitions.
+
+Created definition files:
+- `swarm/definitions/grits_audit.py` — 9-step integrity surveillance pipeline
+- `swarm/definitions/oregon_ai_brief.py` — 20-step text brief + 29-step audio variant
+
+Updated ProofUI auto-registration to call `find_or_register` for all four swarms on `/api/swarms`.
+
+### Real TTS Pipeline
+
+Built 8 `ToolAdapter` classes in `swarm/tools/adapters/tts/` that produce real audio via macOS `/usr/bin/say`:
+1. `TtsArtifactResolverAdapter` — locates report from prior results
+2. `TtsTextExtractorAdapter` — strips markdown/HTML/citations for narration
+3. `TtsTextNormalizerAdapter` — expands abbreviations (AI→A.I.), adds breath markers
+4. `TtsChunkerAdapter` — splits at paragraph/sentence boundaries (max 1200 chars)
+5. `TtsRendererAdapter` — calls `say -v Samantha -o chunk.aiff -f textfile` per chunk
+6. `TtsAssemblerAdapter` — concatenates via ffmpeg concat demuxer
+7. `TtsAudioValidatorAdapter` — checks file/size/duration via afinfo, computes SHA-256
+8. `TtsArtifactRegistrarAdapter` — writes tts_result.json metadata
+
+Also rewired `swarm/argus_hold/adapters/tts.py` from stub to real `say` command.
+
+**Smoke test:** 253KB AIFF, 5.7 seconds real audio from "say -v Samantha".
+
+### Delivery Wiring
+
+**Email (Proton Mail Bridge):**
+- Created `policies/smtp_relay_profile.json` with localhost:1025 STARTTLS config
+- Wired `SwarmRunner` to load SMTP profile and pass to `DeliveryEngine`
+- Changed `EmailAdapter` from fake-success stub to honest failure when unconfigured
+- Renamed `_is_stub` → `_is_configured`, `_send_stub` → `_send_unconfigured`
+
+**Telegram (real):**
+- Rewrote `TelegramAdapter` with real `urllib.request.Request` POST to Bot API
+- Token: `TELEGRAM_BOT_TOKEN` env var, chat_id: `5218027396`
+- Verified: message_id 947 delivered to @Nick_M4_Bot
+- Wired `SwarmRunner` to pass `TELEGRAM_BOT_TOKEN` to `DeliveryEngine`
+
+**ProofUI delivery dropdown:**
+- Added `/api/delivery/available` — validates Telegram (getMe) and Email (SMTP connect) live
+- Added `/api/delivery/last/<swarm_id>` — returns last-used preference
+- Swarm detail page shows dropdown next to "Run Now" with only validated methods
+- Selection sent as `delivery_type`/`delivery_destination` in run request
+
+### Mock Purge
+
+Eliminated ALL `unittest.mock`, `MagicMock`, `patch`, and `monkeypatch` from 19 test files:
+- `test_cr_adapters.py`: 89 mock refs → real OllamaClient/AppleIntelligenceClient with `skipif`
+- `test_acds_integration.py`: 53 mock refs → real HTTP test servers
+- `test_grits/test_runner.py`: real resolve_suites calls
+- `test_adaptive/test_orchestrator.py`: real `_SimpleRunner` class
+- All `test_full_coverage_batch*.py` files: removed mock imports, used real os.environ
+
+**Rule applied:** If it can't do the thing, it must say it can't do the thing. It must never pretend it did the thing.
+
+### ProofUI Improvements
+
+- All pages now show swarm names instead of IDs (Runs, Dashboard, Events, Tool Detail)
+- Swarm names are clickable links to swarm detail pages
+- Inference engine badges clickable with dropdown selector
+- Pipeline actions table with engine/model assignments per step
+
+**Test results:** 2109+ passed, 0 mocks, real LLM calls (skipif when services unavailable).

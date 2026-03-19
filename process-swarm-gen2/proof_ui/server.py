@@ -509,9 +509,10 @@ function runsTable(runs) {
             h('th', null, 'Run ID'), h('th', null, 'Swarm'), h('th', null, 'Status'), h('th', null, 'Triggered'),
         ])),
         h('tbody', null, runs.map(function(r) {
+            var swarmLabel = r.swarm_name || truncId(r.swarm_id);
             return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#run/' + r.run_id; }}, [
                 h('td', null, truncId(r.run_id)),
-                h('td', null, truncId(r.swarm_id)),
+                h('td', null, h('a', {href: '#swarm/' + r.swarm_id, style: 'color:var(--accent)', onClick: function(e) { e.stopPropagation(); }}, swarmLabel)),
                 h('td', null, statusBadge(r.run_status)),
                 h('td', null, formatTime(r.triggered_at)),
             ]);
@@ -740,13 +741,44 @@ async function renderSwarmDetail(container, swarmId) {
         if (!data.swarm) { container.appendChild(h('div', {className: 'empty-state'}, 'Swarm not found')); return; }
         var s = data.swarm;
 
+        // Delivery dropdown
+        var deliverySelect = h('select', {
+            id: 'delivery-select',
+            style: 'padding:6px 12px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:13px;min-width:180px',
+        }, [h('option', {value: 'none'}, 'Loading...')]);
+
+        // Populate delivery options asynchronously
+        (async function() {
+            try {
+                var methods = await apiGet('delivery/available');
+                var lastPref = await apiGet('delivery/last/' + s.swarm_id);
+                while (deliverySelect.firstChild) deliverySelect.removeChild(deliverySelect.firstChild);
+                methods.forEach(function(m) {
+                    if (m.status !== 'connected') return;
+                    var opt = h('option', {value: m.type, 'data-dest': m.destination}, m.label);
+                    if (m.type === lastPref.type) opt.selected = true;
+                    deliverySelect.appendChild(opt);
+                });
+            } catch(e) {
+                while (deliverySelect.firstChild) deliverySelect.removeChild(deliverySelect.firstChild);
+                deliverySelect.appendChild(h('option', {value: 'none'}, 'No delivery'));
+            }
+        })();
+
         // Run button
         var runBtn = h('button', {className: 'btn', style: 'padding:8px 20px',
             onClick: async function() {
                 runBtn.disabled = true;
                 runBtn.textContent = 'Running...';
+                var selOpt = deliverySelect.options[deliverySelect.selectedIndex];
+                var delType = selOpt ? selOpt.value : 'none';
+                var delDest = selOpt ? (selOpt.getAttribute('data-dest') || '') : '';
                 try {
-                    var result = await apiPost('swarm/run', {swarm_id: s.swarm_id});
+                    var result = await apiPost('swarm/run', {
+                        swarm_id: s.swarm_id,
+                        delivery_type: delType,
+                        delivery_destination: delDest,
+                    });
                     runBtn.textContent = 'Done: ' + (result.run_id || '').substring(0, 16);
                     setTimeout(function() { location.hash = '#run/' + result.run_id; }, 1200);
                 } catch(e) {
@@ -775,8 +807,13 @@ async function renderSwarmDetail(container, swarmId) {
         ]);
         container.appendChild(stats);
 
-        // Action bar
-        container.appendChild(h('div', {style: 'margin-bottom:24px'}, runBtn));
+        // Action bar with delivery dropdown
+        var actionBar = h('div', {style: 'margin-bottom:24px;display:flex;align-items:center;gap:16px'}, [
+            runBtn,
+            h('span', {style: 'color:var(--text-dim);font-size:13px'}, 'Delivery Method'),
+            deliverySelect,
+        ]);
+        container.appendChild(actionBar);
 
         // Pipeline Actions table with clickable engine badges
         var actions = data.actions || [];
@@ -921,16 +958,19 @@ async function renderRuns(container) {
 async function renderEvents(container) {
     container.appendChild(h('div', {className: 'page-title'}, 'Events'));
     try {
-        var events = await apiGet('events?limit=100');
+        var [events, swarms] = await Promise.all([apiGet('events?limit=100'), apiGet('swarms')]);
+        var swarmNames = {};
+        swarms.forEach(function(s) { swarmNames[s.swarm_id] = s.swarm_name; });
         if (!events.length) { container.appendChild(h('div', {className: 'empty-state'}, 'No events recorded')); return; }
         var tbl = h('table', null, [
             h('thead', null, h('tr', null, [
                 h('th', null, 'Event'), h('th', null, 'Swarm'), h('th', null, 'Summary'), h('th', null, 'Time'),
             ])),
             h('tbody', null, events.map(function(ev) {
+                var swarmLabel = swarmNames[ev.swarm_id] || truncId(ev.swarm_id);
                 return h('tr', null, [
                     h('td', null, ev.event_type),
-                    h('td', null, truncId(ev.swarm_id)),
+                    h('td', null, ev.swarm_id ? h('a', {href: '#swarm/' + ev.swarm_id, style: 'color:var(--accent)'}, swarmLabel) : '-'),
                     h('td', null, ev.summary || '-'),
                     h('td', null, formatTime(ev.event_time)),
                 ]);
@@ -992,13 +1032,12 @@ async function renderToolDetail(container, toolName) {
         } else {
             var tbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'Name'), h('th', null, 'ID'), h('th', null, 'Status'),
+                    h('th', null, 'Swarm'), h('th', null, 'Status'),
                     h('th', null, 'Stage'), h('th', null, 'Engine'),
                 ])),
                 h('tbody', null, data.swarms.map(function(s) {
                     return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#swarm/' + s.swarm_id; }}, [
-                        h('td', null, s.swarm_name),
-                        h('td', null, truncId(s.swarm_id)),
+                        h('td', null, h('a', {href: '#swarm/' + s.swarm_id, style: 'color:var(--accent)', onClick: function(e) { e.stopPropagation(); }}, s.swarm_name)),
                         h('td', null, statusBadge(s.lifecycle_status)),
                         h('td', null, s.step_id || '-'),
                         h('td', null, s.engine || '-'),
@@ -1136,6 +1175,9 @@ def _make_handler(
 ) -> type[BaseHTTPRequestHandler]:
     """Create a handler class with bound state and platform references."""
 
+    # Per-swarm last-used delivery preference (survives across requests)
+    _delivery_prefs: dict[str, dict] = {}
+
     class ProofUIHandler(BaseHTTPRequestHandler):
         """HTTP request handler for the ProofUI console."""
 
@@ -1255,12 +1297,24 @@ def _make_handler(
 
             # Swarm platform API endpoints
             if path == "/api/swarms":
-                # Auto-register Nik's Context Report if not present
+                # Auto-register all system swarms if not present
                 try:
                     from swarm.definitions.niks_context_report import find_or_register
                     find_or_register(swarm_platform.repo)
                 except Exception:
-                    pass  # Non-fatal — swarm list still works
+                    pass
+                try:
+                    from swarm.definitions.grits_audit import find_or_register as grits_register
+                    grits_register(swarm_platform.repo)
+                except Exception:
+                    pass
+                try:
+                    from swarm.definitions.oregon_ai_brief import find_or_register as oregon_register
+                    from swarm.definitions.oregon_ai_brief import find_or_register_audio as oregon_audio_register
+                    oregon_register(swarm_platform.repo)
+                    oregon_audio_register(swarm_platform.repo)
+                except Exception:
+                    pass
 
                 status_filter = params.get("status")
                 self._json_response(
@@ -1327,9 +1381,16 @@ def _make_handler(
             if path == "/api/runs":
                 status_filter = params.get("status")
                 limit = int(params.get("limit", "100"))
-                self._json_response(
-                    swarm_platform.repo.list_all_runs(status=status_filter, limit=limit)
-                )
+                runs = swarm_platform.repo.list_all_runs(status=status_filter, limit=limit)
+                # Enrich with swarm names
+                swarm_cache = {}
+                for r in runs:
+                    sid = r.get("swarm_id", "")
+                    if sid not in swarm_cache:
+                        sw = swarm_platform.repo.get_swarm(sid)
+                        swarm_cache[sid] = (sw.get("swarm_name") or sid) if sw else sid
+                    r["swarm_name"] = swarm_cache[sid]
+                self._json_response(runs)
                 return
 
             m = _RUN_DETAIL_RE.match(path)
@@ -1382,6 +1443,75 @@ def _make_handler(
                     "inference_trace": inference_trace,
                     "events": run_events,
                 })
+                return
+
+            if path == "/api/delivery/available":
+                # Validate which delivery methods are actually reachable
+                methods = []
+                # Check Telegram
+                import os as _os
+                tg_token = _os.environ.get("TELEGRAM_BOT_TOKEN", "")
+                if tg_token:
+                    try:
+                        import urllib.request as _ur
+                        req = _ur.Request(
+                            f"https://api.telegram.org/bot{tg_token}/getMe",
+                            method="GET",
+                        )
+                        with _ur.urlopen(req, timeout=5) as resp:
+                            import json as _j2
+                            data = _j2.loads(resp.read())
+                            if data.get("ok"):
+                                bot_name = data.get("result", {}).get("username", "bot")
+                                methods.append({
+                                    "type": "telegram",
+                                    "label": f"Telegram (@{bot_name})",
+                                    "destination": "5218027396",
+                                    "status": "connected",
+                                })
+                    except Exception:
+                        pass
+                # Check Email/SMTP
+                try:
+                    from swarm.delivery.validation import load_smtp_profile
+                    profile = load_smtp_profile(swarm_platform.openclaw_root)
+                    if profile and profile.get("host"):
+                        import smtplib as _smtp
+                        host = profile["host"]
+                        port = profile.get("port", 587)
+                        try:
+                            s = _smtp.SMTP(host, port, timeout=5)
+                            s.quit()
+                            sender = profile.get("sender", {}).get("address", "")
+                            methods.append({
+                                "type": "email",
+                                "label": f"Email ({sender})",
+                                "destination": sender,
+                                "status": "connected",
+                            })
+                        except OSError:
+                            methods.append({
+                                "type": "email",
+                                "label": f"Email ({profile.get('sender', {}).get('address', '')})",
+                                "destination": "",
+                                "status": "unreachable",
+                            })
+                except Exception:
+                    pass
+                # Always include "none"
+                methods.insert(0, {
+                    "type": "none",
+                    "label": "No delivery",
+                    "destination": "",
+                    "status": "connected",
+                })
+                self._json_response(methods)
+                return
+
+            if path.startswith("/api/delivery/last/"):
+                sid = path.split("/api/delivery/last/")[1]
+                pref = _delivery_prefs.get(sid, {"type": "none", "destination": ""})
+                self._json_response(pref)
                 return
 
             if path == "/api/tools":
@@ -1554,12 +1684,37 @@ def _make_handler(
                 trigger_source = body.get("trigger_source", "manual_proof_ui")
                 created_by = body.get("created_by", "proof_ui")
                 execute = body.get("execute", True)
+                delivery_type = body.get("delivery_type", "none")
+                delivery_destination = body.get("delivery_destination", "")
                 if not swarm_id:
                     self._error_response(400, "swarm_id required")
                     return
                 run_id = swarm_platform.repo.create_run(
                     swarm_id, trigger_source, created_by_trigger=created_by,
                 )
+                # Configure delivery for this run if requested
+                if delivery_type and delivery_type != "none":
+                    try:
+                        # Check for existing delivery config
+                        existing = swarm_platform.repo.get_delivery_by_swarm(swarm_id)
+                        if existing:
+                            # Update existing delivery
+                            swarm_platform.repo.conn.execute(
+                                "UPDATE swarm_deliveries SET delivery_type = ?, destination = ?, enabled = 1 WHERE delivery_id = ?",
+                                (delivery_type, delivery_destination, existing["delivery_id"]),
+                            )
+                            swarm_platform.repo._commit()
+                        else:
+                            swarm_platform.repo.create_delivery(
+                                swarm_id, delivery_type, delivery_destination,
+                            )
+                    except Exception:
+                        pass  # Non-fatal — run proceeds without delivery
+                    # Store as last-used preference
+                    _delivery_prefs[swarm_id] = {
+                        "type": delivery_type,
+                        "destination": delivery_destination,
+                    }
                 if execute:
                     try:
                         exec_result = swarm_platform.execute_run(run_id)

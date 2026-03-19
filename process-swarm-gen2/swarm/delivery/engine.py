@@ -40,12 +40,13 @@ class DeliveryEngine:
         event_recorder: EventRecorder,
         *,
         smtp_config: dict | None = None,
+        telegram_bot_token: str | None = None,
     ):
         self.repo = repository
         self.events = event_recorder
         self.adapters: dict[str, DeliveryAdapter] = {
             "email": EmailAdapter(smtp_config=smtp_config),
-            "telegram": TelegramAdapter(),
+            "telegram": TelegramAdapter(bot_token=telegram_bot_token),
         }
 
     def deliver(self, run_id: str) -> Optional[str]:

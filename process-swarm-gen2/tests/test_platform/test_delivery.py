@@ -59,7 +59,7 @@ def swarm_with_telegram(repo):
 
 
 class TestAdapters:
-    def test_email_adapter_stub(self):
+    def test_email_adapter_unconfigured_reports_failure(self):
         adapter = EmailAdapter()
         result = adapter.send("user@example.com", {
             "subject": "Test",
@@ -68,19 +68,19 @@ class TestAdapters:
             "run_id": "run-001",
             "status": "succeeded",
         })
-        assert result["success"] is True
-        assert result["provider_message_id"] is not None
+        assert result["success"] is False
+        assert "not configured" in result["provider_response"]
 
-    def test_telegram_adapter_stub(self):
-        adapter = TelegramAdapter()
+    def test_telegram_adapter_unconfigured(self):
+        adapter = TelegramAdapter()  # No token → honest failure
         result = adapter.send("chat-12345", {
             "body": "Hello",
             "swarm_name": "Test",
             "run_id": "run-001",
             "status": "succeeded",
         })
-        assert result["success"] is True
-        assert result["provider_message_id"] is not None
+        assert result["success"] is False
+        assert "not configured" in result["provider_response"]
 
 
 # ──────────────────────────────────────────────
@@ -89,7 +89,8 @@ class TestAdapters:
 
 
 class TestDeliveryEngine:
-    def test_deliver_with_email(self, engine, repo, swarm_with_delivery):
+    def test_deliver_with_email_unconfigured(self, engine, repo, swarm_with_delivery):
+        """Without SMTP config, email delivery reports honest failure."""
         run_id = repo.create_run(swarm_with_delivery, "manual")
         repo.update_run(
             run_id,
@@ -100,7 +101,7 @@ class TestDeliveryEngine:
         receipt_id = engine.deliver(run_id)
         assert receipt_id is not None
         receipt = repo.get_delivery_receipt(receipt_id)
-        assert receipt["delivery_status"] == "sent"
+        assert receipt["delivery_status"] == "failed"
         assert receipt["delivery_type"] == "email"
 
     def test_deliver_with_telegram(self, engine, repo, swarm_with_telegram):
@@ -132,9 +133,10 @@ class TestDeliveryEngine:
         )
         engine.deliver(run_id)
         run = repo.get_run(run_id)
-        assert run["delivery_status"] == "sent"
+        assert run["delivery_status"] == "failed"  # No SMTP config → honest failure
 
-    def test_delivery_records_event(self, engine, repo, events, swarm_with_delivery):
+    def test_delivery_records_failure_event(self, engine, repo, events, swarm_with_delivery):
+        """Without SMTP config, delivery records a failure event."""
         run_id = repo.create_run(swarm_with_delivery, "manual")
         repo.update_run(
             run_id,
@@ -143,7 +145,7 @@ class TestDeliveryEngine:
             artifact_refs_json='["artifact-1"]',
         )
         engine.deliver(run_id)
-        evts = repo.list_events(swarm_with_delivery, event_type="delivery_sent")
+        evts = repo.list_events(swarm_with_delivery, event_type="delivery_failed")
         assert len(evts) == 1
 
     def test_delivery_nonexistent_run(self, engine):

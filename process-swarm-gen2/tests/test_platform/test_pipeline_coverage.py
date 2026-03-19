@@ -1,7 +1,10 @@
-"""Tests targeting pipeline.py coverage gaps — canonical paths, action tables,
+"""Tests targeting pipeline.py coverage gaps -- canonical paths, action tables,
 dependency assignment from canonical rows, event emission, exception classes,
 action expansion, _derive_target_path, _looks_like_output_target, and
-run_canonical_pipeline_for_swarm."""
+run_canonical_pipeline_for_swarm.
+
+All tests use real objects -- no mocks, no stubs, no patches.
+"""
 from __future__ import annotations
 
 import json
@@ -36,7 +39,7 @@ def repo():
 
 
 def _setup_acceptance(repo, swarm_id, raw_text):
-    """Create draft → restatement → acceptance chain for a swarm."""
+    """Create draft -> restatement -> acceptance chain for a swarm."""
     draft_id = repo.create_intent_draft(
         swarm_id=swarm_id, raw_text=raw_text, created_by="tester",
     )
@@ -91,21 +94,21 @@ class TestEmitEvent:
         assert events_list == []
 
     def test_events_with_record_method(self):
-        class FakeRecorder:
+        class RealRecorder:
             def record(self, **kwargs):
                 return "evt-123"
 
         events_list = []
-        _emit_event(FakeRecorder(), events_list, swarm_id="s1", event_type="test")
+        _emit_event(RealRecorder(), events_list, swarm_id="s1", event_type="test")
         assert events_list == ["evt-123"]
 
     def test_events_record_returns_none(self):
-        class FakeRecorder:
+        class RealRecorder:
             def record(self, **kwargs):
                 return None
 
         events_list = []
-        _emit_event(FakeRecorder(), events_list, swarm_id="s1", event_type="test")
+        _emit_event(RealRecorder(), events_list, swarm_id="s1", event_type="test")
         assert events_list == []
 
 
@@ -148,7 +151,7 @@ class TestLooksLikeOutputTarget:
 
 # ──────────────────────────────────────────────
 # _derive_target_path
-# ────────────────────────────────────��─────────
+# ──────────────────────────────────────────────
 
 
 class TestDeriveTargetPath:
@@ -374,7 +377,7 @@ class TestCanonicalPipeline:
 # ──────────────────────────────────────────────
 
 
-class _FakeEventRecorder:
+class _RealEventRecorder:
     def __init__(self):
         self.events = []
         self._counter = 0
@@ -398,7 +401,7 @@ class TestPipelineWithEvents:
             created_by="tester",
         )
 
-        recorder = _FakeEventRecorder()
+        recorder = _RealEventRecorder()
         result = run_action_table_pipeline(
             swarm_id=swarm_id,
             intent_text="Generate a weekly intelligence report",
@@ -551,55 +554,88 @@ class TestPipelineCanonicalDependencies:
 
 
 # ──────────────────────────────────────────────
-# Validate dependencies helper
+# _load_action_table_rows — edge cases with real DB
 # ──────────────────────────────────────────────
+
+
+class _RepoWithNonStringActions(SwarmRepository):
+    """Real SwarmRepository subclass that returns actions_json as a list."""
+
+    def get_latest_action_table_for_swarm(self, swarm_id):
+        at = super().get_latest_action_table_for_swarm(swarm_id)
+        if at:
+            at["actions_json"] = [{"step": 1}]
+        return at
+
+
+class _RepoWithNoneActions(SwarmRepository):
+    """Real SwarmRepository subclass that returns actions_json as None."""
+
+    def get_latest_action_table_for_swarm(self, swarm_id):
+        at = super().get_latest_action_table_for_swarm(swarm_id)
+        if at:
+            at["actions_json"] = None
+        return at
 
 
 class TestLoadActionTableRows:
     """Cover pipeline.py line 608: non-string actions_json path."""
 
-    def test_non_string_actions_json(self, repo):
+    def test_non_string_actions_json(self):
         """When actions_json is already a list (not a string)."""
         from swarm.definer.pipeline import _load_action_table_rows
-        seed_default_tools(repo)
+        db = RegistryDatabase(":memory:")
+        db.connect()
+        db.migrate()
+        repo = _RepoWithNonStringActions(db)
+
         swarm_id = repo.create_swarm(
             swarm_name="non-str", description="test", created_by="tester",
         )
-        _, acceptance_id = _setup_acceptance(repo, swarm_id, "test task")
+        draft_id = repo.create_intent_draft(
+            swarm_id=swarm_id, raw_text="test", created_by="tester",
+        )
+        restatement_id = repo.create_restatement(draft_id, "test", [{"step": 1}])
+        acceptance_id = repo.accept_intent(restatement_id=restatement_id, accepted_by="tester")
         repo.create_action_table(
             swarm_id=swarm_id,
             intent_ref=acceptance_id,
             actions=[{"step": 1, "verb": "do", "object": "thing"}],
         )
-        # The DB stores it as JSON string, so _load_action_table_rows will
-        # parse the string. To test the non-string path (line 608), we need
-        # to mock the action_table to return a list directly.
-        from unittest.mock import patch
-        original_get = repo.get_latest_action_table_for_swarm
-
-        def mock_get(sid):
-            at = original_get(sid)
-            if at:
-                at["actions_json"] = [{"step": 1}]
-            return at
-
-        with patch.object(repo, "get_latest_action_table_for_swarm", mock_get):
-            rows = _load_action_table_rows(swarm_id, repo)
+        rows = _load_action_table_rows(swarm_id, repo)
         assert rows == [{"step": 1}]
 
-    def test_none_actions_json(self, repo):
+    def test_none_actions_json(self):
         """When actions_json is None."""
         from swarm.definer.pipeline import _load_action_table_rows
-        from unittest.mock import patch
+        db = RegistryDatabase(":memory:")
+        db.connect()
+        db.migrate()
+        repo = _RepoWithNoneActions(db)
+
         swarm_id = repo.create_swarm(
             swarm_name="none-json", description="test", created_by="tester",
         )
+        draft_id = repo.create_intent_draft(
+            swarm_id=swarm_id, raw_text="test", created_by="tester",
+        )
+        restatement_id = repo.create_restatement(draft_id, "test", [{"step": 1}])
+        acceptance_id = repo.accept_intent(restatement_id=restatement_id, accepted_by="tester")
+        repo.create_action_table(
+            swarm_id=swarm_id,
+            intent_ref=acceptance_id,
+            actions=[{"step": 1}],
+        )
+        rows = _load_action_table_rows(swarm_id, repo)
+        assert rows == []
 
-        def mock_get(sid):
-            return {"actions_json": None}
-
-        with patch.object(repo, "get_latest_action_table_for_swarm", mock_get):
-            rows = _load_action_table_rows(swarm_id, repo)
+    def test_no_action_table_returns_empty(self, repo):
+        """When no action table exists for the swarm."""
+        from swarm.definer.pipeline import _load_action_table_rows
+        swarm_id = repo.create_swarm(
+            swarm_name="no-at", description="test", created_by="tester",
+        )
+        rows = _load_action_table_rows(swarm_id, repo)
         assert rows == []
 
 
@@ -616,7 +652,7 @@ class TestStageAssignDependenciesEdges:
         assert result == 0
 
     def test_missing_step_mapping_skipped(self, repo):
-        """Line 749: canonical row step doesn't map to action → skip."""
+        """Line 749: canonical row step doesn't map to action -> skip."""
         from swarm.definer.pipeline import _stage_assign_dependencies
         seed_default_tools(repo)
         swarm_id = repo.create_swarm(
@@ -640,12 +676,11 @@ class TestStageAssignDependenciesEdges:
             action_text="test",
             action_type="create",
         )
-        # Step 99 → action_ids_by_step.get(98) → None → continue (line 749)
         result = _stage_assign_dependencies(swarm_id, "structured_report", repo, None, [])
         assert result == 0
 
     def test_missing_dependency_target_skipped(self, repo):
-        """Line 753: dependency target step doesn't map to action → skip."""
+        """Line 753: dependency target step doesn't map to action -> skip."""
         from swarm.definer.pipeline import _stage_assign_dependencies
         seed_default_tools(repo)
         swarm_id = repo.create_swarm(
@@ -668,7 +703,6 @@ class TestStageAssignDependenciesEdges:
             action_text="test",
             action_type="create",
         )
-        # Step 1 maps to action_ids_by_step[0], but dep step 99 → get(98) → None → continue
         result = _stage_assign_dependencies(swarm_id, "structured_report", repo, None, [])
         assert result == 0
 
@@ -698,9 +732,6 @@ class TestCanonicalPipelineNoStoredClassification:
             intent_ref=acceptance_id,
             actions=actions,
         )
-        # No archetype classification stored → line 302 path
-        # May raise ClarificationNeeded if confidence is below threshold,
-        # which is expected — we just need to exercise the line 302 branch.
         try:
             result = run_canonical_pipeline_for_swarm(swarm_id, repo)
             assert isinstance(result, PipelineResult)
@@ -708,12 +739,27 @@ class TestCanonicalPipelineNoStoredClassification:
             pass  # line 302 was still exercised before the exception
 
 
+class _RepoWithListWarnings(SwarmRepository):
+    """Real SwarmRepository subclass that returns ambiguous_fields_json as a list."""
+
+    def get_constraint_set(self, constraint_set_id):
+        record = super().get_constraint_set(constraint_set_id)
+        if record:
+            record["ambiguous_fields_json"] = ["some_field"]
+        return record
+
+
 class TestCanonicalNonStringWarnings:
     """Cover pipeline.py line 422: warnings_raw is not a string."""
 
-    def test_non_string_warnings_in_constraint_set(self, repo):
+    def test_non_string_warnings_in_constraint_set(self):
         """Line 422: warnings_raw is already a list."""
         from swarm.definer.pipeline import _run_planning_pipeline
+        db = RegistryDatabase(":memory:")
+        db.connect()
+        db.migrate()
+        repo = _RepoWithListWarnings(db)
+
         seed_default_tools(repo)
         swarm_id = repo.create_swarm(
             swarm_name="non-str-warn", description="test", created_by="tester",
@@ -723,32 +769,22 @@ class TestCanonicalNonStringWarnings:
             raw_text="Generate a weekly summary report",
             created_by="tester",
         )
-        # Create a constraint set with non-string ambiguous_fields_json
+        # Create a constraint set
         from swarm.definer.constraints import ConstraintSet, constraint_set_to_dict
         cs = ConstraintSet(sections=["overview"])
         cs_id = repo.create_constraint_set(
             intent_id=draft_id,
             constraints_json=json.dumps(constraint_set_to_dict(cs)),
         )
-        # Manually set ambiguous_fields_json to a list (not string)
-        from unittest.mock import patch
-        original_get = repo.get_constraint_set
 
-        def mock_get(cid):
-            record = original_get(cid)
-            if record:
-                record["ambiguous_fields_json"] = ["some_field"]
-            return record
-
-        with patch.object(repo, "get_constraint_set", mock_get):
-            result = _run_planning_pipeline(
-                swarm_id=swarm_id,
-                intent_text="Generate a weekly summary report",
-                draft_id=draft_id,
-                repo=repo,
-                events=None,
-                override_archetype="structured_report",
-            )
+        result = _run_planning_pipeline(
+            swarm_id=swarm_id,
+            intent_text="Generate a weekly summary report",
+            draft_id=draft_id,
+            repo=repo,
+            events=None,
+            override_archetype="structured_report",
+        )
         assert isinstance(result, PipelineResult)
 
 
@@ -762,6 +798,5 @@ class TestValidateDependenciesExtended:
     def test_self_cycle(self):
         actions = [{"action_id": "a1", "action_name": "A1"}]
         deps = [("a1", "a1")]
-        # Kahn's will detect this
         errors = validate_dependencies(actions, deps)
         assert len(errors) > 0

@@ -208,31 +208,49 @@ class TestLoadSmtpProfile:
 
 
 class TestResolveSmtpCredentials:
-    def test_with_env_vars(self, monkeypatch):
-        monkeypatch.setenv("MY_SMTP_USER", "alice")
-        monkeypatch.setenv("MY_SMTP_PASS", "s3cret")
-        profile = {
-            "auth": {
-                "username_env": "MY_SMTP_USER",
-                "password_env": "MY_SMTP_PASS",
+    def test_with_env_vars(self):
+        saved_user = os.environ.get("MY_SMTP_USER")
+        saved_pass = os.environ.get("MY_SMTP_PASS")
+        try:
+            os.environ["MY_SMTP_USER"] = "alice"
+            os.environ["MY_SMTP_PASS"] = "s3cret"
+            profile = {
+                "auth": {
+                    "username_env": "MY_SMTP_USER",
+                    "password_env": "MY_SMTP_PASS",
+                }
             }
-        }
-        user, pw = resolve_smtp_credentials(profile)
-        assert user == "alice"
-        assert pw == "s3cret"
+            user, pw = resolve_smtp_credentials(profile)
+            assert user == "alice"
+            assert pw == "s3cret"
+        finally:
+            if saved_user is not None:
+                os.environ["MY_SMTP_USER"] = saved_user
+            else:
+                os.environ.pop("MY_SMTP_USER", None)
+            if saved_pass is not None:
+                os.environ["MY_SMTP_PASS"] = saved_pass
+            else:
+                os.environ.pop("MY_SMTP_PASS", None)
 
-    def test_without_env_vars(self, monkeypatch):
-        monkeypatch.delenv("NONEXISTENT_USER", raising=False)
-        monkeypatch.delenv("NONEXISTENT_PASS", raising=False)
-        profile = {
-            "auth": {
-                "username_env": "NONEXISTENT_USER",
-                "password_env": "NONEXISTENT_PASS",
+    def test_without_env_vars(self):
+        saved_user = os.environ.pop("NONEXISTENT_USER", None)
+        saved_pass = os.environ.pop("NONEXISTENT_PASS", None)
+        try:
+            profile = {
+                "auth": {
+                    "username_env": "NONEXISTENT_USER",
+                    "password_env": "NONEXISTENT_PASS",
+                }
             }
-        }
-        user, pw = resolve_smtp_credentials(profile)
-        assert user is None
-        assert pw is None
+            user, pw = resolve_smtp_credentials(profile)
+            assert user is None
+            assert pw is None
+        finally:
+            if saved_user is not None:
+                os.environ["NONEXISTENT_USER"] = saved_user
+            if saved_pass is not None:
+                os.environ["NONEXISTENT_PASS"] = saved_pass
 
     def test_missing_auth_section(self):
         user, pw = resolve_smtp_credentials({})
@@ -344,18 +362,18 @@ class TestDeliveryAdapter:
 
 
 class TestEmailAdapter:
-    def test_stub_mode_no_config(self):
+    def test_unconfigured_no_config(self):
         adapter = EmailAdapter()
-        assert adapter._is_stub is True
+        assert adapter._is_configured is False
         result = adapter.send("x@test.com", {"run_id": "r1", "swarm_name": "s"})
-        assert result["success"] is True
-        assert "stub" in result["provider_message_id"]
+        assert result["success"] is False
+        assert "not configured" in result["provider_response"]
 
-    def test_stub_mode_empty_host(self):
+    def test_unconfigured_empty_host(self):
         adapter = EmailAdapter(smtp_config={"host": ""})
-        assert adapter._is_stub is True
+        assert adapter._is_configured is False
         result = adapter.send("x@test.com", {"run_id": "r2"})
-        assert result["success"] is True
+        assert result["success"] is False
 
     def test_policy_rejection(self):
         config = {
@@ -373,7 +391,7 @@ class TestEmailAdapter:
             },
         }
         adapter = EmailAdapter(smtp_config=config)
-        assert adapter._is_stub is False
+        assert adapter._is_configured is True
         result = adapter.send("dest@example.com", {"subject": "Hi", "body": "hello"})
         assert result["success"] is False
         assert "POLICY_REJECTED" in result["provider_response"]
@@ -395,11 +413,11 @@ class TestEmailAdapter:
 
 
 class TestTelegramAdapter:
-    def test_send(self):
-        adapter = TelegramAdapter()
+    def test_send_unconfigured(self):
+        adapter = TelegramAdapter()  # No token → honest failure
         result = adapter.send("chat123", {"run_id": "r5", "swarm_name": "s"})
-        assert result["success"] is True
-        assert "tg-stub-r5" == result["provider_message_id"]
+        assert result["success"] is False
+        assert "not configured" in result["provider_response"]
 
 
 # ================================================================

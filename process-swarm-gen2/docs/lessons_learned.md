@@ -167,3 +167,15 @@ These lessons were documented in the original Process Swarm and are being applie
 72. **Pipeline stages as near-pure functions simplify testing** — Each ARGUS-Hold stage (normalize, validate, policy, scope, plan) is a function from typed input to typed output with no hidden state. The dispatcher is the only stateful component, and its state is just the wiring. This means each stage can be tested in isolation with real objects — no mocking needed.
 
 73. **Bogus command specs test adapter routing gaps** — To test the "no adapter for namespace" branch, copy real specs to a temp dir and add a `bogus.do_thing.v1.json`. The command passes normalize, validate, policy, and scope — but the dispatcher has no adapter for the `"bogus"` namespace. This tests the exact failure path without any mocking.
+
+74. **Never tell the user something doesn't exist without checking every database on the machine** — When the user said GRITS and Oregon AI Brief swarms existed, the swarm definitions weren't in the current `platform.db`. But the original data lived in `/Users/m4/openclaw/platform.db` and copies. Always search broadly before contradicting the user. `find / -name "platform.db"` is cheaper than losing trust.
+
+75. **Stubs that return success are lies** — `EmailAdapter._send_stub` returned `{"success": True}` when no SMTP was configured. This made the system appear to deliver when it didn't. The fix: `_send_unconfigured` returns `{"success": False}` with an honest message. If it can't do the thing, it must say it can't do the thing.
+
+76. **TTS as a pipeline of adapters, not a monolith** — The Oregon AI Brief + Audio swarm has 8 TTS steps, each as its own `ToolAdapter`. This matches the swarm architecture: each step reads from `prior_results`, does one thing, writes artifacts. The renderer calls `say -f tempfile` (no shell injection). The assembler uses ffmpeg concat demuxer. Each step is independently testable.
+
+77. **Validate delivery methods at selection time, not execution time** — The ProofUI `/api/delivery/available` endpoint probes Telegram (getMe) and Email (SMTP connect) before populating the dropdown. Users only see methods that are actually reachable. No "select email" → run for 10 minutes → "SMTP connection refused" surprise.
+
+78. **Environment variables for secrets, profiles for config** — SMTP credentials use env vars (`SMTP_USERNAME`, `SMTP_PASSWORD`) referenced by name in `smtp_relay_profile.json`. Telegram uses `TELEGRAM_BOT_TOKEN`. The profile file is safe to commit; the secrets never touch disk.
+
+79. **Fresh SwarmRunner per execution solves DB connection isolation** — `SwarmPlatform.execute_run()` creates a new `SwarmRunner` each time with its own DB connection. This avoids WAL locking issues and ensures each run picks up current env vars (like `TELEGRAM_BOT_TOKEN`).

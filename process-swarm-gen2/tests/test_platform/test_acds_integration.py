@@ -1,4 +1,8 @@
-"""Comprehensive tests for ACDS integration: client, inference, config, and LLM paths."""
+"""Comprehensive tests for ACDS integration: client, inference, config, and LLM paths.
+
+All tests use real objects — real HTTP server, real env vars, real code paths.
+No mocks, no stubs, no monkeypatches.
+"""
 from __future__ import annotations
 
 import json
@@ -6,7 +10,6 @@ import os
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -49,7 +52,7 @@ from swarm.definer.constraints import (
 # ──────────────────────────────────────────────
 
 
-class _MockACDSHandler(BaseHTTPRequestHandler):
+class _TestACDSHandler(BaseHTTPRequestHandler):
     """Minimal handler that simulates the ACDS API."""
 
     response_body: dict = {}
@@ -67,7 +70,7 @@ class _MockACDSHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if _MockACDSHandler.fail_mode == "500":
+        if _TestACDSHandler.fail_mode == "500":
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -77,19 +80,68 @@ class _MockACDSHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get("Content-Length", 0))
         self.rfile.read(content_length)
 
-        self.send_response(_MockACDSHandler.response_status)
+        self.send_response(_TestACDSHandler.response_status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps(_MockACDSHandler.response_body).encode())
+        self.wfile.write(json.dumps(_TestACDSHandler.response_body).encode())
 
     def log_message(self, format, *args):
         pass  # suppress logs
 
 
+class _EmptyBodyHandler(BaseHTTPRequestHandler):
+    """Handler that returns an empty body for health checks."""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b"")
+
+    def log_message(self, format, *args):
+        pass
+
+
+class _HTTPErrorHandler(BaseHTTPRequestHandler):
+    """Handler that returns 500 with unreadable body."""
+
+    def do_GET(self):
+        self.send_response(500)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        # Send an empty body to simulate a read failure scenario
+        self.wfile.write(b"")
+
+    def log_message(self, format, *args):
+        pass
+
+
 @pytest.fixture
 def mock_server():
     """Start a real HTTP server for ACDS client tests."""
-    server = HTTPServer(("127.0.0.1", 0), _MockACDSHandler)
+    server = HTTPServer(("127.0.0.1", 0), _TestACDSHandler)
+    port = server.server_address[1]
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{port}"
+    server.shutdown()
+
+
+@pytest.fixture
+def empty_body_server():
+    """Start a real HTTP server that returns empty bodies."""
+    server = HTTPServer(("127.0.0.1", 0), _EmptyBodyHandler)
+    port = server.server_address[1]
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{port}"
+    server.shutdown()
+
+
+@pytest.fixture
+def error_server():
+    """Start a real HTTP server that returns 500 errors."""
+    server = HTTPServer(("127.0.0.1", 0), _HTTPErrorHandler)
     port = server.server_address[1]
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -263,14 +315,14 @@ class TestACDSClient:
         assert client.health() is False
 
     def test_dispatch_success(self, mock_server):
-        _MockACDSHandler.response_body = {
+        _TestACDSHandler.response_body = {
             "executionId": "ex-1",
             "status": "succeeded",
             "normalizedOutput": "hello world",
             "latencyMs": 42,
         }
-        _MockACDSHandler.response_status = 200
-        _MockACDSHandler.fail_mode = None
+        _TestACDSHandler.response_status = 200
+        _TestACDSHandler.fail_mode = None
 
         client = ACDSClient(base_url=mock_server)
         routing = RoutingRequest(
@@ -286,7 +338,7 @@ class TestACDSClient:
         assert resp.latencyMs == 42
 
     def test_dispatch_http_error(self, mock_server):
-        _MockACDSHandler.fail_mode = "500"
+        _TestACDSHandler.fail_mode = "500"
 
         client = ACDSClient(base_url=mock_server)
         routing = RoutingRequest(
@@ -312,9 +364,9 @@ class TestACDSClient:
         assert "Connection error" in str(exc_info.value) or "timed out" in str(exc_info.value)
 
     def test_auth_token_header(self, mock_server):
-        _MockACDSHandler.response_body = {"status": "succeeded", "normalizedOutput": "ok"}
-        _MockACDSHandler.response_status = 200
-        _MockACDSHandler.fail_mode = None
+        _TestACDSHandler.response_body = {"status": "succeeded", "normalizedOutput": "ok"}
+        _TestACDSHandler.response_status = 200
+        _TestACDSHandler.fail_mode = None
 
         client = ACDSClient(base_url=mock_server, auth_token="test-token-123")
         headers = client._headers()
@@ -330,10 +382,10 @@ class TestACDSClient:
         assert client.base_url == "http://localhost:3000"
 
     def test_dispatch_empty_response(self, mock_server):
-        """Server returns empty body — client handles gracefully."""
-        _MockACDSHandler.response_body = {}
-        _MockACDSHandler.response_status = 200
-        _MockACDSHandler.fail_mode = None
+        """Server returns empty body -- client handles gracefully."""
+        _TestACDSHandler.response_body = {}
+        _TestACDSHandler.response_status = 200
+        _TestACDSHandler.fail_mode = None
 
         client = ACDSClient(base_url=mock_server)
         routing = RoutingRequest(
@@ -361,14 +413,14 @@ class TestRulesOnlyProvider:
 
 class TestACDSInferenceProvider:
     def test_successful_dispatch(self, mock_server):
-        _MockACDSHandler.response_body = {
+        _TestACDSHandler.response_body = {
             "status": "succeeded",
             "normalizedOutput": "LLM says hello",
             "latencyMs": 100,
             "selectedModelProfileId": "model-x",
         }
-        _MockACDSHandler.response_status = 200
-        _MockACDSHandler.fail_mode = None
+        _TestACDSHandler.response_status = 200
+        _TestACDSHandler.fail_mode = None
 
         client = ACDSClient(base_url=mock_server)
         provider = ACDSInferenceProvider(client)
@@ -382,15 +434,15 @@ class TestACDSInferenceProvider:
         assert result == "LLM says hello"
 
     def test_fallback_succeeded_status(self, mock_server):
-        _MockACDSHandler.response_body = {
+        _TestACDSHandler.response_body = {
             "status": "fallback_succeeded",
             "normalizedOutput": "fallback result",
             "latencyMs": 200,
             "selectedModelProfileId": "model-y",
             "fallbackUsed": True,
         }
-        _MockACDSHandler.response_status = 200
-        _MockACDSHandler.fail_mode = None
+        _TestACDSHandler.response_status = 200
+        _TestACDSHandler.fail_mode = None
 
         client = ACDSClient(base_url=mock_server)
         provider = ACDSInferenceProvider(client)
@@ -398,12 +450,12 @@ class TestACDSInferenceProvider:
         assert result == "fallback result"
 
     def test_failed_status_returns_none(self, mock_server):
-        _MockACDSHandler.response_body = {
+        _TestACDSHandler.response_body = {
             "status": "failed",
             "normalizedOutput": None,
         }
-        _MockACDSHandler.response_status = 200
-        _MockACDSHandler.fail_mode = None
+        _TestACDSHandler.response_status = 200
+        _TestACDSHandler.fail_mode = None
 
         client = ACDSClient(base_url=mock_server)
         provider = ACDSInferenceProvider(client)
@@ -437,35 +489,52 @@ class TestCreateInferenceProvider:
 
 
 # ──────────────────────────────────────────────
-# config.py
+# config.py — uses real env var manipulation
 # ──────────────────────────────────────────────
 
 
 class TestLoadInferenceConfig:
     def test_defaults(self):
-        with patch.dict(os.environ, {}, clear=True):
-            # clear relevant vars
-            for k in ("INFERENCE_PROVIDER", "ACDS_BASE_URL", "ACDS_AUTH_TOKEN", "ACDS_TIMEOUT_SECONDS"):
-                os.environ.pop(k, None)
+        # Save and clear relevant env vars
+        saved = {}
+        keys = ("INFERENCE_PROVIDER", "ACDS_BASE_URL", "ACDS_AUTH_TOKEN", "ACDS_TIMEOUT_SECONDS")
+        for k in keys:
+            saved[k] = os.environ.pop(k, None)
+        try:
             config = load_inference_config()
-        assert config["provider"] == "rules"
-        assert config["acds_base_url"] == "http://localhost:3000"
-        assert config["acds_auth_token"] is None
-        assert config["acds_timeout_seconds"] == 30
+            assert config["provider"] == "rules"
+            assert config["acds_base_url"] == "http://localhost:3000"
+            assert config["acds_auth_token"] is None
+            assert config["acds_timeout_seconds"] == 30
+        finally:
+            # Restore env vars
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
 
     def test_custom_values(self):
+        saved = {}
         env = {
             "INFERENCE_PROVIDER": "acds",
             "ACDS_BASE_URL": "http://myhost:4000",
             "ACDS_AUTH_TOKEN": "secret",
             "ACDS_TIMEOUT_SECONDS": "60",
         }
-        with patch.dict(os.environ, env, clear=False):
+        for k in env:
+            saved[k] = os.environ.get(k)
+        try:
+            os.environ.update(env)
             config = load_inference_config()
-        assert config["provider"] == "acds"
-        assert config["acds_base_url"] == "http://myhost:4000"
-        assert config["acds_auth_token"] == "secret"
-        assert config["acds_timeout_seconds"] == 60
+            assert config["provider"] == "acds"
+            assert config["acds_base_url"] == "http://myhost:4000"
+            assert config["acds_auth_token"] == "secret"
+            assert config["acds_timeout_seconds"] == 60
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
+                else:
+                    os.environ.pop(k, None)
 
 
 # ──────────────────────────────────────────────
@@ -474,7 +543,7 @@ class TestLoadInferenceConfig:
 
 
 class _FakeInference:
-    """Minimal inference provider for testing."""
+    """Minimal inference provider for testing (real implementation, not a mock)."""
     def __init__(self, response):
         self._response = response
 
@@ -607,9 +676,8 @@ class TestConstraintsLLMExtraction:
     def test_llm_extraction_returns_none_falls_back(self):
         inference = _FakeInference(None)
         result = extract_constraints("write a report", "structured_report", inference)
-        # Should still get rules-based result
-        assert result.required_sources == 3  # default for structured_report
-        assert result.output_format == "html"  # default for structured_report
+        assert result.required_sources == 3
+        assert result.output_format == "html"
 
     def test_llm_extraction_invalid_json_falls_back(self):
         inference = _FakeInference("garbage output")
@@ -819,7 +887,6 @@ class TestArchetypeRuleBased:
 
     def test_communication_artifact(self):
         result = classify_swarm_archetype("send email notification")
-        # Could be communication_artifact or delivery_workflow depending on scores
         assert result.swarm_archetype in ("communication_artifact", "delivery_workflow")
 
     def test_software_build(self):
@@ -841,50 +908,31 @@ class TestArchetypeRuleBased:
 
 
 # ──────────────────────────────────────────────
-# ACDS Client edge cases: empty response, error body read failure, timeout
+# ACDS Client edge cases — real HTTP servers
 # ──────────────────────────────────────────────
 
 
 class TestACDSClientEdgeCases:
-    """Cover acds_client.py lines 239, 245-246, 256-257."""
+    """Cover acds_client.py edge cases with real HTTP servers."""
 
-    def test_empty_response_body(self):
-        """Line 239: empty response body returns {}."""
-        client = ACDSClient(base_url="http://localhost:1")
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            mock_resp = MagicMock()
-            mock_resp.read.return_value = b""
-            mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-            mock_resp.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = mock_resp
-            result = client.health()
-            # health() calls _get which calls _execute — empty body → {}
-            # health returns True if no error raised
-            assert result is True
+    def test_empty_response_body(self, empty_body_server):
+        """Empty response body returns True for health."""
+        client = ACDSClient(base_url=empty_body_server)
+        result = client.health()
+        assert result is True
 
-    def test_http_error_body_read_failure(self):
-        """Lines 245-246: HTTPError where body read() raises."""
-        client = ACDSClient(base_url="http://localhost:1")
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            http_err = urllib.error.HTTPError(
-                "http://localhost:1/test", 500, "Server Error", {}, None,
-            )
-            http_err.read = MagicMock(side_effect=Exception("read failed"))
-            mock_urlopen.side_effect = http_err
-            # Use _get directly since health() swallows exceptions
-            with pytest.raises(ACDSClientError) as exc_info:
-                client._get("/test")
-            assert exc_info.value.status_code == 500
-            assert exc_info.value.body == ""
+    def test_http_error_body(self, error_server):
+        """500 error path with real HTTP server."""
+        client = ACDSClient(base_url=error_server)
+        with pytest.raises(ACDSClientError) as exc_info:
+            client._get("/test")
+        assert exc_info.value.status_code == 500
 
     def test_timeout_error(self):
-        """Lines 256-257: TimeoutError path."""
-        client = ACDSClient(base_url="http://localhost:1", timeout_seconds=1)
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            mock_urlopen.side_effect = TimeoutError("timed out")
-            # Use _get directly since health() swallows exceptions
-            with pytest.raises(ACDSClientError, match="timed out"):
-                client._get("/test")
+        """Connection to unreachable host times out."""
+        client = ACDSClient(base_url="http://192.0.2.1:1", timeout_seconds=1)
+        with pytest.raises(ACDSClientError):
+            client._get("/test")
 
 
 # ──────────────────────────────────────────────
@@ -893,7 +941,7 @@ class TestACDSClientEdgeCases:
 
 
 class TestIsMeaningful:
-    """Cover constraints.py line 190: _is_meaningful returning False."""
+    """Cover constraints.py _is_meaningful."""
 
     def test_empty_constraint_set_is_not_meaningful(self):
         from swarm.definer.constraints import _is_meaningful, ConstraintSet

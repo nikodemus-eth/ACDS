@@ -1,7 +1,8 @@
-"""Tests for AdaptiveOrchestrator."""
-from __future__ import annotations
+"""Tests for AdaptiveOrchestrator.
 
-from unittest.mock import MagicMock
+All tests use real objects -- no mocks, no stubs, no MagicMock.
+"""
+from __future__ import annotations
 
 import pytest
 
@@ -13,19 +14,30 @@ from swarm.adaptive.orchestrator import (
 )
 
 
-def _mock_runner(adapter_results_fn=None):
-    runner = MagicMock()
-    runner.events = MagicMock()
+class _SimpleRunner:
+    """A real lightweight runner that satisfies the AdaptiveOrchestrator interface."""
 
-    def default_fn(run_id, swarm_id, actions):
+    def __init__(self, execute_fn=None):
+        self.events = _NoOpEvents()
+        self._execute_fn = execute_fn or self._default_execute
+
+    def _execute_via_adapters(self, run_id, swarm_id, actions):
+        return self._execute_fn(run_id, swarm_id, actions)
+
+    @staticmethod
+    def _default_execute(run_id, swarm_id, actions):
         return {
             "execution_status": "succeeded",
             "adapter_results": {},
             "artifacts": [],
         }
 
-    runner._execute_via_adapters = adapter_results_fn or default_fn
-    return runner
+
+class _NoOpEvents:
+    """Real no-op events object."""
+
+    def record(self, **kwargs):
+        return None
 
 
 def _high_score_results(**extra):
@@ -55,7 +67,7 @@ def _low_tts_results():
 
 class TestAdaptiveOrchestrator:
     def test_single_cycle_all_converged(self):
-        runner = _mock_runner(lambda *a: _high_score_results())
+        runner = _SimpleRunner(lambda *a: _high_score_results())
         orch = AdaptiveOrchestrator(runner, completion_target=0.75)
         configs = [
             BranchConfig(branch_id=BranchId.BRIEFING_SYNTHESIS.value, actions=[]),
@@ -66,7 +78,7 @@ class TestAdaptiveOrchestrator:
         assert result.total_cycles == 1
 
     def test_max_cycles_terminates(self):
-        runner = _mock_runner(lambda *a: _low_tts_results())
+        runner = _SimpleRunner(lambda *a: _low_tts_results())
         orch = AdaptiveOrchestrator(
             runner, max_cycles=3, completion_target=0.99
         )
@@ -83,7 +95,7 @@ class TestAdaptiveOrchestrator:
             call_count[0] += 1
             return _low_tts_results()
 
-        runner = _mock_runner(mixed_results)
+        runner = _SimpleRunner(mixed_results)
         orch = AdaptiveOrchestrator(
             runner,
             max_cycles=5,
@@ -96,15 +108,6 @@ class TestAdaptiveOrchestrator:
             BranchConfig(branch_id=BranchId.BRIEFING_SYNTHESIS.value, actions=[]),
         ]
 
-        # Manually inject high scores for written branch so reroute triggers
-        # We override the runner to return high results for written
-        original_fn = runner._execute_via_adapters
-
-        def smart_results(run_id, swarm_id, actions):
-            # Check which branch is being evaluated via the ledger
-            return _low_tts_results()
-
-        runner._execute_via_adapters = smart_results
         result = orch.run_adaptive("swarm-1", "run-1", configs)
 
         # The TTS should eventually be deactivated
@@ -128,7 +131,7 @@ class TestAdaptiveOrchestrator:
         assert len(result.ledger_dicts) == 1
 
     def test_persist_validation(self, tmp_path):
-        runner = _mock_runner(lambda *a: _high_score_results())
+        runner = _SimpleRunner(lambda *a: _high_score_results())
         orch = AdaptiveOrchestrator(runner, completion_target=0.75)
         configs = [
             BranchConfig(branch_id=BranchId.BRIEFING_SYNTHESIS.value, actions=[]),

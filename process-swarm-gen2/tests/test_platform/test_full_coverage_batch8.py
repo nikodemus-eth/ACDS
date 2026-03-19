@@ -980,13 +980,13 @@ class TestTelegramAdapterStub:
     def test_telegram_stub(self):
         from swarm.delivery.adapters import TelegramAdapter
 
-        adapter = TelegramAdapter()
+        adapter = TelegramAdapter()  # No token → honest failure
         result = adapter.send(
             "12345",
             {"run_id": "r1", "swarm_name": "test-swarm"},
         )
-        assert result["success"] is True
-        assert "tg-stub" in result["provider_message_id"]
+        assert result["success"] is False
+        assert "not configured" in result["provider_response"]
 
 
 # ──────────────────────────────────────────────

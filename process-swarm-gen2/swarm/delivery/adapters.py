@@ -7,8 +7,12 @@ and real SMTP transport (with smtp_config).
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import smtplib
+import urllib.error
+import urllib.request
 import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -31,9 +35,9 @@ class DeliveryAdapter:
 
 
 class EmailAdapter(DeliveryAdapter):
-    """Email delivery adapter with stub and SMTP modes.
+    """Email delivery adapter via SMTP.
 
-    Without smtp_config: stub mode (logs only).
+    Without smtp_config: reports honest failure (no transport available).
     With smtp_config containing a valid host: real SMTP transport.
     """
 
@@ -41,14 +45,14 @@ class EmailAdapter(DeliveryAdapter):
         self._config = smtp_config
 
     @property
-    def _is_stub(self) -> bool:
+    def _is_configured(self) -> bool:
         if self._config is None:
-            return True
-        return not self._config.get("host", "")
+            return False
+        return bool(self._config.get("host", ""))
 
     def send(self, destination: str, message: dict) -> dict:
-        if self._is_stub:
-            return self._send_stub(destination, message)
+        if not self._is_configured:
+            return self._send_unconfigured(destination, message)
 
         # Policy validation
         policy_msg = {
@@ -67,18 +71,18 @@ class EmailAdapter(DeliveryAdapter):
 
         return self._send_smtp(destination, message)
 
-    def _send_stub(self, destination: str, message: dict) -> dict:
+    def _send_unconfigured(self, destination: str, message: dict) -> dict:
         run_id = message.get("run_id", "unknown")
-        logger.info(
-            "EMAIL DELIVERY [stub]: to=%s swarm=%s run=%s",
+        logger.warning(
+            "EMAIL DELIVERY SKIPPED: SMTP not configured. to=%s swarm=%s run=%s",
             destination,
             message.get("swarm_name", "unknown"),
             run_id,
         )
         return {
-            "success": True,
-            "provider_message_id": f"email-stub-{run_id}",
-            "provider_response": f"Stub delivery to {destination}",
+            "success": False,
+            "provider_message_id": None,
+            "provider_response": "SMTP not configured — no email transport available",
         }
 
     def _send_smtp(self, destination: str, message: dict) -> dict:
@@ -129,18 +133,71 @@ class EmailAdapter(DeliveryAdapter):
 
 
 class TelegramAdapter(DeliveryAdapter):
-    """MVP Telegram delivery adapter (stub — logs only)."""
+    """Telegram delivery adapter via Bot API.
+
+    Without bot_token: reports honest failure.
+    With bot_token: sends real messages via https://api.telegram.org.
+    """
+
+    def __init__(self, *, bot_token: str | None = None):
+        self._token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
 
     def send(self, destination: str, message: dict) -> dict:
         run_id = message.get("run_id", "unknown")
-        logger.info(
-            "TELEGRAM DELIVERY [stub]: chat_id=%s swarm=%s run=%s",
-            destination,
-            message.get("swarm_name", "unknown"),
-            run_id,
+
+        if not self._token:
+            logger.warning(
+                "TELEGRAM DELIVERY SKIPPED: no bot token. chat_id=%s run=%s",
+                destination, run_id,
+            )
+            return {
+                "success": False,
+                "provider_message_id": None,
+                "provider_response": "Telegram bot token not configured",
+            }
+
+        subject = message.get("subject", "Swarm Result")
+        body = message.get("body", "")
+        text = f"*{subject}*\n\n{body}" if body else subject
+
+        url = f"https://api.telegram.org/bot{self._token}/sendMessage"
+        payload = json.dumps({
+            "chat_id": destination,
+            "text": text,
+            "parse_mode": "Markdown",
+        }).encode()
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
-        return {
-            "success": True,
-            "provider_message_id": f"tg-stub-{run_id}",
-            "provider_response": f"Stub delivery to chat {destination}",
-        }
+
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read())
+                msg_id = result.get("result", {}).get("message_id", "")
+                logger.info(
+                    "TELEGRAM DELIVERY SENT: chat_id=%s message_id=%s run=%s",
+                    destination, msg_id, run_id,
+                )
+                return {
+                    "success": True,
+                    "provider_message_id": f"tg-{msg_id}",
+                    "provider_response": f"Sent to chat {destination}",
+                }
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode(errors="replace")
+            logger.error("Telegram API error %s: %s", exc.code, error_body)
+            return {
+                "success": False,
+                "provider_message_id": None,
+                "provider_response": f"Telegram API {exc.code}: {error_body[:200]}",
+            }
+        except OSError as exc:
+            return {
+                "success": False,
+                "provider_message_id": None,
+                "provider_response": f"TRANSPORT_FAILED: {exc}",
+            }

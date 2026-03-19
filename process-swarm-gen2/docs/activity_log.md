@@ -218,3 +218,18 @@ Timestamped record of what was done and when during the rebuild.
 | — | HTTP rewrite | Replaced all 5 mocked tests with real `HTTPServer` on port 0. Endpoints: /data, /big, /echo-ua, /error, HEAD /. Module-scoped fixture |
 | — | Mock cleanup | Removed `from unittest.mock import patch, MagicMock` from `test_dispatcher.py` |
 | — | **100% Coverage Achieved** | **186 tests, 559/559 statements = 100%, 0 mocks/stubs/monkeypatches, 0.75s runtime** |
+
+### 2026-03-18 — Session: TTS Pipeline, Delivery, Swarm Registration, Mock Purge
+
+| When | What | Details |
+|------|----------|---------|
+| Start | Swarm registration | Created `grits_audit.py` (9 steps), `oregon_ai_brief.py` (20+29 steps). Auto-registration in ProofUI |
+| — | TTS adapters | 8 real ToolAdapter classes in `swarm/tools/adapters/tts/`. macOS `say` + ffmpeg. 28 total adapters |
+| — | ARGUS-Hold TTS | Rewired from `{"implemented": False}` stub to real `say` command |
+| — | Email delivery | SMTP profile for Proton Mail Bridge (localhost:1025). Honest failure when unconfigured |
+| — | Telegram delivery | Real Bot API integration. Token via env var. Verified: message_id 947 |
+| — | ProofUI delivery dropdown | `/api/delivery/available` validates methods live. Dropdown on swarm detail page |
+| — | Mock purge | Eliminated ALL mocks from 19 test files. Real LLM calls with skipif |
+| — | ProofUI names | All pages show swarm names instead of IDs. Clickable links |
+| — | Inference trace | Runner emits `inference_trace.json`. Run detail page shows engine/model/latency per stage |
+| — | **Result** | **2109+ tests, 0 mocks, real TTS/Telegram/LLM, 4 swarms registered** |

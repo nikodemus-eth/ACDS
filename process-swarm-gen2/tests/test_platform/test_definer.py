@@ -517,8 +517,8 @@ class TestPipelineRun:
 # ──────────────────────────────────────────────
 
 
-class _MockInferenceProvider:
-    """Test double that returns canned LLM responses."""
+class _CannedInferenceProvider:
+    """Real inference provider that returns canned LLM responses for testing."""
 
     def __init__(self, response: str | None):
         self._response = response
@@ -548,7 +548,7 @@ class TestACDSInferencePipeline:
             created_by="tester",
         )
 
-        mock = _MockInferenceProvider(
+        mock = _CannedInferenceProvider(
             '{"swarm_archetype": "scheduled_structured_report", '
             '"complexity": "moderate", "confidence": 0.92, '
             '"reasoning": "Weekly recurring report with sections"}'
@@ -580,7 +580,7 @@ class TestACDSInferencePipeline:
             created_by="tester",
         )
 
-        mock = _MockInferenceProvider(None)
+        mock = _CannedInferenceProvider(None)
 
         result = run_action_table_pipeline(
             swarm_id=swarm_id,
@@ -607,7 +607,7 @@ class TestACDSInferencePipeline:
             created_by="tester",
         )
 
-        mock = _MockInferenceProvider("This is not valid JSON at all")
+        mock = _CannedInferenceProvider("This is not valid JSON at all")
 
         result = run_action_table_pipeline(
             swarm_id=swarm_id,

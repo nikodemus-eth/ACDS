@@ -61,7 +61,7 @@ class TestAdapterRegistry:
     def test_create_default_loads_all_adapters(self):
         reg = AdapterRegistry.create_default()
         names = reg.list_adapters()
-        assert len(names) == 20
+        assert len(names) == 28
         expected = [
             "run_manager",
             "policy_loader",
@@ -83,6 +83,14 @@ class TestAdapterRegistry:
             "cr_prioritization",
             "cr_synthesis",
             "cr_validation",
+            "tts_artifact_resolver",
+            "tts_text_extractor",
+            "tts_text_normalizer",
+            "tts_chunker",
+            "tts_renderer",
+            "tts_assembler",
+            "tts_audio_validator",
+            "tts_artifact_registrar",
         ]
         for name in expected:
             assert name in names, f"Missing adapter: {name}"

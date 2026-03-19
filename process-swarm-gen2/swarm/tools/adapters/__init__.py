@@ -23,6 +23,18 @@ from swarm.tools.adapters.cr_prioritization import CRPrioritizationAdapter
 from swarm.tools.adapters.cr_synthesis import CRSynthesisAdapter
 from swarm.tools.adapters.cr_validation import CRValidationAdapter
 
+# TTS pipeline adapters
+from swarm.tools.adapters.tts import (
+    TtsArtifactResolverAdapter,
+    TtsTextExtractorAdapter,
+    TtsTextNormalizerAdapter,
+    TtsChunkerAdapter,
+    TtsRendererAdapter,
+    TtsAssemblerAdapter,
+    TtsAudioValidatorAdapter,
+    TtsArtifactRegistrarAdapter,
+)
+
 ALL_ADAPTERS = [
     RunManagerAdapter,
     PolicyLoaderAdapter,
@@ -45,4 +57,13 @@ ALL_ADAPTERS = [
     CRPrioritizationAdapter,
     CRSynthesisAdapter,
     CRValidationAdapter,
+    # TTS pipeline adapters
+    TtsArtifactResolverAdapter,
+    TtsTextExtractorAdapter,
+    TtsTextNormalizerAdapter,
+    TtsChunkerAdapter,
+    TtsRendererAdapter,
+    TtsAssemblerAdapter,
+    TtsAudioValidatorAdapter,
+    TtsArtifactRegistrarAdapter,
 ]

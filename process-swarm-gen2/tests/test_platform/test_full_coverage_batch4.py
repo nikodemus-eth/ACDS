@@ -144,8 +144,8 @@ class TestDeliveryEngineDeliver:
         assert receipt["delivery_status"] == "failed"
         assert "No adapter" in receipt["provider_response_summary"]
 
-    def test_deliver_successful_email(self, repo, events):
-        """Lines 174-184: successful stub email delivery."""
+    def test_deliver_email_without_smtp(self, repo, events):
+        """Lines 174-184: email delivery without SMTP config returns failed."""
         swarm_id = repo.create_swarm("Test", "desc", "tester")
         run_id = _make_run_with_execution(repo, swarm_id)
         repo.create_delivery(swarm_id, "email", "test@example.com")
@@ -153,7 +153,7 @@ class TestDeliveryEngineDeliver:
         receipt_id = engine.deliver(run_id)
         assert receipt_id is not None
         receipt = repo.get_delivery_receipt(receipt_id)
-        assert receipt["delivery_status"] == "sent"
+        assert receipt["delivery_status"] == "failed"
 
     def test_deliver_failed_send_result(self, repo, events):
         """Lines 186-198: adapter returns success=False."""
@@ -324,7 +324,7 @@ class TestDeliveryEngineDeliver:
         assert "RECIPIENT_LIMIT_EXCEEDED" in receipt["provider_response_summary"]
 
     def test_deliver_with_resolved_recipients(self, repo, events):
-        """Lines 150-154: successful delivery with resolved recipient profile."""
+        """Lines 150-154: delivery with resolved recipient profile (no SMTP → failed)."""
         swarm_id = repo.create_swarm("Test", "desc", "tester")
         run_id = _make_run_with_execution(repo, swarm_id)
         profile_id = repo.create_recipient_profile(
@@ -345,7 +345,7 @@ class TestDeliveryEngineDeliver:
         receipt_id = engine.deliver(run_id)
         assert receipt_id is not None
         receipt = repo.get_delivery_receipt(receipt_id)
-        assert receipt["delivery_status"] == "sent"
+        assert receipt["delivery_status"] == "failed"
 
 
 class TestDeliveryEngineBuildMessage:

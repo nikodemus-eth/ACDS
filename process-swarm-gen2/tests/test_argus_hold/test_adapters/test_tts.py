@@ -1,6 +1,11 @@
-"""Tests for swarm.argus_hold.adapters.tts — TtsAdapter."""
+"""Tests for swarm.argus_hold.adapters.tts — real TTS via macOS say command.
+
+All tests produce real audio files. No mocks, no stubs.
+"""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from swarm.argus_hold.adapters.tts import TtsAdapter
 from swarm.argus_hold.models import (
@@ -25,65 +30,85 @@ def _make_envelope(params: dict) -> CommandEnvelope:
 
 
 class TestTtsAdapter:
-    """Tests for the stub TTS adapter."""
+    """Tests for the real TTS adapter using macOS say command."""
 
-    def test_returns_not_implemented(self, workspace):
+    def test_produces_real_audio(self, workspace):
         adapter = TtsAdapter()
         env = _make_envelope({
-            "text": "Hello world",
-            "voice_profile": "default",
-            "output_path": "output.mp3",
+            "text": "Hello world. This is a test.",
+            "voice_profile": "Samantha",
+            "output_path": "test_output.aiff",
         })
         result = adapter.execute_command(env, workspace, {})
-        assert result["implemented"] is False
+        assert result["implemented"] is True
+        assert result["size_bytes"] > 0
+        assert Path(result["output_path"]).exists()
 
     def test_text_length_reported(self, workspace):
+        text = "Test text with measured length"
         adapter = TtsAdapter()
         env = _make_envelope({
-            "text": "Test text with length",
-            "voice_profile": "narrator",
-            "output_path": "out.mp3",
+            "text": text,
+            "voice_profile": "Samantha",
+            "output_path": "length_test.aiff",
         })
         result = adapter.execute_command(env, workspace, {})
-        assert result["text_length"] == len("Test text with length")
+        assert result["text_length"] == len(text)
 
     def test_voice_profile_forwarded(self, workspace):
         adapter = TtsAdapter()
         env = _make_envelope({
-            "text": "hello",
-            "voice_profile": "custom_voice",
-            "output_path": "out.mp3",
+            "text": "Voice test.",
+            "voice_profile": "Daniel",
+            "output_path": "voice_test.aiff",
         })
         result = adapter.execute_command(env, workspace, {})
-        assert result["voice_profile"] == "custom_voice"
+        assert result["voice_profile"] == "Daniel"
+        assert result["size_bytes"] > 0
 
-    def test_format_default_mp3(self, workspace):
+    def test_sha256_hash_computed(self, workspace):
         adapter = TtsAdapter()
         env = _make_envelope({
-            "text": "hello",
-            "voice_profile": "v1",
-            "output_path": "out.mp3",
+            "text": "Hash verification test.",
+            "voice_profile": "Samantha",
+            "output_path": "hash_test.aiff",
         })
         result = adapter.execute_command(env, workspace, {})
-        assert result["format"] == "mp3"
+        assert len(result["sha256"]) == 64  # SHA-256 hex digest
+        assert all(c in "0123456789abcdef" for c in result["sha256"])
 
-    def test_format_wav(self, workspace):
+    def test_empty_text_raises(self, workspace):
         adapter = TtsAdapter()
         env = _make_envelope({
-            "text": "hello",
-            "voice_profile": "v1",
-            "output_path": "out.wav",
-            "format": "wav",
+            "text": "",
+            "voice_profile": "Samantha",
+            "output_path": "empty.aiff",
         })
-        result = adapter.execute_command(env, workspace, {})
-        assert result["format"] == "wav"
+        try:
+            adapter.execute_command(env, workspace, {})
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "non-empty" in str(e)
 
-    def test_message_present(self, workspace):
+    def test_missing_output_path_raises(self, workspace):
         adapter = TtsAdapter()
         env = _make_envelope({
-            "text": "hi",
-            "voice_profile": "v1",
-            "output_path": "out.mp3",
+            "text": "Some text.",
+            "voice_profile": "Samantha",
+        })
+        try:
+            adapter.execute_command(env, workspace, {})
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "output_path" in str(e)
+
+    def test_creates_subdirectory(self, workspace):
+        adapter = TtsAdapter()
+        env = _make_envelope({
+            "text": "Subdirectory test.",
+            "voice_profile": "Samantha",
+            "output_path": "nested/dir/output.aiff",
         })
         result = adapter.execute_command(env, workspace, {})
-        assert "not available" in result["message"]
+        assert result["implemented"] is True
+        assert Path(result["output_path"]).exists()

@@ -1,0 +1,21 @@
+{
+  "host": "127.0.0.1",
+  "port": 1025,
+  "tls_mode": "starttls",
+  "sender": {
+    "address": "corvusforge_bot@proton.me",
+    "name": "Process Swarm"
+  },
+  "auth": {
+    "username_env": "SMTP_USERNAME",
+    "password_env": "SMTP_PASSWORD"
+  },
+  "connection": {
+    "timeout_seconds": 30
+  },
+  "policy": {
+    "allowed_domains": [],
+    "max_recipients": 5,
+    "max_body_bytes": 102400
+  }
+}
