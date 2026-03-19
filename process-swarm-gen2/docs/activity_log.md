@@ -242,3 +242,6 @@ Timestamped record of what was done and when during the rebuild.
 | — | CORS hardening | Replaced `Access-Control-Allow-Origin: *` with localhost-only origin validation |
 | — | `test_rt12_proofui_security.py` | 15 new red team tests: XSS protection, CORS restriction, artifact path traversal, delivery destination injection |
 | — | **Result** | **2154 total tests passing. 269 red team tests across 21 files** |
+| — | ACDS integration layer | `swarm/integration/`: contracts, node schemas, ACDS client adapter, execution pipeline, lineage tracker, retry/fallback, policy engine |
+| — | GRITS integration suite | `tests/test_integration/`: 120 tests across 8 files — contracts, nodes, client, pipeline, lineage, retry, policy, GRITS-INT-001-012 |
+| — | **Result** | **2274 total tests passing. Process Swarm + ACDS fully decoupled with governed integration boundary** |
