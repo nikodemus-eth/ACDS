@@ -16,6 +16,12 @@ export interface ACDSMethodRequest {
     localOnly?: boolean;
     /** Maximum acceptable execution latency in milliseconds. */
     maxLatencyMs?: number;
+    /** Maximum cost per request in USD. */
+    maxCostUSD?: number;
+    /** Data sensitivity level — higher sensitivity prefers local execution. */
+    sensitivity?: 'low' | 'medium' | 'high';
+    /** Soft preference for a specific provider (scoring hint, not a hard constraint). */
+    preferredProvider?: string;
   };
   /** Explicitly request a specific capability instead of default provider routing. */
   useCapability?: string;

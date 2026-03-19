@@ -982,3 +982,41 @@ Full UI pass on admin-web for US Federal ADA Title II and Oregon state complianc
 - `docs/architecture/accessibility-compliance.md` — full WCAG 2.1 AA criterion matrix
 
 **Total test count:** 191 files, 1919 tests, all passing.
+
+## 2026-03-19 — Application-Agnostic Cognitive Fabric
+
+### Capability Contract Layer
+
+Implemented ACDS as an application-agnostic cognitive routing fabric. Applications now bind to **portable capability contracts** (`text.summarize`, `speech.transcribe`, `image.generate`) instead of provider-specific methods. ACDS determines which provider executes the request.
+
+**New abstractions:**
+- `CapabilityContract` — versioned, typed, provider-agnostic capability definitions (18 contracts covering text, speech, image, control, governance)
+- `CapabilityBinding` — maps a capability to a provider's method with cost, latency, and reliability metadata
+- `CapabilityRegistry` — registers contracts, binds providers, resolves capability → eligible methods
+- `ProviderScorer` — multi-objective scoring: cost (0.3), latency (0.3), reliability (0.3), locality (0.1)
+- `CostEnforcer` — cost ceiling enforcement (free/per_token/per_request models)
+- `CapabilityOrchestrator` — top-level API: `request(capability, input, constraints) → response`
+- `LineageBuilder` — execution lineage tracking (request → policy → scoring → selection → execution → validation)
+
+**API surface:**
+```
+request({
+  capability: "text.summarize",
+  input: { text: "..." },
+  constraints: { localOnly: true, maxLatencyMs: 5000, maxCostUSD: 0.01, sensitivity: "high" }
+}) → {
+  output: { summary: "..." },
+  metadata: { capabilityId, providerId, methodId, latencyMs, costUSD, validated },
+  decision: { eligibleProviders, selectedReason, fallbackAvailable, policyApplied }
+}
+```
+
+**Apple bindings:** All 17 Apple methods mapped to standard capability IDs (e.g., `apple.foundation_models.summarize` → `text.summarize`)
+
+**Test suite:** 89 new tests (53 unit + 14 integration + 12 GRITS + 10 red team)
+- Capability contract validation, registry integrity, scoring determinism
+- Full pipeline execution for all 7 capability categories
+- Cost ceiling enforcement, sensitivity policy, fallback routing
+- Adversarial tests: constraint conflicts, cost manipulation, version mismatch, stress testing
+
+**Total test count:** 199 files, 2008 tests, all passing.

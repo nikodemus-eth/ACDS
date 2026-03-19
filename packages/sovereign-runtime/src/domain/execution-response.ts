@@ -21,5 +21,20 @@ export interface ACDSMethodResponse {
     validated: boolean;
     /** Any warnings from execution or validation. */
     warnings?: string[];
+    /** Estimated cost of this execution in USD. */
+    costUSD?: number;
+    /** Token counts for input and output if applicable. */
+    tokenCount?: { input: number; output: number };
+  };
+  /** Routing decision metadata for observability. */
+  decision?: {
+    /** Number of providers considered eligible. */
+    eligibleProviders: number;
+    /** Reason the selected provider was chosen. */
+    selectedReason: string;
+    /** Whether a fallback provider is available. */
+    fallbackAvailable: boolean;
+    /** Names of policies applied during routing. */
+    policyApplied: string[];
   };
 }

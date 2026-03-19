@@ -14,6 +14,13 @@ export interface ExecutionLogEvent {
   status: 'success' | 'failure' | 'timeout';
   validationResult?: 'pass' | 'fail' | 'warn';
   policyPath?: string;
+  capabilityId?: string;
+  capabilityVersion?: string;
+  costUSD?: number;
+  tokenCount?: { input: number; output: number };
+  eligibleProviderCount?: number;
+  scoringBreakdown?: Record<string, number>;
+  policyDecisions?: Array<{ rule: string; result: 'allow' | 'deny'; reason: string }>;
   timestamp: string;
 }
 
