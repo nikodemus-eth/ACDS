@@ -30,7 +30,9 @@
       "@acds/shared-utils": ["packages/shared-utils/src/index.ts"],
       "@acds/shared-utils/*": ["packages/shared-utils/src/*"],
       "@acds/grits": ["packages/grits/src/index.ts"],
-      "@acds/grits/*": ["packages/grits/src/*"]
+      "@acds/grits/*": ["packages/grits/src/*"],
+      "@acds/sovereign-runtime": ["packages/sovereign-runtime/src/index.ts"],
+      "@acds/sovereign-runtime/*": ["packages/sovereign-runtime/src/*"]
     },
     "rootDir": ".",
     "jsx": "react-jsx",

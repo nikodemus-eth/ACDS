@@ -8,14 +8,11 @@ importers:
 
   .:
     devDependencies:
-      '@electric-sql/pglite':
-        specifier: ^0.3.16
-        version: 0.3.16
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
       '@vitest/coverage-v8':
-        specifier: ^3.2.4
+        specifier: ^3.0.0
         version: 3.2.4(vitest@3.2.4(@types/node@25.5.0)(tsx@4.21.0))
       typescript:
         specifier: ^5.7.0
@@ -300,6 +297,25 @@ importers:
 
   packages/shared-utils: {}
 
+  packages/sovereign-runtime:
+    dependencies:
+      '@acds/grits':
+        specifier: workspace:*
+        version: link:../grits
+      '@acds/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.5.0)(tsx@4.21.0)
+
   tests:
     dependencies:
       '@acds/core-types':
@@ -426,9 +442,6 @@ packages:
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
-
-  '@electric-sql/pglite@0.3.16':
-    resolution: {integrity: sha512-mZkZfOd9OqTMHsK+1cje8OSzfAQcpD7JmILXTl5ahdempjUDdmg4euf1biDex5/LfQIDJ3gvCu6qDgdnDxfJmA==}
 
   '@esbuild/aix-ppc64@0.27.4':
     resolution: {integrity: sha512-cQPwL2mp2nSmHHJlCyoXgHGhbEPMrEEU5xhkcy3Hs/O7nGZqEpZ2sUtLaL9MORLtDfRvVl2/3PAuEkYZH0Ty8Q==}
@@ -1739,8 +1752,6 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@bcoe/v8-coverage@1.0.2': {}
-
-  '@electric-sql/pglite@0.3.16': {}
 
   '@esbuild/aix-ppc64@0.27.4':
     optional: true
