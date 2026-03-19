@@ -29,6 +29,7 @@ from swarm.integration.node_schemas import (
     ControlNodeConfig,
     PolicyNodeConfig,
 )
+from swarm.integration.retry import RetryStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class IntegrationPipeline:
         self._acds = acds
         self._workspace = workspace
         self._lineage = LineageTracker(workspace)
-        self._last_entry_id: str | None = None
+        self._last_entry_by_process: dict[str, str] = {}
 
     @property
     def lineage(self) -> LineageTracker:
@@ -90,9 +91,12 @@ class IntegrationPipeline:
             constraints=config.constraints,
             context=context,
         )
+        retry_strategy = RetryStrategy(
+            max_retries=config.max_retries if config.retry_on_failure else 0,
+        )
 
         try:
-            resp = self._acds.request(req)
+            resp = self._acds.request(req, retry_strategy=retry_strategy)
         except IntegrationError as exc:
             duration = int((time.monotonic() - t0) * 1000)
             result = NodeResult(
@@ -180,9 +184,6 @@ class IntegrationPipeline:
                 duration_ms=duration,
                 response=None,
             )
-            # Default to first branch on failure
-            if config.branches:
-                return next(iter(config.branches.values()))
             return ""
 
         duration = int((time.monotonic() - t0) * 1000)
@@ -223,6 +224,8 @@ class IntegrationPipeline:
         """Execute a policy evaluation node.
 
         Returns True if the policy allows continuation, False if denied.
+        When ``block_on_deny=False`` (advisory mode), both denials **and**
+        ACDS errors return True (allow).  This is a fail-open path.
         """
         t0 = time.monotonic()
 
@@ -271,7 +274,9 @@ class IntegrationPipeline:
             response=resp,
         )
 
-        return allowed
+        if allowed:
+            return True
+        return not config.block_on_deny
 
     # ------------------------------------------------------------------
     # Aggregation node
@@ -366,10 +371,10 @@ class IntegrationPipeline:
             ),
             artifacts=artifacts,
             duration_ms=duration_ms,
-            parent_entry_id=self._last_entry_id,
+            parent_entry_id=self._last_entry_by_process.get(context.process_id),
         )
         self._lineage.record(entry)
-        self._last_entry_id = entry.entry_id
+        self._last_entry_by_process[context.process_id] = entry.entry_id
 
     def _write_artifact(
         self,

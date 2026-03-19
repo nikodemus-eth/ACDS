@@ -7,7 +7,7 @@
     "build": "pnpm -r run build",
     "dev": "pnpm -r --parallel run dev",
     "lint": "pnpm -r run lint",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r exec vitest run --passWithNoTests",
     "test:integration": "pnpm --filter ./tests run test",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r run clean"

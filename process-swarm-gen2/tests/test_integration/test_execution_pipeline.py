@@ -9,8 +9,9 @@ Live inference tests are skipped when services are unavailable.
 from __future__ import annotations
 
 import json
-import socket
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from threading import Thread
 
 import pytest
 
@@ -23,24 +24,79 @@ from swarm.integration.node_schemas import (
     ControlNodeConfig,
     PolicyNodeConfig,
 )
+from swarm.tools.inference_engines import AppleIntelligenceClient, OllamaClient
 
 
-def _port_open(port: int) -> bool:
+def _service_available(client) -> bool:
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        result = s.connect_ex(("localhost", port))
-        s.close()
-        return result == 0
+        return bool(client.health())
     except Exception:
         return False
 
 
-INFERENCE_UP = _port_open(11434) or _port_open(11435)
+INFERENCE_UP = _service_available(OllamaClient(timeout_seconds=2)) or _service_available(
+    AppleIntelligenceClient(timeout_seconds=2)
+)
 
 
 def _make_ctx(process_id: str = "test-proc", node_id: str = "test-node") -> ExecutionContext:
     return ExecutionContext(process_id=process_id, node_id=node_id, swarm_id="test-swarm")
+
+
+class _IntegrationOllamaHandler(BaseHTTPRequestHandler):
+    mode = "success"
+    response_text = "ok"
+    request_count = 0
+
+    def do_POST(self):
+        if self.path != "/api/generate":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        type(self).request_count += 1
+        content_length = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(content_length)
+
+        if type(self).mode == "failure":
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"failure"}')
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        payload = {
+            "response": type(self).response_text,
+            "total_duration": 1,
+            "eval_count": 1,
+        }
+        self.wfile.write(json.dumps(payload).encode())
+
+    def log_message(self, format, *args):
+        pass
+
+
+@pytest.fixture
+def ollama_loopback_server():
+    server = HTTPServer(("127.0.0.1", 0), _IntegrationOllamaHandler)
+    _IntegrationOllamaHandler.mode = "success"
+    _IntegrationOllamaHandler.response_text = "ok"
+    _IntegrationOllamaHandler.request_count = 0
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def _make_real_acds(server: HTTPServer) -> ACDSClient:
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    return ACDSClient(providers={"ollama": OllamaClient(base_url=base_url, timeout_seconds=2)})
 
 
 class TestAggregationNode:
@@ -137,7 +193,72 @@ class TestPipelineWorkspace:
         assert pipeline.lineage is not None
 
 
-@pytest.mark.skipif(not INFERENCE_UP, reason="No inference service on 11434 or 11435")
+class TestPipelineFailureSemantics:
+    """Pipeline fail-closed semantics for control/policy and retry wiring."""
+
+    def test_control_node_failure_returns_no_branch(self, tmp_path, ollama_loopback_server):
+        _IntegrationOllamaHandler.mode = "failure"
+        pipeline = IntegrationPipeline(_make_real_acds(ollama_loopback_server), tmp_path)
+        config = ControlNodeConfig(branches={"yes": "approve_node", "no": "reject_node"})
+        branch = pipeline.execute_control_node(
+            config,
+            {"prompt": "Classify"},
+            _make_ctx(),
+        )
+        assert branch == ""
+
+    def test_policy_node_can_be_advisory_only(self, tmp_path, ollama_loopback_server):
+        _IntegrationOllamaHandler.mode = "success"
+        _IntegrationOllamaHandler.response_text = "deny"
+        pipeline = IntegrationPipeline(_make_real_acds(ollama_loopback_server), tmp_path)
+        config = PolicyNodeConfig(block_on_deny=False)
+        allowed = pipeline.execute_policy_node(
+            config,
+            {"prompt": "Evaluate"},
+            _make_ctx(node_id="policy-node"),
+        )
+        assert allowed is True
+
+    def test_cognitive_node_respects_retry_disabled(self, tmp_path, ollama_loopback_server):
+        _IntegrationOllamaHandler.mode = "failure"
+        pipeline = IntegrationPipeline(_make_real_acds(ollama_loopback_server), tmp_path)
+        config = CognitiveNodeConfig(
+            capability="text.generate",
+            constraints=RequestConstraints(local_only=True),
+            retry_on_failure=False,
+            max_retries=7,
+        )
+        result = pipeline.execute_cognitive_node(
+            config,
+            {"prompt": "test"},
+            _make_ctx(node_id="cog-node"),
+        )
+        assert result.success is False
+        assert _IntegrationOllamaHandler.request_count == 1
+
+
+class TestPipelineLineageIsolation:
+    """Lineage parent chains stay isolated per process."""
+
+    def test_parent_chain_does_not_cross_processes(self, tmp_path, ollama_loopback_server):
+        _IntegrationOllamaHandler.mode = "success"
+        _IntegrationOllamaHandler.response_text = "ok"
+        pipeline = IntegrationPipeline(_make_real_acds(ollama_loopback_server), tmp_path)
+        config = CognitiveNodeConfig(
+            capability="text.generate",
+            constraints=RequestConstraints(local_only=True),
+        )
+
+        pipeline.execute_cognitive_node(config, {"prompt": "a"}, _make_ctx(process_id="proc-a", node_id="a1"))
+        pipeline.execute_cognitive_node(config, {"prompt": "b"}, _make_ctx(process_id="proc-b", node_id="b1"))
+
+        chain_a = pipeline.lineage.get_chain("proc-a")
+        chain_b = pipeline.lineage.get_chain("proc-b")
+        assert chain_a[0].parent_entry_id is None
+        assert chain_b[0].parent_entry_id is None
+
+
+@pytest.mark.skipif(not INFERENCE_UP, reason="No healthy inference service available")
 class TestLiveCognitiveNode:
     """Cognitive node produces artifact in workspace with live inference."""
 
@@ -205,7 +326,7 @@ class TestLiveCognitiveNode:
         assert "selected" in chain[0].decision_trace
 
 
-@pytest.mark.skipif(not INFERENCE_UP, reason="No inference service on 11434 or 11435")
+@pytest.mark.skipif(not INFERENCE_UP, reason="No healthy inference service available")
 class TestLiveControlNode:
     """Control node returns branch decision."""
 
@@ -222,7 +343,7 @@ class TestLiveControlNode:
         assert isinstance(branch, str)
 
 
-@pytest.mark.skipif(not INFERENCE_UP, reason="No inference service on 11434 or 11435")
+@pytest.mark.skipif(not INFERENCE_UP, reason="No healthy inference service available")
 class TestLivePolicyNode:
     """Policy node returns boolean."""
 

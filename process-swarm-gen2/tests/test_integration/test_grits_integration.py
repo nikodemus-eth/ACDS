@@ -9,7 +9,6 @@ Live inference tests are skipped when services are unavailable.
 from __future__ import annotations
 
 import json
-import socket
 from dataclasses import asdict
 from pathlib import Path
 
@@ -34,21 +33,18 @@ from swarm.integration.lineage import LineageEntry, LineageTracker
 from swarm.integration.node_schemas import CognitiveNodeConfig
 from swarm.integration.policy import CAPABILITY_REGISTRY, DefaultPolicy
 from swarm.integration.retry import FailurePropagator, RetryStrategy
+from swarm.tools.inference_engines import AppleIntelligenceClient, OllamaClient
 
 
-def _port_open(port: int) -> bool:
+def _service_available(client) -> bool:
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        result = s.connect_ex(("localhost", port))
-        s.close()
-        return result == 0
+        return bool(client.health())
     except Exception:
         return False
 
 
-OLLAMA_UP = _port_open(11434)
-APPLE_UP = _port_open(11435)
+OLLAMA_UP = _service_available(OllamaClient(timeout_seconds=2))
+APPLE_UP = _service_available(AppleIntelligenceClient(timeout_seconds=2))
 INFERENCE_UP = OLLAMA_UP or APPLE_UP
 
 

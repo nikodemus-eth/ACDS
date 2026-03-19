@@ -8,8 +8,6 @@ Live inference tests are skipped when services are unavailable.
 
 from __future__ import annotations
 
-import socket
-
 import pytest
 
 from swarm.integration.acds_client import ACDSClient, _PROVIDER_META
@@ -28,20 +26,16 @@ from swarm.integration.errors import (
 from swarm.tools.inference_engines import AppleIntelligenceClient, OllamaClient
 
 
-def _port_open(port: int) -> bool:
-    """Check if a local port is accepting connections."""
+def _service_available(client) -> bool:
+    """Use provider-specific health checks, not just open ports."""
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        result = s.connect_ex(("localhost", port))
-        s.close()
-        return result == 0
+        return bool(client.health())
     except Exception:
         return False
 
 
-OLLAMA_UP = _port_open(11434)
-APPLE_UP = _port_open(11435)
+OLLAMA_UP = _service_available(OllamaClient(timeout_seconds=2))
+APPLE_UP = _service_available(AppleIntelligenceClient(timeout_seconds=2))
 
 
 def _make_ctx() -> ExecutionContext:
@@ -186,7 +180,7 @@ class TestLatencyRecording:
         assert len(client._latency_history["ollama"]) == 20
 
 
-@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not available on port 11434")
+@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama health check failed")
 class TestLiveOllamaRequest:
     """Live inference tests requiring Ollama."""
 

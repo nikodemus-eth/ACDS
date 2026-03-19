@@ -245,3 +245,10 @@ Timestamped record of what was done and when during the rebuild.
 | — | ACDS integration layer | `swarm/integration/`: contracts, node schemas, ACDS client adapter, execution pipeline, lineage tracker, retry/fallback, policy engine |
 | — | GRITS integration suite | `tests/test_integration/`: 120 tests across 8 files — contracts, nodes, client, pipeline, lineage, retry, policy, GRITS-INT-001-012 |
 | — | **Result** | **2274 total tests passing. Process Swarm + ACDS fully decoupled with governed integration boundary** |
+| — | Lineage isolation fix | `_last_entry_id` → `_last_entry_by_process` dict prevents cross-contamination across concurrent processes |
+| — | Injectable retry | `ACDSClient.request()` accepts per-request `RetryStrategy`, wired through from `CognitiveNodeConfig.max_retries` |
+| — | Advisory policy mode | `PolicyNodeConfig(block_on_deny=False)` returns allow on both denials and errors (documented fail-open) |
+| — | Probabilistic synthesis | Snippet dedup, structured output (lead + key points + supporting), source metadata in section output |
+| — | Health-based test guards | Replaced socket port checks with provider `.health()` calls for accurate skipif |
+| — | Loopback HTTP server | `_IntegrationOllamaHandler` on port 0 for real HTTP testing without mocks or live services |
+| — | **Result** | **2278 total tests passing** |

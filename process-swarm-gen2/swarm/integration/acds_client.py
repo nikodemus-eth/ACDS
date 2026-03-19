@@ -10,13 +10,7 @@ import logging
 import time
 from typing import Any
 
-from swarm.integration.contracts import (
-    CapabilityRequest,
-    CapabilityResponse,
-    DecisionTrace,
-    IntegrationError as IntegrationErrorData,
-    _now_utc,
-)
+from swarm.integration.contracts import CapabilityRequest, CapabilityResponse, DecisionTrace, _now_utc
 from swarm.integration.errors import (
     CapabilityUnavailableError,
     ContractViolationError,
@@ -28,7 +22,7 @@ from swarm.integration.policy import (
     CAPABILITY_REGISTRY,
     DefaultPolicy,
 )
-from swarm.integration.retry import FailurePropagator, RetryStrategy
+from swarm.integration.retry import RetryStrategy
 from swarm.tools.inference_engines import (
     AppleIntelligenceClient,
     InferenceResult,
@@ -74,7 +68,11 @@ class ACDSClient:
     # Public API
     # ------------------------------------------------------------------
 
-    def request(self, req: CapabilityRequest) -> CapabilityResponse:
+    def request(
+        self,
+        req: CapabilityRequest,
+        retry_strategy: RetryStrategy | None = None,
+    ) -> CapabilityResponse:
         """Execute a capability request through the ACDS pipeline.
 
         Pipeline: validate -> policy -> select -> execute -> trace
@@ -88,7 +86,13 @@ class ACDSClient:
         # 3. Execute with fallback
         trace = DecisionTrace(timestamp=_now_utc())
         output, used_provider, fallback_used, latency_ms = (
-            self._execute_with_fallback(req, provider_id, client, trace)
+            self._execute_with_fallback(
+                req,
+                provider_id,
+                client,
+                trace,
+                retry_strategy=retry_strategy or self._retry,
+            )
         )
 
         # 4. Build response
@@ -222,6 +226,7 @@ class ACDSClient:
         provider_id: str,
         client: Any,
         trace: DecisionTrace,
+        retry_strategy: RetryStrategy,
     ) -> tuple[dict, str, bool, int]:
         """Execute with automatic same-class fallback on failure.
 
@@ -240,7 +245,12 @@ class ACDSClient:
             tried.append(current_id)
 
             # Attempt execution with retries on the current provider
-            result, latency = self._execute_single(req, current_id, current_client)
+            result, latency = self._execute_single(
+                req,
+                current_id,
+                current_client,
+                retry_strategy=retry_strategy,
+            )
 
             if result is not None and result.success:
                 self._record_latency(current_id, latency)
@@ -291,6 +301,7 @@ class ACDSClient:
         req: CapabilityRequest,
         provider_id: str,
         client: Any,
+        retry_strategy: RetryStrategy,
     ) -> tuple[InferenceResult | None, int]:
         """Execute on a single provider with retry.
 
@@ -299,9 +310,9 @@ class ACDSClient:
         last_result: InferenceResult | None = None
         total_latency = 0
 
-        for attempt in range(self._retry.max_retries + 1):
+        for attempt in range(retry_strategy.max_retries + 1):
             if attempt > 0:
-                delay = self._retry.delay_ms(attempt - 1)
+                delay = retry_strategy.delay_ms(attempt - 1)
                 time.sleep(delay / 1000.0)
 
             t0 = time.monotonic()
@@ -324,7 +335,7 @@ class ACDSClient:
                     provider_id, attempt, exc,
                 )
                 error = ProviderFailedError(str(exc))
-                if not self._retry.should_retry(attempt, error):
+                if not retry_strategy.should_retry(attempt, error):
                     return None, total_latency
                 continue
 
@@ -336,7 +347,7 @@ class ACDSClient:
 
             # Check if retryable
             error = ProviderFailedError(last_result.error or "unknown error")
-            if not self._retry.should_retry(attempt, error):
+            if not retry_strategy.should_retry(attempt, error):
                 return last_result, total_latency
 
         return last_result, total_latency
