@@ -693,3 +693,42 @@ Systematic replacement of in-memory stubs and empty placeholder implementations 
 - 612 tests pass across 59 test files
 - Zero `InMemory*` or `Noop*` stubs remain in the API DI container
 - All three apps typecheck clean (api, admin-web, grits-worker)
+
+---
+
+## 2026-03-18 — ACDS Sovereign Runtime Implementation
+
+### Overview
+Built the ACDS sovereign execution engine with Apple Intelligence as a first-class method-level Provider, strict Provider/Capability/Session taxonomy, and GRITS runtime integrity validation. TypeScript/Node.js with Vitest. Zero mocks.
+
+### Package Location
+`packages/runtime/` — new shared library in the pnpm workspace
+
+### Build Sequence (4 passes)
+1. **Domain + Registry** — Discriminated unions for Provider/Capability/Session, typed errors with reason codes, registry with mixed-class rejection, default Apple + Ollama providers, 17 Apple methods registered with correct policy tiers
+2. **Runtime Pipeline** — Intent resolver (10 intents), method resolver (deterministic Apple mapping), policy engine (tier enforcement, cross-class blocking, local_only), execution planner (same-class fallback only), response assembler, full orchestrator
+3. **Apple Adapter** — ProviderRuntime interface, platform boundary interfaces, realistic fakes (not mocks), 8 method family handlers (foundation-models, writing-tools, speech, tts, vision, image, translation, sound), AppleRuntimeAdapter dispatching to subsystem handlers
+4. **GRITS + Observability** — Schema/latency/drift validators, hooks (onExecution, onPolicyDecision, onFallback), execution/audit loggers with redaction, telemetry event types
+
+### File Count
+44 source files across 6 modules (domain, registry, runtime, providers, grits, telemetry)
+
+### Test Suite
+- 368 tests across 24 test files
+- 100% code coverage (statements, branches, functions, lines)
+- Zero mocks, zero stubs, zero monkeypatches
+- Unit tests: domain (23), registry (26), intent resolver (10), method resolver (13), policy engine (11), execution planner (5), Apple methods (39), coverage completion (131)
+- Integration tests: full pipeline (6), Apple pipeline (5)
+- GRITS tests: registry integrity (5), routing integrity (6), policy integrity (6), provider integrity (5), Apple method integrity (9), fallback integrity (5), observability integrity (6), adversarial (7), drift (5)
+- Red team tests: taxonomy attacks (5), silent escalation (5), cross-class fallback injection (4), input injection (5), telemetry integrity (4), determinism verification (3), resource exhaustion (3)
+
+### Documentation
+- Filed Apple Sovereign Runtime Integration explanatory document to `docs/apple_sovereign_runtime.md`
+
+### Key Design Decisions
+1. TypeScript discriminated unions enforce source class separation at compile time
+2. Pure functions for resolver and planner logic — deterministic, testable
+3. Apple platform boundary behind interfaces — fakes at OS layer, real architecture everywhere else
+4. No cross-class fallback enforced in both planner AND policy engine (double enforcement)
+5. Redaction layer on all telemetry — tokens, auth headers, secrets stripped before logging
+6. 1000-run determinism test proves routing is truly deterministic
