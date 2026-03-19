@@ -182,9 +182,9 @@ CONSOLE_HTML = r"""<!DOCTYPE html>
 :root {
     --bg: #0a0e17;
     --surface: #141926;
-    --border: #1e2a3a;
+    --border: #2a3a4a;
     --text: #e0e6f0;
-    --text-dim: #6b7a8d;
+    --text-dim: #8a9bb0;
     --accent: #00bcd4;
     --green: #4caf50;
     --red: #f44336;
@@ -303,11 +303,44 @@ tr:hover td { background: rgba(0,188,212,0.03); }
 .btn:hover { opacity: 0.9; }
 
 .empty-state { color: var(--text-dim); text-align: center; padding: 40px; font-size: 13px; }
+
+/* Accessibility: Focus indicators (WCAG 2.4.7) */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.nav-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+tr[tabindex]:focus-visible td { background: rgba(0,188,212,0.08); }
+tr[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Accessibility: Skip link (WCAG 2.4.1) */
+.skip-link {
+    position: absolute;
+    top: -50px;
+    left: 16px;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 13px;
+    z-index: 10000;
+    transition: top 0.2s;
+}
+.skip-link:focus { top: 16px; }
 </style>
 </head>
 <body>
-<div class="app">
-    <nav class="sidebar">
+<a href="#content" class="skip-link">Skip to main content</a>
+<div class="app" role="application" aria-label="ProofUI Console">
+    <nav class="sidebar" aria-label="Main navigation">
         <h1>ProofUI</h1>
         <a class="nav-item" href="#dashboard">Dashboard</a>
         <a class="nav-item" href="#swarms">Swarms</a>
@@ -320,6 +353,7 @@ tr:hover td { background: rgba(0,188,212,0.03); }
         </div>
     </nav>
     <main class="main" id="content"></main>
+    <div id="aria-live" role="status" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)"></div>
 </div>
 <script>
 // -- Helpers --
@@ -376,15 +410,34 @@ function truncId(id) {
     return id.length > 16 ? id.slice(0, 14) + '..' : id;
 }
 
+// Accessibility: announce status changes to screen readers (aria-live region)
+function announce(msg) {
+    var el = document.getElementById('aria-live');
+    if (el) el.textContent = msg;
+}
+
+// Accessible clickable row: tabindex + Enter/Space activation (WCAG 2.1.1)
+function clickableRow(hash, children) {
+    return h('tr', {
+        tabindex: '0',
+        role: 'link',
+        'aria-label': 'Navigate to ' + hash,
+        style: 'cursor:pointer',
+        onClick: function() { location.hash = '#' + hash; },
+        onKeyDown: function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); location.hash = '#' + hash; }
+        },
+    }, children);
+}
+
 function clearContent() {
     var content = document.getElementById('content');
     while (content.firstChild) content.removeChild(content.firstChild);
     return content;
 }
 
-// -- Engine Selector Popup --
+// -- Engine Selector Popup (keyboard-accessible, WCAG 2.1 AA) --
 function showEngineSelector(badge, actionId, field, currentEngine) {
-    // Remove any existing selector
     var old = document.getElementById('engine-selector');
     if (old) old.remove();
 
@@ -396,13 +449,18 @@ function showEngineSelector(badge, actionId, field, currentEngine) {
 
     var popup = h('div', {
         id: 'engine-selector',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-label': 'Select inference engine',
         style: 'position:fixed;z-index:1000;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:8px;min-width:200px;box-shadow:0 4px 16px rgba(0,0,0,0.4)',
     });
 
+    var buttons = [];
     engines.forEach(function(eng) {
         var isActive = (eng.value === (currentEngine || ''));
-        var item = h('div', {
-            style: 'padding:8px 12px;cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:8px' + (isActive ? ';background:rgba(0,188,212,0.15)' : ''),
+        var item = h('button', {
+            type: 'button',
+            style: 'display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;cursor:pointer;border-radius:4px;border:none;background:' + (isActive ? 'rgba(0,188,212,0.15)' : 'transparent') + ';color:var(--text);font-family:inherit;font-size:12px;text-align:left',
             onClick: function() {
                 var updates = {};
                 updates[field] = eng.value;
@@ -414,7 +472,7 @@ function showEngineSelector(badge, actionId, field, currentEngine) {
                 updates['action_id'] = actionId;
                 apiPost('action/update-inference', updates).then(function() {
                     popup.remove();
-                    route(); // refresh page
+                    route();
                 }).catch(function(err) {
                     alert('Failed: ' + err.message);
                 });
@@ -423,20 +481,35 @@ function showEngineSelector(badge, actionId, field, currentEngine) {
             h('span', {className: 'badge ' + eng.cls, style: 'min-width:60px;text-align:center'}, eng.label),
             isActive ? h('span', {style: 'color:var(--accent);font-size:11px'}, '(current)') : null,
         ]);
+        buttons.push(item);
         popup.appendChild(item);
     });
 
-    // Close button
-    popup.appendChild(h('div', {
-        style: 'padding:6px 12px;cursor:pointer;text-align:center;color:var(--text-dim);font-size:11px;margin-top:4px;border-top:1px solid var(--border)',
-        onClick: function() { popup.remove(); },
-    }, 'Cancel'));
+    // Cancel button
+    var cancelBtn = h('button', {
+        type: 'button',
+        style: 'display:block;width:100%;padding:6px 12px;cursor:pointer;text-align:center;color:var(--text-dim);font-size:11px;margin-top:4px;border-top:1px solid var(--border);border:none;background:transparent;font-family:inherit',
+        onClick: function() { popup.remove(); badge.focus(); },
+    }, 'Cancel');
+    buttons.push(cancelBtn);
+    popup.appendChild(cancelBtn);
 
     // Position near the badge
     var rect = badge.getBoundingClientRect();
     popup.style.top = (rect.bottom + 4) + 'px';
     popup.style.left = rect.left + 'px';
     document.body.appendChild(popup);
+
+    // Focus first button
+    buttons[0].focus();
+
+    // Keyboard: Escape closes, Arrow keys navigate
+    popup.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { popup.remove(); badge.focus(); e.preventDefault(); }
+        var idx = buttons.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown' && idx < buttons.length - 1) { buttons[idx + 1].focus(); e.preventDefault(); }
+        if (e.key === 'ArrowUp' && idx > 0) { buttons[idx - 1].focus(); e.preventDefault(); }
+    });
 
     // Close on outside click
     setTimeout(function() {
@@ -451,7 +524,7 @@ function showEngineSelector(badge, actionId, field, currentEngine) {
 
 // -- Pages --
 async function renderDashboard(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Dashboard'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Dashboard'));
     try {
         var d = await apiGet('dashboard');
         var grid = h('div', {className: 'stat-grid'}, [
@@ -472,16 +545,16 @@ async function renderDashboard(container) {
             ]);
             container.appendChild(sg);
             if (runs.length) {
-                container.appendChild(h('div', {className: 'page-title', style: 'margin-top:16px'}, 'Recent Runs'));
+                container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:16px'}, 'Recent Runs'));
                 container.appendChild(runsTable(runs));
             }
         } catch(e2) {}
 
         if (d.recent_executions && d.recent_executions.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:16px'}, 'Recent Executions'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:16px'}, 'Recent Executions'));
             var tbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'ID'), h('th', null, 'Status'), h('th', null, 'Time'),
+                    h('th', {scope: 'col'}, 'ID'), h('th', {scope: 'col'}, 'Status'), h('th', {scope: 'col'}, 'Time'),
                 ])),
                 h('tbody', null, d.recent_executions.map(function(e) {
                     return h('tr', null, [
@@ -508,11 +581,11 @@ function statCard(label, value) {
 function runsTable(runs) {
     return h('table', null, [
         h('thead', null, h('tr', null, [
-            h('th', null, 'Run ID'), h('th', null, 'Swarm'), h('th', null, 'Status'), h('th', null, 'Triggered'),
+            h('th', {scope: 'col'}, 'Run ID'), h('th', {scope: 'col'}, 'Swarm'), h('th', {scope: 'col'}, 'Status'), h('th', {scope: 'col'}, 'Triggered'),
         ])),
         h('tbody', null, runs.map(function(r) {
             var swarmLabel = r.swarm_name || truncId(r.swarm_id);
-            return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#run/' + r.run_id; }}, [
+            return clickableRow('run/' + r.run_id, [
                 h('td', null, truncId(r.run_id)),
                 h('td', null, h('a', {href: '#swarm/' + r.swarm_id, style: 'color:var(--accent)', onClick: function(e) { e.stopPropagation(); }}, swarmLabel)),
                 h('td', null, statusBadge(r.run_status)),
@@ -523,7 +596,7 @@ function runsTable(runs) {
 }
 
 async function renderRunDetail(container, runId) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Run Detail'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Run Detail'));
     try {
         var data = await apiGet('run/' + runId);
         var run = data.run;
@@ -554,7 +627,7 @@ async function renderRunDetail(container, runId) {
 
         // Inference Trace
         if (data.inference_trace && data.inference_trace.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Inference Trace'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Inference Trace'));
             var totalLatency = data.inference_trace.reduce(function(sum, t) { return sum + (t.latency_ms || 0); }, 0);
             var engines = {};
             data.inference_trace.forEach(function(t) {
@@ -570,12 +643,12 @@ async function renderRunDetail(container, runId) {
 
             var traceTbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'Stage'),
-                    h('th', null, 'Tool'),
-                    h('th', null, 'Engine'),
-                    h('th', null, 'Model'),
-                    h('th', null, 'Latency'),
-                    h('th', null, 'Status'),
+                    h('th', {scope: 'col'}, 'Stage'),
+                    h('th', {scope: 'col'}, 'Tool'),
+                    h('th', {scope: 'col'}, 'Engine'),
+                    h('th', {scope: 'col'}, 'Model'),
+                    h('th', {scope: 'col'}, 'Latency'),
+                    h('th', {scope: 'col'}, 'Status'),
                 ])),
                 h('tbody', null, data.inference_trace.map(function(t) {
                     var engineBadge = '-';
@@ -603,12 +676,12 @@ async function renderRunDetail(container, runId) {
 
         // Pipeline Steps (action results)
         if (data.action_results.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Pipeline Steps'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Pipeline Steps'));
             var stepsTbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, '#'), h('th', null, 'Action'), h('th', null, 'Tool'),
-                    h('th', null, 'Status'), h('th', null, 'Started'), h('th', null, 'Completed'),
-                    h('th', null, 'Artifact'),
+                    h('th', {scope: 'col'}, '#'), h('th', {scope: 'col'}, 'Action'), h('th', {scope: 'col'}, 'Tool'),
+                    h('th', {scope: 'col'}, 'Status'), h('th', {scope: 'col'}, 'Started'), h('th', {scope: 'col'}, 'Completed'),
+                    h('th', {scope: 'col'}, 'Artifact'),
                 ])),
                 h('tbody', null, data.action_results.map(function(ar) {
                     var artifactCell = '-';
@@ -635,7 +708,7 @@ async function renderRunDetail(container, runId) {
 
         // Artifacts
         if (data.artifact_files.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Artifacts'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Artifacts'));
             var artifactPanel = h('div', {className: 'detail-panel'});
             data.artifact_files.forEach(function(af) {
                 var ext = af.path.split('.').pop().toLowerCase();
@@ -666,10 +739,10 @@ async function renderRunDetail(container, runId) {
 
         // Events
         if (data.events.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Run Events'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Run Events'));
             var evtTbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'Type'), h('th', null, 'Summary'), h('th', null, 'Time'),
+                    h('th', {scope: 'col'}, 'Type'), h('th', {scope: 'col'}, 'Summary'), h('th', {scope: 'col'}, 'Time'),
                 ])),
                 h('tbody', null, data.events.map(function(ev) {
                     return h('tr', null, [
@@ -713,16 +786,16 @@ async function viewArtifact(runId, filePath) {
 }
 
 async function renderSwarms(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Swarms'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Swarms'));
     try {
         var swarms = await apiGet('swarms');
         if (!swarms.length) { container.appendChild(h('div', {className: 'empty-state'}, 'No swarms defined')); return; }
         var tbl = h('table', null, [
             h('thead', null, h('tr', null, [
-                h('th', null, 'Name'), h('th', null, 'ID'), h('th', null, 'Status'), h('th', null, 'Created'),
+                h('th', {scope: 'col'}, 'Name'), h('th', {scope: 'col'}, 'ID'), h('th', {scope: 'col'}, 'Status'), h('th', {scope: 'col'}, 'Created'),
             ])),
             h('tbody', null, swarms.map(function(s) {
-                return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#swarm/' + s.swarm_id; }}, [
+                return clickableRow('swarm/' + s.swarm_id, [
                     h('td', null, s.swarm_name),
                     h('td', null, truncId(s.swarm_id)),
                     h('td', null, statusBadge(s.lifecycle_status)),
@@ -737,7 +810,7 @@ async function renderSwarms(container) {
 }
 
 async function renderSwarmDetail(container, swarmId) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Swarm Detail'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Swarm Detail'));
     try {
         var data = await apiGet('swarm/' + swarmId);
         if (!data.swarm) { container.appendChild(h('div', {className: 'empty-state'}, 'Swarm not found')); return; }
@@ -772,6 +845,7 @@ async function renderSwarmDetail(container, swarmId) {
             onClick: async function() {
                 runBtn.disabled = true;
                 runBtn.textContent = 'Running...';
+                announce('Swarm execution started');
                 var selOpt = deliverySelect.options[deliverySelect.selectedIndex];
                 var delType = selOpt ? selOpt.value : 'none';
                 var delDest = selOpt ? (selOpt.getAttribute('data-dest') || '') : '';
@@ -782,9 +856,11 @@ async function renderSwarmDetail(container, swarmId) {
                         delivery_destination: delDest,
                     });
                     runBtn.textContent = 'Done: ' + (result.run_id || '').substring(0, 16);
+                    announce('Swarm execution completed: ' + (result.run_id || ''));
                     setTimeout(function() { location.hash = '#run/' + result.run_id; }, 1200);
                 } catch(e) {
                     runBtn.textContent = 'Failed: ' + e.message;
+                    announce('Swarm execution failed: ' + e.message);
                     setTimeout(function() { runBtn.textContent = 'Run Now'; runBtn.disabled = false; }, 3000);
                 }
             }
@@ -820,7 +896,7 @@ async function renderSwarmDetail(container, swarmId) {
         // Pipeline Actions table with clickable engine badges
         var actions = data.actions || [];
         if (actions.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:8px'}, 'Pipeline'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:8px'}, 'Pipeline'));
             var actTbody = h('tbody');
             actions.forEach(function(act) {
                 function makeEngineBadge(engine, model, field, actionId) {
@@ -828,9 +904,11 @@ async function renderSwarmDetail(container, swarmId) {
                     var cls = 'badge badge-dim';
                     if (engine === 'ollama') { label = 'Ollama'; cls = 'badge badge-blue'; if (model) label += '\\n' + model; }
                     else if (engine === 'apple_intelligence') { label = 'Apple\\nIntelligence'; cls = 'badge badge-green'; }
-                    var badge = h('span', {
+                    var badge = h('button', {
+                        type: 'button',
                         className: cls,
-                        style: 'cursor:pointer;white-space:pre-line;line-height:1.3;text-align:center;min-width:70px;display:inline-block',
+                        'aria-label': 'Change ' + field.replace('_', ' ') + ': currently ' + (engine || 'none'),
+                        style: 'cursor:pointer;white-space:pre-line;line-height:1.3;text-align:center;min-width:70px;display:inline-block;border:none;font-family:inherit;font-size:inherit;font-weight:inherit',
                         onClick: function(e) {
                             e.stopPropagation();
                             showEngineSelector(badge, actionId, field, engine);
@@ -849,19 +927,19 @@ async function renderSwarmDetail(container, swarmId) {
             });
             var actTbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'Action'), h('th', null, 'ID'), h('th', null, 'Type'),
-                    h('th', null, 'Engine'), h('th', null, 'Fallback'),
+                    h('th', {scope: 'col'}, 'Action'), h('th', {scope: 'col'}, 'ID'), h('th', {scope: 'col'}, 'Type'),
+                    h('th', {scope: 'col'}, 'Engine'), h('th', {scope: 'col'}, 'Fallback'),
                 ])),
                 actTbody,
             ]);
             container.appendChild(actTbl);
         } else if (data.pipeline_steps && data.pipeline_steps.length) {
             // Fallback: show pipeline steps if no actions yet
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:8px'}, 'Pipeline'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:8px'}, 'Pipeline'));
             var pipeTbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, '#'), h('th', null, 'Step'), h('th', null, 'Tool'),
-                    h('th', null, 'Engine'), h('th', null, 'Description'),
+                    h('th', {scope: 'col'}, '#'), h('th', {scope: 'col'}, 'Step'), h('th', {scope: 'col'}, 'Tool'),
+                    h('th', {scope: 'col'}, 'Engine'), h('th', {scope: 'col'}, 'Description'),
                 ])),
                 h('tbody', null, data.pipeline_steps.map(function(step, i) {
                     function engineBadge(eng) {
@@ -884,13 +962,13 @@ async function renderSwarmDetail(container, swarmId) {
 
         // Tools table
         if (data.tools && data.tools.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Tools'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Tools'));
             var toolsTbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'Name'), h('th', null, 'Family'), h('th', null, 'Execution Class'), h('th', null, 'Status'),
+                    h('th', {scope: 'col'}, 'Name'), h('th', {scope: 'col'}, 'Family'), h('th', {scope: 'col'}, 'Execution Class'), h('th', {scope: 'col'}, 'Status'),
                 ])),
                 h('tbody', null, data.tools.map(function(t) {
-                    return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#tool/' + t.tool_name; }}, [
+                    return clickableRow('tool/' + t.tool_name, [
                         h('td', null, t.tool_name),
                         h('td', null, t.tool_family || '-'),
                         h('td', {style: 'font-family:monospace;font-size:12px'}, t.execution_class || '-'),
@@ -903,13 +981,13 @@ async function renderSwarmDetail(container, swarmId) {
 
         // Recent Runs
         if (data.runs && data.runs.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Runs'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Runs'));
             container.appendChild(runsTable(data.runs.slice(0, 10)));
         }
 
         // Warnings
         if (data.warnings && data.warnings.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Warnings'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Warnings'));
             data.warnings.forEach(function(w) {
                 container.appendChild(h('div', {className: 'detail-panel'}, [
                     detailRow('Severity', w.severity),
@@ -921,9 +999,9 @@ async function renderSwarmDetail(container, swarmId) {
 
         // Events
         if (data.events && data.events.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Events'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Events'));
             var evtTbl = h('table', null, [
-                h('thead', null, h('tr', null, [h('th', null, 'Type'), h('th', null, 'Summary'), h('th', null, 'Time')])),
+                h('thead', null, h('tr', null, [h('th', {scope: 'col'}, 'Type'), h('th', {scope: 'col'}, 'Summary'), h('th', {scope: 'col'}, 'Time')])),
                 h('tbody', null, data.events.slice(0, 20).map(function(ev) {
                     return h('tr', null, [
                         h('td', null, ev.event_type),
@@ -947,7 +1025,7 @@ function detailRow(label, value, el) {
 }
 
 async function renderRuns(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Runs'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Runs'));
     try {
         var runs = await apiGet('runs?limit=50');
         if (!runs.length) { container.appendChild(h('div', {className: 'empty-state'}, 'No runs found')); return; }
@@ -958,7 +1036,7 @@ async function renderRuns(container) {
 }
 
 async function renderEvents(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Events'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Events'));
     try {
         var [events, swarms] = await Promise.all([apiGet('events?limit=100'), apiGet('swarms')]);
         var swarmNames = {};
@@ -966,7 +1044,7 @@ async function renderEvents(container) {
         if (!events.length) { container.appendChild(h('div', {className: 'empty-state'}, 'No events recorded')); return; }
         var tbl = h('table', null, [
             h('thead', null, h('tr', null, [
-                h('th', null, 'Event'), h('th', null, 'Swarm'), h('th', null, 'Summary'), h('th', null, 'Time'),
+                h('th', {scope: 'col'}, 'Event'), h('th', {scope: 'col'}, 'Swarm'), h('th', {scope: 'col'}, 'Summary'), h('th', {scope: 'col'}, 'Time'),
             ])),
             h('tbody', null, events.map(function(ev) {
                 var swarmLabel = swarmNames[ev.swarm_id] || truncId(ev.swarm_id);
@@ -985,16 +1063,16 @@ async function renderEvents(container) {
 }
 
 async function renderTools(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Tools'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Tools'));
     try {
         var tools = await apiGet('tools');
         if (!tools.length) { container.appendChild(h('div', {className: 'empty-state'}, 'No tools registered')); return; }
         var tbl = h('table', null, [
             h('thead', null, h('tr', null, [
-                h('th', null, 'Name'), h('th', null, 'Family'), h('th', null, 'Status'), h('th', null, 'Dry Run'),
+                h('th', {scope: 'col'}, 'Name'), h('th', {scope: 'col'}, 'Family'), h('th', {scope: 'col'}, 'Status'), h('th', {scope: 'col'}, 'Dry Run'),
             ])),
             h('tbody', null, tools.map(function(t) {
-                return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#tool/' + t.tool_name; }}, [
+                return clickableRow('tool/' + t.tool_name, [
                     h('td', null, t.tool_name),
                     h('td', null, t.tool_family || '-'),
                     h('td', null, statusBadge(t.maturity_status)),
@@ -1009,7 +1087,7 @@ async function renderTools(container) {
 }
 
 async function renderToolDetail(container, toolName) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Tool Detail'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Tool Detail'));
     try {
         var data = await apiGet('tool/' + encodeURIComponent(toolName));
         var tool = data.tool;
@@ -1028,17 +1106,17 @@ async function renderToolDetail(container, toolName) {
         container.appendChild(panel);
 
         // Swarms using this tool
-        container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Swarms Using This Tool'));
+        container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Swarms Using This Tool'));
         if (!data.swarms.length) {
             container.appendChild(h('div', {className: 'empty-state'}, 'No swarms reference this tool'));
         } else {
             var tbl = h('table', null, [
                 h('thead', null, h('tr', null, [
-                    h('th', null, 'Swarm'), h('th', null, 'Status'),
-                    h('th', null, 'Stage'), h('th', null, 'Engine'),
+                    h('th', {scope: 'col'}, 'Swarm'), h('th', {scope: 'col'}, 'Status'),
+                    h('th', {scope: 'col'}, 'Stage'), h('th', {scope: 'col'}, 'Engine'),
                 ])),
                 h('tbody', null, data.swarms.map(function(s) {
-                    return h('tr', {style: 'cursor:pointer', onClick: function() { location.hash = '#swarm/' + s.swarm_id; }}, [
+                    return clickableRow('swarm/' + s.swarm_id, [
                         h('td', null, h('a', {href: '#swarm/' + s.swarm_id, style: 'color:var(--accent)', onClick: function(e) { e.stopPropagation(); }}, s.swarm_name)),
                         h('td', null, statusBadge(s.lifecycle_status)),
                         h('td', null, s.step_id || '-'),
@@ -1051,7 +1129,7 @@ async function renderToolDetail(container, toolName) {
 
         // Recent runs where this tool was invoked
         if (data.recent_runs && data.recent_runs.length) {
-            container.appendChild(h('div', {className: 'page-title', style: 'margin-top:24px'}, 'Recent Runs'));
+            container.appendChild(h('h2', {className: 'page-title', style: 'margin-top:24px'}, 'Recent Runs'));
             container.appendChild(runsTable(data.recent_runs));
         }
 
@@ -1061,7 +1139,7 @@ async function renderToolDetail(container, toolName) {
 }
 
 async function renderSettings(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'Settings'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'Settings'));
     try {
         var id = await apiGet('settings/identity');
         var panel = h('div', {className: 'detail-panel'}, [
@@ -1079,7 +1157,7 @@ async function renderSettings(container) {
 
 // -- Context Report Page --
 async function renderACDSAdmin(container) {
-    container.appendChild(h('div', {className: 'page-title'}, 'ACDS Admin'));
+    container.appendChild(h('h1', {className: 'page-title'}, 'ACDS Admin'));
 
     // Health status bar
     var healthPanel = h('div', {className: 'detail-panel'}, [
