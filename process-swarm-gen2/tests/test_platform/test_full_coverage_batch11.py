@@ -216,6 +216,9 @@ class TestSessionWatcherScanError:
 
         def stop_after_delay():
             time.sleep(0.3)
+            # Reset cursor_file to a valid path before stopping, so stop()
+            # doesn't trigger IsADirectoryError in its own _save_cursors() call.
+            watcher.cursor_file = tmp_path / "valid_cursor.json"
             watcher.stop()
 
         t = threading.Thread(target=stop_after_delay, daemon=True)
