@@ -78,7 +78,6 @@ describe('GeminiAdapter', () => {
       // Use a port from a stopped server to force a network error whose message contains the URL with key=
       const tempServer = new TestHttpServer();
       const tempUrl = await tempServer.start();
-      const tempPort = tempServer.port;
       await tempServer.close();
 
       const config: AdapterConfig = { baseUrl: tempUrl, apiKey: 'secret-key' };
@@ -95,7 +94,7 @@ describe('GeminiAdapter', () => {
     it('should return response on success', async () => {
       server.setRoutes({
         'POST /v1beta/models/gemini-pro:generateContent': async (req, res) => {
-          const body = JSON.parse(await readBody(req));
+          await readBody(req);
           jsonResponse(res, 200, {
             candidates: [{ content: { parts: [{ text: 'Response' }] }, finishReason: 'STOP' }],
             usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 1 },

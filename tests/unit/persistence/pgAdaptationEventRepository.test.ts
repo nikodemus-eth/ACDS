@@ -37,18 +37,18 @@ function makeRankedCandidate(id: string, rank: number, score: number): RankedCan
     candidate: {
       candidateId: id,
       familyKey: 'app/proc/step',
-      modelProfileId: `profile-${id}`,
-      tacticProfileId: `tactic-${id}`,
-      providerId: `prov-${id}`,
+      rollingScore: score,
+      runCount: 10,
+      successRate: score,
+      averageLatency: 250,
+      lastSelectedAt: '2026-03-16T10:00:00.000Z',
     },
     rank,
     compositeScore: score,
-    breakdown: {
-      performanceScore: score,
-      costScore: 0.5,
-      latencyScore: 0.5,
-      recencyBonus: 0,
-      explorationBonus: 0,
+    scoreBreakdown: {
+      performanceComponent: score,
+      recencyComponent: 0.5,
+      successRateComponent: score,
     },
   };
 }
@@ -86,7 +86,7 @@ describe('PgAdaptationEventRepository', () => {
       expect(result!.familyKey).toBe('app/proc/step');
       expect(result!.evidenceSummary).toBe('Score improvement detected');
       expect(result!.mode).toBe('auto_apply_low_risk');
-      expect(result!.trigger).toBe('auto_apply_low_risk'); // mapRow uses mode for trigger
+      expect(result!.trigger).toBe('scheduled'); // trigger maps to risk_basis column
       expect(result!.previousRanking).toHaveLength(1);
       expect(result!.previousRanking[0].candidate.candidateId).toBe('cand-a');
       expect(result!.newRanking).toHaveLength(1);
@@ -180,9 +180,9 @@ describe('PgAdaptationEventRepository', () => {
 
     it('applies trigger filter (maps to mode column)', async () => {
       await repo.writeEvent(makeAdaptationEvent({ id: 'ae-fm1', mode: 'auto_apply_low_risk' }));
-      await repo.writeEvent(makeAdaptationEvent({ id: 'ae-fm2', mode: 'recommend_only' }));
+      await repo.writeEvent(makeAdaptationEvent({ id: 'ae-fm2', mode: 'recommend_only', trigger: 'manual' }));
 
-      const results = await repo.find({ trigger: 'recommend_only' });
+      const results = await repo.find({ trigger: 'manual' });
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe('ae-fm2');
     });

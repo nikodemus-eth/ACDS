@@ -24,15 +24,15 @@ export class ExecutionLogger {
   }
 
   getExecutionLogs(): ReadonlyArray<ExecutionLogEvent> {
-    return this.executionLogs;
+    return this.executionLogs.slice();
   }
 
   getPolicyLogs(): ReadonlyArray<PolicyAuditEvent> {
-    return this.policyLogs;
+    return this.policyLogs.slice();
   }
 
   getFallbackLogs(): ReadonlyArray<FallbackAuditEvent> {
-    return this.fallbackLogs;
+    return this.fallbackLogs.slice();
   }
 
   clear(): void {

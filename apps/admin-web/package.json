@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:mock": "VITE_USE_MOCKS=true vite",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "clean": "rm -rf dist"
   },
   "dependencies": {

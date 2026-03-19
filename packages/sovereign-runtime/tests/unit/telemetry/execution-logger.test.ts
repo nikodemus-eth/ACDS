@@ -71,4 +71,23 @@ describe('ExecutionLogger', () => {
     logger.clear();
     expect(logger.getExecutionLogs()).toHaveLength(0);
   });
+
+  it('returns snapshots instead of mutable backing arrays', () => {
+    logger.logExecution({
+      executionId: 'exec-004',
+      sourceType: 'provider',
+      sourceId: 'apple-intelligence-runtime',
+      providerId: 'apple-intelligence-runtime',
+      methodId: 'apple.foundation_models.summarize',
+      executionMode: 'local',
+      latencyMs: 10,
+      status: 'success',
+      timestamp: new Date().toISOString(),
+    });
+
+    const logs = logger.getExecutionLogs() as ExecutionLogEvent[];
+    logs.length = 0;
+
+    expect(logger.getExecutionLogs()).toHaveLength(1);
+  });
 });

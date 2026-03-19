@@ -1,13 +1,13 @@
-import type { FoundationModelInput, GenerateOutput, SummarizeOutput, ExtractOutput } from '../apple-interfaces.js';
-import { fakeGenerate, fakeSummarize, fakeExtract } from '../apple-fakes.js';
+import type { FoundationModelInput } from '../apple-interfaces.js';
+import { extractEntities, generateText, summarizeText } from '../apple-local-engine.js';
 import { MethodNotAvailableError } from '../../../domain/errors.js';
 
 export type FoundationModelMethod = 'generate' | 'summarize' | 'extract';
 
 const handlers: Record<FoundationModelMethod, (input: FoundationModelInput) => unknown> = {
-  generate: fakeGenerate,
-  summarize: fakeSummarize,
-  extract: fakeExtract,
+  generate: generateText,
+  summarize: summarizeText,
+  extract: extractEntities,
 };
 
 export function executeFoundationModel(method: string, input: unknown): unknown {

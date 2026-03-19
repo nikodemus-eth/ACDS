@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
-// Unit Tests – createDiContainer (DI wiring verification)
+// Integration Tests – createDiContainer (DI wiring verification)
+// Requires a running PostgreSQL instance on localhost:5432.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -16,6 +17,9 @@ const TEST_CONFIG: AppConfig = {
   masterKeyPath: MASTER_KEY_PATH,
   adminSessionSecret: 'test-secret',
   nodeEnv: 'test',
+  logLevel: 'silent',
+  version: '0.1.0',
+  startedAt: new Date('2026-03-16T00:00:00Z'),
 };
 
 const REQUIRED_KEYS = [
@@ -70,6 +74,10 @@ describe('createDiContainer', () => {
 
   it('resolve() returns the correct service by name', async () => {
     const container = await createDiContainer(TEST_CONFIG);
+    expect(container).toBeDefined();
+    if (!container) {
+      throw new Error('DI container was not created');
+    }
 
     const auditReader = container.resolve('auditEventReader');
     expect(auditReader).toBe(container.auditEventReader);
@@ -80,17 +88,29 @@ describe('createDiContainer', () => {
 
   it('secretRotationService is defined', async () => {
     const container = await createDiContainer(TEST_CONFIG);
+    expect(container).toBeDefined();
+    if (!container) {
+      throw new Error('DI container was not created');
+    }
     expect(container.secretRotationService).toBeDefined();
   });
 
   it('approvalAuditEmitter is defined and not Noop', async () => {
     const container = await createDiContainer(TEST_CONFIG);
+    expect(container).toBeDefined();
+    if (!container) {
+      throw new Error('DI container was not created');
+    }
     expect(container.approvalAuditEmitter).toBeDefined();
     expect(container.approvalAuditEmitter.constructor.name).not.toBe('NoopApprovalAuditEmitter');
   });
 
   it('adaptationEventReader is defined', async () => {
     const container = await createDiContainer(TEST_CONFIG);
+    expect(container).toBeDefined();
+    if (!container) {
+      throw new Error('DI container was not created');
+    }
     expect(container.adaptationEventReader).toBeDefined();
   });
 

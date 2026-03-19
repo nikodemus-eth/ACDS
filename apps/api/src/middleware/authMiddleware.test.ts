@@ -144,7 +144,7 @@ describe('registerAuth', () => {
   it('registers the preHandler hook on the app', () => {
     const hooks: Array<(req: any, rep: any, done: any) => void> = [];
     const fakeApp = {
-      addHook: (name: string, handler: any) => {
+      addHook: (_name: string, handler: any) => {
         hooks.push(handler);
       },
     };

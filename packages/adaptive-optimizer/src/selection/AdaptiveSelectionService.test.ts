@@ -137,7 +137,6 @@ describe('select (AdaptiveSelectionService)', () => {
       });
       // Run multiple times to statistically cover exploration path
       let explorationUsedAtLeastOnce = false;
-      let exploitationUsedAtLeastOnce = false;
       for (let i = 0; i < 50; i++) {
         const result = select('fam:test', [candidateA, candidateB, candidateC], familyState, [], 'fully_applied');
         if (result.explorationUsed) {
@@ -146,7 +145,6 @@ describe('select (AdaptiveSelectionService)', () => {
           // Explored candidate should not be the top-ranked
           expect(result.selectedCandidate.rank).toBeGreaterThan(1);
         } else {
-          exploitationUsedAtLeastOnce = true;
           expect(result.selectionReason).toContain('Exploitation');
         }
       }

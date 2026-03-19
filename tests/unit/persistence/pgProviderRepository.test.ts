@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PgProviderRepository } from '@acds/persistence-pg';
+import { AuthType, ProviderVendor, type Provider } from '@acds/core-types';
 import {
   createTestPool,
   runMigrations,
@@ -28,11 +29,13 @@ beforeEach(async () => {
   await pool.query('TRUNCATE providers CASCADE');
 });
 
-function makeProvider(overrides: Record<string, unknown> = {}) {
+function makeProvider(
+  overrides: Partial<Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>> = {},
+): Omit<Provider, 'id' | 'createdAt' | 'updatedAt'> {
   return {
     name: 'OpenAI Production',
-    vendor: 'openai' as const,
-    authType: 'api_key' as const,
+    vendor: ProviderVendor.OPENAI,
+    authType: AuthType.API_KEY,
     baseUrl: 'https://api.openai.com/v1',
     enabled: true,
     environment: 'production',
@@ -55,8 +58,8 @@ describe('PgProviderRepository', () => {
 
       expect(result.id).toBeTruthy();
       expect(result.name).toBe('OpenAI Production');
-      expect(result.vendor).toBe('openai');
-      expect(result.authType).toBe('api_key');
+      expect(result.vendor).toBe(ProviderVendor.OPENAI);
+      expect(result.authType).toBe(AuthType.API_KEY);
       expect(result.baseUrl).toBe('https://api.openai.com/v1');
       expect(result.enabled).toBe(true);
       expect(result.environment).toBe('production');
@@ -104,13 +107,13 @@ describe('PgProviderRepository', () => {
 
   describe('findByVendor()', () => {
     it('returns providers matching the vendor', async () => {
-      await repo.create(makeProvider({ name: 'P1', vendor: 'openai' }));
-      await repo.create(makeProvider({ name: 'P2', vendor: 'anthropic' }));
-      await repo.create(makeProvider({ name: 'P3', vendor: 'openai' }));
+      await repo.create(makeProvider({ name: 'P1', vendor: ProviderVendor.OPENAI }));
+      await repo.create(makeProvider({ name: 'P2', vendor: ProviderVendor.GEMINI }));
+      await repo.create(makeProvider({ name: 'P3', vendor: ProviderVendor.OPENAI }));
 
-      const results = await repo.findByVendor('openai');
+      const results = await repo.findByVendor(ProviderVendor.OPENAI);
       expect(results).toHaveLength(2);
-      results.forEach(r => expect(r.vendor).toBe('openai'));
+      results.forEach(r => expect(r.vendor).toBe(ProviderVendor.OPENAI));
     });
 
     it('returns empty array when no vendor match', async () => {
@@ -148,16 +151,16 @@ describe('PgProviderRepository', () => {
       const created = await repo.create(makeProvider());
       const updated = await repo.update(created.id, {
         name: 'New Name',
-        vendor: 'anthropic' as any,
-        authType: 'bearer_token' as any,
+        vendor: ProviderVendor.GEMINI,
+        authType: AuthType.BEARER_TOKEN,
         baseUrl: 'https://api.anthropic.com/v1',
         enabled: false,
         environment: 'staging',
       });
 
       expect(updated.name).toBe('New Name');
-      expect(updated.vendor).toBe('anthropic');
-      expect(updated.authType).toBe('bearer_token');
+      expect(updated.vendor).toBe(ProviderVendor.GEMINI);
+      expect(updated.authType).toBe(AuthType.BEARER_TOKEN);
       expect(updated.baseUrl).toBe('https://api.anthropic.com/v1');
       expect(updated.enabled).toBe(false);
       expect(updated.environment).toBe('staging');

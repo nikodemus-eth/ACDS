@@ -54,6 +54,20 @@ describe('scoreProviders', () => {
       expect(result.winner.providerId).toBe('cheap');
     });
 
+    it('treats maxCostUSD=0 as a real free-only ceiling', () => {
+      const bindings = [
+        makeBinding({ providerId: 'free', methodId: 'free.method', cost: FREE_COST }),
+        makeBinding({
+          providerId: 'paid',
+          methodId: 'paid.method',
+          cost: { model: 'per_request', unitCost: 0.001, currency: 'USD' },
+        }),
+      ];
+      const result = scoreProviders(bindings, { maxCostUSD: 0 });
+      expect(result.scores).toHaveLength(1);
+      expect(result.winner.providerId).toBe('free');
+    });
+
     it('returns empty result when no providers pass constraints', () => {
       const bindings = [makeBinding({ locality: 'remote' })];
       const result = scoreProviders(bindings, { localOnly: true });

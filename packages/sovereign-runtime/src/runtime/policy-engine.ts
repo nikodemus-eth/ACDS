@@ -1,9 +1,8 @@
 import type { ACDSMethodRequest } from '../domain/execution-request.js';
 import type { MethodDefinition } from '../domain/method-registry.js';
 import type { SourceRegistry } from '../registry/registry.js';
-import type { SourceDefinition, SourceClass } from '../domain/source-types.js';
-import { PolicyTier, SOVEREIGN_ALLOWED_TIERS } from '../domain/policy-tiers.js';
-import { PolicyBlockedError } from '../domain/errors.js';
+import type { SourceClass } from '../domain/source-types.js';
+import { SOVEREIGN_ALLOWED_TIERS } from '../domain/policy-tiers.js';
 
 export interface PolicyDecision {
   allowed: boolean;
@@ -25,7 +24,7 @@ export function evaluatePolicy(
   request: ACDSMethodRequest,
   method: MethodDefinition,
   registry: SourceRegistry,
-  isOverride: boolean,
+  _isOverride: boolean,
 ): PolicyDecision {
   // 1. If explicit capability override, require explicit approval
   if (request.useCapability) {

@@ -117,7 +117,7 @@ describe('LeaseManager', () => {
     it('returns null for expired lease and removes it', () => {
       const manager = new LeaseManager();
       // Mint with a very short TTL — we need it to expire
-      const lease = manager.mint('prov-1', ['chat'], 1);
+      manager.mint('prov-1', ['chat'], 1);
 
       // Manually force expiry by waiting or manipulating the date
       // The lease expires at Date.now() + 1ms, so by the time validate runs it should be expired
@@ -209,7 +209,7 @@ describe('LeaseManager', () => {
     it('validate returns null and removes expired leases', () => {
       // Create a manager, mint a lease, then force the expiresAt to the past
       const manager = new LeaseManager();
-      const lease = manager.mint('prov-1', ['chat'], 60_000);
+      manager.mint('prov-1', ['chat'], 60_000);
       // Manually set expiresAt to a past date by minting with TTL of 0
       // Use a separate manager with guaranteed-expired lease
       const mgr = new LeaseManager({ defaultTtlMs: 1, maxTtlMs: 1 });

@@ -5,6 +5,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PgExecutionRecordRepository } from '@acds/persistence-pg';
 import {
+  CognitiveGrade,
+  DecisionPosture,
+  type ExecutionRecord,
+} from '@acds/core-types';
+import {
   createTestPool,
   runMigrations,
   truncateAll,
@@ -58,20 +63,20 @@ beforeEach(async () => {
   await pool.query('TRUNCATE execution_records CASCADE');
 });
 
-function makeRecord(overrides: Record<string, unknown> = {}) {
+function makeRecord(overrides: Partial<Omit<ExecutionRecord, 'id'>> = {}): Omit<ExecutionRecord, 'id'> {
   return {
     executionFamily: {
       application: 'test-app',
       process: 'test-process',
       step: 'test-step',
-      decisionPosture: 'standard' as const,
-      cognitiveGrade: 'B' as const,
+      decisionPosture: DecisionPosture.OPERATIONAL,
+      cognitiveGrade: CognitiveGrade.STANDARD,
     },
     routingDecisionId: 'rd-001',
     selectedModelProfileId: 'mp-001',
     selectedTacticProfileId: 'tp-001',
     selectedProviderId: 'prov-001',
-    status: 'completed' as const,
+    status: 'succeeded',
     inputTokens: 100,
     outputTokens: 200,
     latencyMs: 500,
@@ -79,6 +84,7 @@ function makeRecord(overrides: Record<string, unknown> = {}) {
     normalizedOutput: 'test output',
     errorMessage: null,
     fallbackAttempts: 0,
+    createdAt: new Date('2026-03-16T11:00:00Z'),
     completedAt: new Date('2026-03-16T12:00:00Z'),
     ...overrides,
   };
@@ -101,13 +107,13 @@ describe('PgExecutionRecordRepository', () => {
       expect(result.executionFamily.application).toBe('test-app');
       expect(result.executionFamily.process).toBe('test-process');
       expect(result.executionFamily.step).toBe('test-step');
-      expect(result.executionFamily.decisionPosture).toBe('standard');
-      expect(result.executionFamily.cognitiveGrade).toBe('B');
+      expect(result.executionFamily.decisionPosture).toBe(DecisionPosture.OPERATIONAL);
+      expect(result.executionFamily.cognitiveGrade).toBe(CognitiveGrade.STANDARD);
       expect(result.routingDecisionId).toBe('rd-001');
       expect(result.selectedModelProfileId).toBe('mp-001');
       expect(result.selectedTacticProfileId).toBe('tp-001');
       expect(result.selectedProviderId).toBe('prov-001');
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('succeeded');
       expect(result.inputTokens).toBe(100);
       expect(result.outputTokens).toBe(200);
       expect(result.latencyMs).toBe(500);
@@ -167,8 +173,8 @@ describe('PgExecutionRecordRepository', () => {
           application: 'other-app',
           process: 'other-process',
           step: 'other-step',
-          decisionPosture: 'standard',
-          cognitiveGrade: 'A',
+          decisionPosture: DecisionPosture.OPERATIONAL,
+          cognitiveGrade: CognitiveGrade.ENHANCED,
         },
       }));
 
@@ -206,13 +212,13 @@ describe('PgExecutionRecordRepository', () => {
         `INSERT INTO execution_records
          (application, process, step, status, created_at)
          VALUES ($1, $2, $3, $4, $5)`,
-        ['app', 'proc', 'step', 'completed', '2026-03-14T00:00:00Z'],
+        ['app', 'proc', 'step', 'succeeded', '2026-03-14T00:00:00Z'],
       );
       await pool.query(
         `INSERT INTO execution_records
          (application, process, step, status, created_at)
          VALUES ($1, $2, $3, $4, $5)`,
-        ['app', 'proc', 'step', 'completed', '2026-03-16T00:00:00Z'],
+        ['app', 'proc', 'step', 'succeeded', '2026-03-16T00:00:00Z'],
       );
 
       const results = await repo.findRecent();
@@ -242,12 +248,12 @@ describe('PgExecutionRecordRepository', () => {
 
   describe('findFiltered()', () => {
     it('filters by status', async () => {
-      await repo.create(makeRecord({ status: 'completed' }));
+      await repo.create(makeRecord({ status: 'succeeded' }));
       await repo.create(makeRecord({ status: 'failed' }));
 
-      const results = await repo.findFiltered({ status: 'completed' });
+      const results = await repo.findFiltered({ status: 'succeeded' });
       expect(results).toHaveLength(1);
-      expect(results[0].status).toBe('completed');
+      expect(results[0].status).toBe('succeeded');
     });
 
     it('filters by application', async () => {
@@ -257,8 +263,8 @@ describe('PgExecutionRecordRepository', () => {
           application: 'other-app',
           process: 'p',
           step: 's',
-          decisionPosture: 'standard',
-          cognitiveGrade: 'A',
+          decisionPosture: DecisionPosture.OPERATIONAL,
+          cognitiveGrade: CognitiveGrade.ENHANCED,
         },
       }));
 
@@ -273,24 +279,24 @@ describe('PgExecutionRecordRepository', () => {
         `INSERT INTO execution_records
          (application, process, step, status, created_at)
          VALUES ($1, $2, $3, $4, $5)`,
-        ['app', 'proc', 'step', 'completed', '2026-03-14T00:00:00Z'],
+        ['app', 'proc', 'step', 'succeeded', '2026-03-14T00:00:00Z'],
       );
       await pool.query(
         `INSERT INTO execution_records
          (application, process, step, status, created_at)
          VALUES ($1, $2, $3, $4, $5)`,
-        ['app', 'proc', 'step', 'completed', '2026-03-15T12:00:00Z'],
+        ['app', 'proc', 'step', 'succeeded', '2026-03-15T12:00:00Z'],
       );
       await pool.query(
         `INSERT INTO execution_records
          (application, process, step, status, created_at)
          VALUES ($1, $2, $3, $4, $5)`,
-        ['app', 'proc', 'step', 'completed', '2026-03-17T00:00:00Z'],
+        ['app', 'proc', 'step', 'succeeded', '2026-03-17T00:00:00Z'],
       );
 
       const results = await repo.findFiltered({
-        from: new Date('2026-03-15T00:00:00Z'),
-        to: new Date('2026-03-16T00:00:00Z'),
+        from: '2026-03-15T00:00:00Z',
+        to: '2026-03-16T00:00:00Z',
       });
       expect(results).toHaveLength(1);
     });
@@ -313,20 +319,20 @@ describe('PgExecutionRecordRepository', () => {
     });
 
     it('combines multiple filters', async () => {
-      await repo.create(makeRecord({ status: 'completed' }));
+      await repo.create(makeRecord({ status: 'succeeded' }));
       await repo.create(makeRecord({ status: 'failed' }));
       await repo.create(makeRecord({
-        status: 'completed',
+        status: 'succeeded',
         executionFamily: {
           application: 'other',
           process: 'p',
           step: 's',
-          decisionPosture: 'standard',
-          cognitiveGrade: 'A',
+          decisionPosture: DecisionPosture.OPERATIONAL,
+          cognitiveGrade: CognitiveGrade.ENHANCED,
         },
       }));
 
-      const results = await repo.findFiltered({ status: 'completed', application: 'test-app' });
+      const results = await repo.findFiltered({ status: 'succeeded', application: 'test-app' });
       expect(results).toHaveLength(1);
     });
   });
@@ -336,9 +342,9 @@ describe('PgExecutionRecordRepository', () => {
   describe('update()', () => {
     it('updates status', async () => {
       const created = await repo.create(makeRecord({ status: 'pending' }));
-      const updated = await repo.update(created.id, { status: 'completed' });
+      const updated = await repo.update(created.id, { status: 'succeeded' });
 
-      expect(updated.status).toBe('completed');
+      expect(updated.status).toBe('succeeded');
       expect(updated.id).toBe(created.id);
     });
 
@@ -350,7 +356,7 @@ describe('PgExecutionRecordRepository', () => {
       }));
 
       const updated = await repo.update(created.id, {
-        status: 'completed',
+        status: 'succeeded',
         inputTokens: 150,
         outputTokens: 300,
         latencyMs: 750,
@@ -360,7 +366,7 @@ describe('PgExecutionRecordRepository', () => {
         completedAt: new Date('2026-03-16T14:00:00Z'),
       });
 
-      expect(updated.status).toBe('completed');
+      expect(updated.status).toBe('succeeded');
       expect(updated.inputTokens).toBe(150);
       expect(updated.outputTokens).toBe(300);
       expect(updated.latencyMs).toBe(750);
@@ -388,7 +394,7 @@ describe('PgExecutionRecordRepository', () => {
       const result = await repo.update(created.id, {});
 
       expect(result.id).toBe(created.id);
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('succeeded');
     });
 
     it('throws when no updates and record does not exist', async () => {

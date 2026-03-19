@@ -15,22 +15,22 @@ const TOKEN_PATTERNS = [
 
 const REDACTED = '[REDACTED]';
 
-/** Known sensitive field names. */
+/** Known sensitive field names (all lowercase — lookup normalizes via .toLowerCase()). */
 const SENSITIVE_FIELDS = new Set([
-  'apikey', 'api_key', 'apiKey',
+  'apikey', 'api_key',
   'secret', 'token', 'password',
   'authorization', 'auth',
   'credential', 'credentials',
-  'private_key', 'privateKey',
+  'private_key', 'privatekey',
 ]);
 
 /**
  * Redact sensitive values from a structured log object.
  */
-export function redactLogEvent<T extends Record<string, unknown>>(event: T): T {
+export function redactLogEvent<T extends object>(event: T): T {
   const result = {} as Record<string, unknown>;
 
-  for (const [key, value] of Object.entries(event)) {
+  for (const [key, value] of Object.entries(event as Record<string, unknown>)) {
     if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
       result[key] = REDACTED;
     } else if (typeof value === 'string') {

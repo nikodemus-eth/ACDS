@@ -78,7 +78,7 @@ export class PgAdaptationEventRepository implements AdaptationEventReader, Adapt
     let paramIndex = 1;
 
     if (filters.trigger) {
-      conditions.push(`mode = $${paramIndex++}`);
+      conditions.push(`risk_basis = $${paramIndex++}`);
       params.push(filters.trigger);
     }
 
@@ -111,7 +111,7 @@ export class PgAdaptationEventRepository implements AdaptationEventReader, Adapt
       familyKey: row.family_key as string,
       previousRanking: (row.previous_ranking ?? []) as AdaptationEvent['previousRanking'],
       newRanking: (row.new_ranking ?? []) as AdaptationEvent['newRanking'],
-      trigger: (row.mode as AdaptationEvent['trigger']) ?? 'scheduled',
+      trigger: (row.risk_basis as AdaptationEvent['trigger']) ?? 'scheduled',
       evidenceSummary: (row.reason as string) ?? '',
       mode: (row.mode as AdaptationEvent['mode']) ?? 'recommend_only',
       policyBoundsSnapshot: { explorationRate: 0, mode: 'recommend_only' as const, additionalConstraints: {} },

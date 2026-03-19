@@ -3,12 +3,9 @@ import type { CapabilityRegistry } from '../registry/capability-registry.js';
 import type { SourceRegistry } from '../registry/registry.js';
 import type { ProviderRuntime, MethodExecutionResult } from '../providers/provider-runtime.js';
 import type { ProviderScore, ScoringResult } from '../domain/score-types.js';
-import type { ACDSRuntimeError } from '../domain/errors.js';
 import { MethodUnresolvedError, ProviderUnavailableError, PolicyBlockedError } from '../domain/errors.js';
 import { scoreProviders } from './provider-scorer.js';
 import { enforceCostCeiling } from './cost-enforcer.js';
-import { evaluatePolicy } from './policy-engine.js';
-import { assembleResponse } from './response-assembler.js';
 
 export interface CapabilityRequest {
   capability: string;
@@ -56,13 +53,11 @@ export interface CapabilityOrchestratorDeps {
 
 export class CapabilityOrchestrator {
   private readonly caps: CapabilityRegistry;
-  private readonly sources: SourceRegistry;
   private readonly runtimes: Map<string, ProviderRuntime>;
   private readonly onValidate?: (response: CapabilityResponse) => { validated: boolean; warnings: string[] };
 
   constructor(deps: CapabilityOrchestratorDeps) {
     this.caps = deps.capabilityRegistry;
-    this.sources = deps.sourceRegistry;
     this.runtimes = deps.runtimes;
     this.onValidate = deps.onValidate;
   }
@@ -72,6 +67,11 @@ export class CapabilityOrchestrator {
     const contract = this.caps.getContract(req.capability);
     if (!contract) {
       throw new MethodUnresolvedError(`Capability not found: ${req.capability}`);
+    }
+    if (req.version !== undefined && req.version !== contract.version) {
+      throw new MethodUnresolvedError(
+        `Capability version mismatch for ${req.capability}: requested ${req.version}, available ${contract.version}`,
+      );
     }
 
     // 2. Get all bindings for this capability
@@ -96,8 +96,14 @@ export class CapabilityOrchestrator {
 
     // 4. Apply cost enforcement on winner
     const winnerBinding = allBindings.find(
-      b => b.providerId === scoring.winner.providerId && b.methodId === scoring.winner.methodId
-    )!;
+      b => b.providerId === scoring.winner!.providerId && b.methodId === scoring.winner!.methodId
+    );
+    if (!winnerBinding) {
+      throw new PolicyBlockedError('Winner binding not found in registry', {
+        capability: req.capability,
+        providerId: scoring.winner!.providerId,
+      });
+    }
 
     if (req.constraints?.maxCostUSD !== undefined) {
       const costResult = enforceCostCeiling(
@@ -128,9 +134,9 @@ export class CapabilityOrchestrator {
     }
 
     // 6. Execute via provider runtime
-    const runtime = this.runtimes.get(scoring.winner.providerId);
+    const runtime = this.runtimes.get(scoring.winner!.providerId);
     if (!runtime) {
-      throw new ProviderUnavailableError(scoring.winner.providerId);
+      throw new ProviderUnavailableError(scoring.winner!.providerId);
     }
 
     const available = await runtime.isAvailable();
@@ -148,20 +154,20 @@ export class CapabilityOrchestrator {
           }
         }
       }
-      throw new ProviderUnavailableError(scoring.winner.providerId);
+      throw new ProviderUnavailableError(scoring.winner!.providerId);
     }
 
     try {
-      const result = await runtime.execute(scoring.winner.methodId, req.input);
-      return this.buildResponse(req, contract, scoring.winner, scoring, result, policyApplied);
+      const result = await runtime.execute(scoring.winner!.methodId, req.input);
+      return this.buildResponse(req, contract, scoring.winner!, scoring, result, policyApplied);
     } catch (error) {
       if (error instanceof Error && 'code' in error) throw error;
-      throw new ProviderUnavailableError(scoring.winner.providerId);
+      throw new ProviderUnavailableError(scoring.winner!.providerId);
     }
   }
 
   private buildResponse(
-    req: CapabilityRequest,
+    _req: CapabilityRequest,
     contract: CapabilityContract,
     selected: ProviderScore,
     scoring: ScoringResult,

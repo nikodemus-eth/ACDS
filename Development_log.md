@@ -1020,3 +1020,32 @@ request({
 - Adversarial tests: constraint conflicts, cost manipulation, version mismatch, stress testing
 
 **Total test count:** 199 files, 2008 tests, all passing.
+
+## 2026-03-19 — Code Review Fixes and User Refactoring
+
+### User Changes (code review requested)
+
+Major refactoring by user:
+- Replaced `apple-fakes.ts` with `apple-local-engine.ts` (real platform bridge)
+- Rewrote all 8 Apple method handlers to use new engine
+- Refactored `registry-validation.ts` validation logic
+- Added `tsconfig.typecheck.json` files across all 15 packages
+- Updated `tsconfig.base.json` with path aliases
+- Expanded test coverage across persistence, routing, and API layers
+- Updated all package.json versions
+
+### Code Review Findings and Fixes
+
+5 issues identified by code review, all corrected:
+
+1. **`privateKey` field escaped redaction** — `SENSITIVE_FIELDS` had mixed-case `'privateKey'` but lookup used `.toLowerCase()`, producing `'privatekey'` which wasn't in the set. Fixed by normalizing all set entries to lowercase.
+
+2. **`ScoringResult.winner` typed as non-optional but set to `undefined as any`** — Created a type lie that hid null access bugs from the type system. Fixed by making `winner: ProviderScore | undefined` and removing `as any`.
+
+3. **`CapabilityOrchestrator` used `!` non-null assertion on `winnerBinding`** — Could silently produce `undefined` on stale registry state. Fixed with explicit guard that throws `PolicyBlockedError`.
+
+4. **`PgAdaptationEventRepository.find()` filtered `trigger` on wrong column** — `find()` used `mode` column instead of `risk_basis`. `mapRow()` also read `trigger` from `row.mode`. Both fixed to use `risk_basis`.
+
+5. **`createDiContainer.test.ts` misclassified as unit test** — Requires live PostgreSQL. Updated header to clarify it's an integration test requiring a running database.
+
+**Total test count:** 199 files, 2010 tests, all passing.

@@ -2,16 +2,24 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { DispatchRunService } from './DispatchRunService.js';
 import { ExecutionStatusTracker } from './ExecutionStatusTracker.js';
 import type { DispatchRunDeps } from './DispatchRunService.js';
+import {
+  CognitiveGrade,
+  DecisionPosture,
+  LoadTier,
+  TaskType,
+  type DispatchRunRequest,
+  type RoutingRequest,
+} from '@acds/core-types';
 
-function makeRoutingRequest() {
+function makeRoutingRequest(): RoutingRequest {
   return {
     application: 'TestApp',
     process: 'Review',
     step: 'Analyze',
-    taskType: 'analytical',
-    loadTier: 'single_shot',
-    decisionPosture: 'operational',
-    cognitiveGrade: 'standard',
+    taskType: TaskType.ANALYTICAL,
+    loadTier: LoadTier.SINGLE_SHOT,
+    decisionPosture: DecisionPosture.OPERATIONAL,
+    cognitiveGrade: CognitiveGrade.STANDARD,
     input: 'test input',
     constraints: {
       privacy: 'cloud_allowed' as const,
@@ -23,7 +31,7 @@ function makeRoutingRequest() {
   };
 }
 
-function makeDispatchRunRequest(overrides: Record<string, unknown> = {}) {
+function makeDispatchRunRequest(overrides: Partial<DispatchRunRequest> = {}): DispatchRunRequest {
   return {
     routingRequest: makeRoutingRequest(),
     inputPayload: 'Hello world',
@@ -185,7 +193,7 @@ describe('DispatchRunService', () => {
 
     const deps = makeDeps({
       resolveRoute: async () => ({ decision, rationale }),
-      executeProvider: async (providerId) => {
+      executeProvider: async (_providerId) => {
         callCount++;
         if (callCount === 1) throw new Error('Primary failed');
         return fallbackResponse;

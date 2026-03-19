@@ -150,7 +150,7 @@ describe('OllamaAdapter', () => {
     });
 
     it('should throw EXECUTION_FAILED on network error (destroyed socket)', async () => {
-      server.setHandler((req, res) => {
+      server.setHandler((req, _res) => {
         // Destroy the socket to simulate a network error
         req.socket.destroy();
       });

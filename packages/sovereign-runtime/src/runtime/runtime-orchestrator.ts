@@ -23,7 +23,10 @@ export interface OrchestratorDeps {
   registry: SourceRegistry;
   runtimes: Map<string, ProviderRuntime>;
   /** Optional GRITS validation hook — called after execution. */
-  onValidate?: (response: ACDSMethodResponse) => { validated: boolean; warnings: string[] };
+  onValidate?: (
+    response: ACDSMethodResponse,
+    method: ReturnType<SourceRegistry['getMethod']>,
+  ) => { validated: boolean; warnings: string[] };
   /** Optional fallback mappings for same-class provider fallback. */
   fallbackMap?: FallbackMapping;
 }
@@ -35,7 +38,10 @@ export interface OrchestratorDeps {
 export class RuntimeOrchestrator {
   private readonly registry: SourceRegistry;
   private readonly runtimes: Map<string, ProviderRuntime>;
-  private readonly onValidate?: (response: ACDSMethodResponse) => { validated: boolean; warnings: string[] };
+  private readonly onValidate?: (
+    response: ACDSMethodResponse,
+    method: ReturnType<SourceRegistry['getMethod']>,
+  ) => { validated: boolean; warnings: string[] };
   private readonly fallbackMap: FallbackMapping;
 
   constructor(deps: OrchestratorDeps) {
@@ -101,7 +107,7 @@ export class RuntimeOrchestrator {
             }, true);
 
             if (this.onValidate) {
-              const validation = this.onValidate(response);
+              const validation = this.onValidate(response, this.registry.getMethod(plan.fallback.methodId));
               response.metadata.validated = validation.validated;
               if (validation.warnings.length > 0) {
                 response.metadata.warnings = validation.warnings;
@@ -128,7 +134,7 @@ export class RuntimeOrchestrator {
 
       // 7. GRITS validation hook
       if (this.onValidate) {
-        const validation = this.onValidate(response);
+        const validation = this.onValidate(response, method);
         response.metadata.validated = validation.validated;
         if (validation.warnings.length > 0) {
           response.metadata.warnings = validation.warnings;
@@ -175,7 +181,7 @@ export class RuntimeOrchestrator {
       const response = assembleResponse(result, plan, true);
 
       if (this.onValidate) {
-        const validation = this.onValidate(response);
+        const validation = this.onValidate(response, method);
         response.metadata.validated = validation.validated;
         if (validation.warnings.length > 0) {
           response.metadata.warnings = validation.warnings;

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify from 'fastify';
 import { adaptationApprovalRoutes } from './adaptationApprovalRoutes.js';
+import type { AppConfig } from '../config/appConfig.js';
+import type { FastifyInstance } from 'fastify';
 
 const SECRET = 'test-secret-approval';
 
@@ -11,12 +13,35 @@ beforeEach(() => {
   process.env.NODE_ENV = 'test';
 });
 
+function makeDiContainer(overrides: Partial<NonNullable<FastifyInstance['diContainer']>> = {}): NonNullable<FastifyInstance['diContainer']> {
+  return {
+    providerHealthService: {} as never,
+    registryService: {} as never,
+    profileCatalogService: {} as never,
+    policyRepository: {} as never,
+    connectionTester: {} as never,
+    secretRotationService: {} as never,
+    dispatchRunService: {} as never,
+    executionRecordService: {} as never,
+    auditEventReader: {} as never,
+    familyPerformanceReader: {} as never,
+    candidateRankingReader: {} as never,
+    adaptationEventReader: {} as never,
+    adaptationRecommendationReader: {} as never,
+    adaptationApprovalRepository: {} as never,
+    approvalAuditEmitter: {} as never,
+    adaptationRollbackService: {} as never,
+    resolve: <T>(name: string) => overrides[name as keyof typeof overrides] as T,
+    ...overrides,
+  };
+}
+
 function buildTestApp() {
   const app = Fastify({ logger: false });
-  app.decorate('diContainer', {
+  app.decorate('diContainer', makeDiContainer({
     adaptationApprovalRepository: {
       findPending: async () => [],
-      findById: async () => null,
+      findById: async () => undefined,
       findByFamily: async () => [],
       save: async () => {},
       updateStatus: async () => {},
@@ -24,10 +49,18 @@ function buildTestApp() {
     approvalAuditEmitter: {
       emit: () => {},
     },
-  });
-  app.decorate('config', {
+  }));
+  const config: AppConfig = {
+    port: 3000,
+    databaseUrl: process.env.DATABASE_URL!,
+    masterKeyPath: process.env.MASTER_KEY_PATH!,
     adminSessionSecret: SECRET,
-  });
+    nodeEnv: 'test',
+    logLevel: 'silent',
+    version: '0.1.0',
+    startedAt: new Date(),
+  };
+  app.decorate('config', config);
   return app;
 }
 

@@ -101,7 +101,7 @@ describe('GRITS Apple Method Integrity', () => {
   });
 
   it('GRITS-APPLE-STT-002: malformed audio still returns structured response', async () => {
-    // Empty string as audio data — the fake adapter should handle it gracefully
+    // Empty string as audio data — the local adapter should handle it gracefully
     const result = await adapter.execute('apple.speech.transcribe_file', {
       audioData: '',
       language: 'en-US',
@@ -153,7 +153,7 @@ describe('GRITS Apple Method Integrity', () => {
 
     const output = result.output as Record<string, unknown>;
     expect(typeof output.confidence).toBe('number');
-    // Confidence field exists (fakes return fixed confidence)
+    // Confidence field exists on all OCR results
     expect(output.confidence).toBeDefined();
   });
 

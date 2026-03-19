@@ -112,18 +112,13 @@ describe('Red Team: Capability Fabric Adversarial Tests', () => {
   it('RED-CAP-004: capability version mismatch - request version 99.0 when only 1.0 registered', async () => {
     const orchestrator = makeOrchestrator();
 
-    // Current implementation does not enforce version matching in the orchestrator.
-    // The contract lookup is by ID only; version in the request is informational.
-    // This test documents the behavior: the request succeeds because version is not checked.
-    const response = await orchestrator.request({
-      capability: CAPABILITY_IDS.TEXT_SUMMARIZE,
-      version: '99.0',
-      input: { text: 'Test' },
-    });
-
-    // Succeeds despite version mismatch - documents current behavior
-    expect(response.metadata.capabilityId).toBe(CAPABILITY_IDS.TEXT_SUMMARIZE);
-    expect(response.metadata.capabilityVersion).toBe('1.0'); // Returns the registered version, not requested
+    await expect(
+      orchestrator.request({
+        capability: CAPABILITY_IDS.TEXT_SUMMARIZE,
+        version: '99.0',
+        input: { text: 'Test' },
+      }),
+    ).rejects.toThrow(MethodUnresolvedError);
   });
 
   it('RED-CAP-005: bind provider to capability twice with same method throws InvalidRegistrationError', () => {

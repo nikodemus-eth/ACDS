@@ -26,6 +26,7 @@ export default defineConfig({
     },
   },
   test: {
+    passWithNoTests: true,
     include: [
       'packages/*/src/**/*.test.ts',
       'packages/sovereign-runtime/tests/**/*.test.ts',

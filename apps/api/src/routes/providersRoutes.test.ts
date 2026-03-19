@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify from 'fastify';
 import { providersRoutes } from './providersRoutes.js';
+import { AuthType, ProviderVendor, type Provider } from '@acds/core-types';
+import type { AppConfig } from '../config/appConfig.js';
+import type { SecretRotationService } from '@acds/security';
+import type { ProviderHealthService } from '@acds/provider-broker';
+import type { FastifyInstance } from 'fastify';
 
 const SECRET = 'test-secret-for-providers';
 
@@ -11,30 +16,86 @@ beforeEach(() => {
   process.env.NODE_ENV = 'test';
 });
 
+function makeDiContainer(overrides: Partial<NonNullable<FastifyInstance['diContainer']>> = {}): NonNullable<FastifyInstance['diContainer']> {
+  return {
+    providerHealthService: {} as never,
+    registryService: {} as never,
+    profileCatalogService: {} as never,
+    policyRepository: {} as never,
+    connectionTester: {} as never,
+    secretRotationService: {} as never,
+    dispatchRunService: {} as never,
+    executionRecordService: {} as never,
+    auditEventReader: {} as never,
+    familyPerformanceReader: {} as never,
+    candidateRankingReader: {} as never,
+    adaptationEventReader: {} as never,
+    adaptationRecommendationReader: {} as never,
+    adaptationApprovalRepository: {} as never,
+    approvalAuditEmitter: {} as never,
+    adaptationRollbackService: {} as never,
+    resolve: <T>(name: string) => overrides[name as keyof typeof overrides] as T,
+    ...overrides,
+  };
+}
+
 function buildTestApp() {
   const app = Fastify({ logger: false });
-  app.decorate('diContainer', {
+  const provider: Provider = {
+    id: 'provider-1',
+    name: 'Provider 1',
+    vendor: ProviderVendor.OPENAI,
+    authType: AuthType.API_KEY,
+    baseUrl: 'https://api.example.test',
+    enabled: true,
+    environment: 'test',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  app.decorate('diContainer', makeDiContainer({
     registryService: {
       listAll: async () => [],
-      getById: async (id: string) => null,
-      create: async (data: any) => ({ id: 'new-id', ...data, createdAt: new Date(), updatedAt: new Date() }),
-      update: async () => ({}),
-      disable: async () => ({}),
-    },
+      listEnabled: async () => [provider],
+      getById: async (_id: string) => provider,
+      create: async (data: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>) => ({
+        ...provider,
+        ...data,
+        id: 'new-id',
+      }),
+      update: async () => provider,
+      disable: async () => ({ ...provider, enabled: false }),
+    } as unknown as NonNullable<FastifyInstance['diContainer']>['registryService'],
     connectionTester: {
       testConnection: async () => ({ success: true, latencyMs: 10, message: 'ok' }),
     },
     secretRotationService: {
-      rotate: async () => ({ rotated: true }),
-    },
+      rotateSecret: async () => ({
+        providerId: provider.id,
+        rotatedAt: new Date(),
+        newKeyId: 'key-1',
+        success: true,
+      }),
+    } as unknown as SecretRotationService,
     providerHealthService: {
-      getHealthForProvider: async () => null,
+      getHealth: async () => null,
       getAllHealth: async () => [],
-    },
-  });
-  app.decorate('config', {
+      getHealthyProviders: async () => [],
+      recordSuccess: async () => {},
+      recordFailure: async () => {},
+      repository: {} as never,
+    } as unknown as ProviderHealthService,
+  }));
+  const config: AppConfig = {
+    port: 3000,
+    databaseUrl: process.env.DATABASE_URL!,
+    masterKeyPath: process.env.MASTER_KEY_PATH!,
     adminSessionSecret: SECRET,
-  });
+    nodeEnv: 'test',
+    logLevel: 'silent',
+    version: '0.1.0',
+    startedAt: new Date(),
+  };
+  app.decorate('config', config);
   return app;
 }
 
@@ -91,6 +152,7 @@ describe('providersRoutes', () => {
       method: 'POST',
       url: '/some-id/rotate-secret',
       headers: { 'x-admin-session': SECRET },
+      payload: { newSecret: 'rotated-secret' },
     });
     expect([200, 404, 500]).toContain(res.statusCode);
     await app.close();

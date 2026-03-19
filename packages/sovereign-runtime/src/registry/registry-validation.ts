@@ -7,64 +7,75 @@ import { InvalidRegistrationError } from '../domain/errors.js';
  * Throws InvalidRegistrationError on any inconsistency.
  */
 export function validateSourceDefinition(source: SourceDefinition): void {
-  if (!source.id || source.id.trim() === '') {
+  const candidate = source as Partial<{
+    id: string;
+    name: string;
+    sourceClass: string;
+    deterministic: boolean;
+    localOnly: boolean;
+    explicitInvocationRequired: boolean;
+    requiresRiskAcknowledgment: boolean;
+    riskLevel: string;
+  }>;
+
+  if (!candidate.id || candidate.id.trim() === '') {
     throw new InvalidRegistrationError('Source ID must be a non-empty string', {
-      sourceClass: source.sourceClass,
+      sourceClass: candidate.sourceClass,
     });
   }
 
-  if (!source.name || source.name.trim() === '') {
+  if (!candidate.name || candidate.name.trim() === '') {
     throw new InvalidRegistrationError('Source name must be a non-empty string', {
-      sourceId: source.id,
+      sourceId: candidate.id,
     });
   }
 
-  switch (source.sourceClass) {
+  switch (candidate.sourceClass) {
     case 'provider':
       // Providers must declare determinism and locality
-      if (typeof source.deterministic !== 'boolean') {
+      if (typeof candidate.deterministic !== 'boolean') {
         throw new InvalidRegistrationError('Provider must declare deterministic flag', {
-          sourceId: source.id,
+          sourceId: candidate.id,
         });
       }
-      if (typeof source.localOnly !== 'boolean') {
+      if (typeof candidate.localOnly !== 'boolean') {
         throw new InvalidRegistrationError('Provider must declare localOnly flag', {
-          sourceId: source.id,
+          sourceId: candidate.id,
         });
       }
       break;
 
     case 'capability':
       // Capabilities must be non-deterministic and explicit-only
-      if (source.deterministic !== false) {
+      if (candidate.deterministic !== false) {
         throw new InvalidRegistrationError('Capability must have deterministic=false', {
-          sourceId: source.id,
+          sourceId: candidate.id,
         });
       }
-      if (source.explicitInvocationRequired !== true) {
+      if (candidate.explicitInvocationRequired !== true) {
         throw new InvalidRegistrationError('Capability must require explicit invocation', {
-          sourceId: source.id,
+          sourceId: candidate.id,
         });
       }
       break;
 
     case 'session':
       // Sessions must require risk acknowledgment
-      if (source.requiresRiskAcknowledgment !== true) {
+      if (candidate.requiresRiskAcknowledgment !== true) {
         throw new InvalidRegistrationError('Session must require risk acknowledgment', {
-          sourceId: source.id,
+          sourceId: candidate.id,
         });
       }
-      if (!source.riskLevel) {
+      if (!candidate.riskLevel) {
         throw new InvalidRegistrationError('Session must declare riskLevel', {
-          sourceId: source.id,
+          sourceId: candidate.id,
         });
       }
       break;
 
     default:
       throw new InvalidRegistrationError(
-        `Unknown source class: ${(source as SourceDefinition).sourceClass}`,
+        `Unknown source class: ${String(candidate.sourceClass)}`,
       );
   }
 }

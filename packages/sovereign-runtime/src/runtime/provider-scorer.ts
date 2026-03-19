@@ -12,18 +12,20 @@ export function scoreProviders(
   if (constraints.localOnly) {
     eligible = eligible.filter((b) => b.locality === 'local');
   }
-  if (constraints.maxLatencyMs) {
-    eligible = eligible.filter((b) => b.latency.p95 <= constraints.maxLatencyMs!);
+  if (constraints.maxLatencyMs !== undefined) {
+    const maxLatencyMs = constraints.maxLatencyMs;
+    eligible = eligible.filter((b) => b.latency.p95 <= maxLatencyMs);
   }
-  if (constraints.maxCostUSD) {
-    eligible = eligible.filter((b) => b.cost.unitCost <= constraints.maxCostUSD!);
+  if (constraints.maxCostUSD !== undefined) {
+    const maxCostUSD = constraints.maxCostUSD;
+    eligible = eligible.filter((b) => b.cost.unitCost <= maxCostUSD);
   }
 
   if (eligible.length === 0) {
     // Return empty result - caller handles the error
     return {
       scores: [],
-      winner: undefined as any,
+      winner: undefined,
       explanation: 'No eligible providers after constraint filtering',
     };
   }

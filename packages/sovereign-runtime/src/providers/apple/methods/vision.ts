@@ -1,12 +1,12 @@
 import type { VisionInput } from '../apple-interfaces.js';
-import { fakeOCR, fakeDocumentExtract } from '../apple-fakes.js';
+import { extractDocument, performOCR } from '../apple-local-engine.js';
 import { MethodNotAvailableError } from '../../../domain/errors.js';
 
 export type VisionMethod = 'ocr' | 'document_extract';
 
 const handlers: Record<VisionMethod, (input: VisionInput) => unknown> = {
-  ocr: fakeOCR,
-  document_extract: fakeDocumentExtract,
+  ocr: performOCR,
+  document_extract: extractDocument,
 };
 
 export function executeVision(method: string, input: unknown): unknown {

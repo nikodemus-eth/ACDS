@@ -1,13 +1,13 @@
 import type { WritingToolInput } from '../apple-interfaces.js';
-import { fakeRewrite, fakeProofread, fakeWritingSummarize } from '../apple-fakes.js';
+import { proofreadText, rewriteText, summarizeWriting } from '../apple-local-engine.js';
 import { MethodNotAvailableError } from '../../../domain/errors.js';
 
 export type WritingToolMethod = 'rewrite' | 'proofread' | 'summarize';
 
 const handlers: Record<WritingToolMethod, (input: WritingToolInput) => unknown> = {
-  rewrite: fakeRewrite,
-  proofread: fakeProofread,
-  summarize: fakeWritingSummarize,
+  rewrite: rewriteText,
+  proofread: proofreadText,
+  summarize: summarizeWriting,
 };
 
 export function executeWritingTool(method: string, input: unknown): unknown {

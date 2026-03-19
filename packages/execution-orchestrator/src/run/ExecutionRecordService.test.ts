@@ -1,33 +1,38 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ExecutionRecordService } from './ExecutionRecordService.js';
 import type { ExecutionRecordRepository, ExecutionRecordFilters } from './ExecutionRecordService.js';
+import {
+  CognitiveGrade,
+  DecisionPosture,
+  type ExecutionRecord,
+} from '@acds/core-types';
 
 // In-memory repository implementing the real interface
 class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
-  private records: Array<{ id: string } & Record<string, unknown>> = [];
+  private records: ExecutionRecord[] = [];
   private nextId = 1;
 
-  async create(record: Record<string, unknown>): Promise<any> {
-    const withId = { ...record, id: `rec-${this.nextId++}` };
-    this.records.push(withId as any);
+  async create(record: Omit<ExecutionRecord, 'id'>): Promise<ExecutionRecord> {
+    const withId: ExecutionRecord = { ...record, id: `rec-${this.nextId++}` };
+    this.records.push(withId);
     return withId;
   }
 
-  async findById(id: string): Promise<any | null> {
+  async findById(id: string): Promise<ExecutionRecord | null> {
     return this.records.find((r) => r.id === id) ?? null;
   }
 
-  async findByFamily(familyKey: string, limit = 50): Promise<any[]> {
+  async findByFamily(familyKey: string, limit = 50): Promise<ExecutionRecord[]> {
     return this.records
-      .filter((r) => (r as any).executionFamily?.application === familyKey)
+      .filter((r) => r.executionFamily.application === familyKey)
       .slice(0, limit);
   }
 
-  async findRecent(limit = 50): Promise<any[]> {
+  async findRecent(limit = 50): Promise<ExecutionRecord[]> {
     return this.records.slice(-limit);
   }
 
-  async findFiltered(filters: ExecutionRecordFilters): Promise<any[]> {
+  async findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]> {
     let results = [...this.records];
     if (filters.status) {
       results = results.filter((r) => r.status === filters.status);
@@ -38,7 +43,7 @@ class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
     return results;
   }
 
-  async update(id: string, updates: Record<string, unknown>): Promise<any> {
+  async update(id: string, updates: Partial<Omit<ExecutionRecord, 'id'>>): Promise<ExecutionRecord> {
     const record = this.records.find((r) => r.id === id);
     if (!record) throw new Error(`Record ${id} not found`);
     Object.assign(record, updates);
@@ -46,9 +51,15 @@ class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
   }
 }
 
-function makeRecord(overrides: Record<string, unknown> = {}) {
+function makeRecord(overrides: Partial<Omit<ExecutionRecord, 'id'>> = {}): Omit<ExecutionRecord, 'id'> {
   return {
-    executionFamily: { application: 'TestApp', process: 'Review', step: 'Analyze', decisionPosture: 'operational', cognitiveGrade: 'standard' },
+    executionFamily: {
+      application: 'TestApp',
+      process: 'Review',
+      step: 'Analyze',
+      decisionPosture: DecisionPosture.OPERATIONAL,
+      cognitiveGrade: CognitiveGrade.STANDARD,
+    },
     routingDecisionId: 'dec-1',
     selectedModelProfileId: 'model-1',
     selectedTacticProfileId: 'tactic-1',

@@ -1,12 +1,12 @@
 import type { TTSInput } from '../apple-interfaces.js';
-import { fakeSpeak, fakeRenderAudio } from '../apple-fakes.js';
+import { renderAudio, speakText } from '../apple-local-engine.js';
 import { MethodNotAvailableError } from '../../../domain/errors.js';
 
 export type TTSMethod = 'speak' | 'render_audio';
 
 const handlers: Record<TTSMethod, (input: TTSInput) => unknown> = {
-  speak: fakeSpeak,
-  render_audio: fakeRenderAudio,
+  speak: speakText,
+  render_audio: renderAudio,
 };
 
 export function executeTTS(method: string, input: unknown): unknown {

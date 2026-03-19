@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PgPolicyRepository } from '@acds/persistence-pg';
-import { randomUUID } from 'node:crypto';
 import {
   createTestPool,
   runMigrations,

@@ -24,6 +24,7 @@ export interface ProviderScore {
 
 export interface ScoringResult {
   scores: ProviderScore[];
-  winner: ProviderScore;
+  /** Undefined when no eligible providers remain after filtering. */
+  winner: ProviderScore | undefined;
   explanation: string;
 }

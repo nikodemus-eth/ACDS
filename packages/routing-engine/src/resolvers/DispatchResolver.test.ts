@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { DispatchResolver } from './DispatchResolver.js';
-import { TaskType, LoadTier, DecisionPosture, CognitiveGrade } from '@acds/core-types';
+import {
+  CognitiveGrade,
+  DecisionPosture,
+  LoadTier,
+  ProviderVendor,
+  TaskType,
+} from '@acds/core-types';
 
 function makeRequest(overrides: Record<string, unknown> = {}) {
   return {
@@ -30,7 +36,7 @@ function makeProfile(id: string, overrides: Record<string, unknown> = {}) {
     id,
     name: `profile_${id}`,
     description: 'test profile',
-    vendor: 'openai',
+    vendor: ProviderVendor.OPENAI,
     modelId: `model_${id}`,
     supportedTaskTypes: [TaskType.ANALYTICAL],
     supportedLoadTiers: [LoadTier.SINGLE_SHOT],

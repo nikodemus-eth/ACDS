@@ -697,7 +697,7 @@ describe('Red Team: Observability Evasion Attacks', () => {
     const orchestrator = new RuntimeOrchestrator({
       registry,
       runtimes: new Map([[APPLE_RUNTIME_PROVIDER.id, runtime]]),
-      onValidate: (response) => grits.validate(response),
+      onValidate: (response, method) => grits.validate(response, method),
     });
 
     // Execute a legitimate task

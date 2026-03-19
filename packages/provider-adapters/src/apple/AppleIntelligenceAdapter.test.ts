@@ -106,7 +106,7 @@ describe('AppleIntelligenceAdapter', () => {
     it('should send request and map response', async () => {
       server.setRoutes({
         'POST /execute': async (req, res) => {
-          const body = JSON.parse(await readBody(req));
+          await readBody(req);
           jsonResponse(res, 200, {
             model: 'apple-fm-base',
             content: 'Hello from Apple',

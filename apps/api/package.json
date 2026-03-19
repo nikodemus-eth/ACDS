@@ -7,7 +7,7 @@
     "build": "pnpm --filter @acds/api^... run build && tsc",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "clean": "rm -rf dist"
   },
   "dependencies": {

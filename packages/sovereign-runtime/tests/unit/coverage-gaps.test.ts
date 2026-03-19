@@ -50,15 +50,15 @@ function makeAppleResponse(overrides: Record<string, unknown> = {}) {
   return makeSuccessResponse({ latencyMs: 10, ...overrides });
 }
 
-/** Minimal mock runtime that is always available. */
-function mockRuntime(
+/** Minimal in-memory runtime that is always available. */
+function makeRuntime(
   providerId: string,
   available = true,
 ): ProviderRuntime {
   return {
     providerId,
     async execute(_methodId: string, _input: unknown): Promise<MethodExecutionResult> {
-      return { output: { result: 'mock' }, latencyMs: 5, deterministic: true, executionMode: 'local' };
+      return { output: { result: 'runtime' }, latencyMs: 5, deterministic: true, executionMode: 'local' };
     },
     async isAvailable() {
       return available;
@@ -211,7 +211,7 @@ describe('RuntimeOrchestrator', () => {
     const orchestrator = new RuntimeOrchestrator({
       registry,
       runtimes,
-      onValidate: (resp) => hookRunner.validate(resp),
+      onValidate: (resp, method) => hookRunner.validate(resp, method),
     });
 
     const response = await orchestrator.executeMethod({
@@ -256,7 +256,7 @@ describe('RuntimeOrchestrator', () => {
   });
 
   it('executeMethod() with unavailable provider throws ProviderUnavailableError', async () => {
-    const unavailableRuntime = mockRuntime('apple-intelligence-runtime', false);
+    const unavailableRuntime = makeRuntime('apple-intelligence-runtime', false);
     const runtimes = new Map<string, ProviderRuntime>();
     runtimes.set('apple-intelligence-runtime', unavailableRuntime);
 
