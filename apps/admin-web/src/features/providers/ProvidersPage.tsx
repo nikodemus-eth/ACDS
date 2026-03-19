@@ -62,6 +62,8 @@ export function ProvidersPage() {
           keyExtractor={(r) => r.id}
           onRowClick={(r) => navigate(`/providers/${r.id}`)}
           emptyMessage="No providers configured"
+          caption="Registered providers"
+          rowLabel={(r) => r.name}
         />
       )}
     </div>

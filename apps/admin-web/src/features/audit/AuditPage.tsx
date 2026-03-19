@@ -33,6 +33,7 @@ export function AuditPage() {
     <div>
       <PageHeader title="Audit Log" />
 
+      <h2 className="sr-only">Filters</h2>
       <div
         style={{
           display: 'flex',
@@ -42,7 +43,7 @@ export function AuditPage() {
           alignItems: 'center',
         }}
       >
-        <select style={inputStyle} value={eventType} onChange={(e) => setEventType(e.target.value)}>
+        <select style={inputStyle} value={eventType} onChange={(e) => setEventType(e.target.value)} aria-label="Event type">
           <option value="">All Types</option>
           {Object.values(AuditEventType).map((t) => (
             <option key={t} value={t}>
@@ -57,6 +58,7 @@ export function AuditPage() {
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
           placeholder="From"
+          aria-label="Date from"
         />
         <input
           style={inputStyle}
@@ -64,6 +66,7 @@ export function AuditPage() {
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
           placeholder="To"
+          aria-label="Date to"
         />
 
         <input
@@ -71,6 +74,7 @@ export function AuditPage() {
           value={actor}
           onChange={(e) => setActor(e.target.value)}
           placeholder="Actor"
+          aria-label="Actor"
         />
 
         <input
@@ -78,6 +82,7 @@ export function AuditPage() {
           value={application}
           onChange={(e) => setApplication(e.target.value)}
           placeholder="Application"
+          aria-label="Application"
         />
       </div>
 

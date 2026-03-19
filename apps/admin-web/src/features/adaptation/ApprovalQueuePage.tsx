@@ -120,15 +120,16 @@ export function ApprovalQueuePage() {
         <p style={{ color: '#6b7280' }}>No approvals match the current filters.</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <caption className="sr-only">Pending approvals</caption>
           <thead>
             <tr>
-              <th style={headerCellStyle}>Family Key</th>
-              <th style={headerCellStyle}>Status</th>
-              <th style={headerCellStyle}>Mode</th>
-              <th style={headerCellStyle}>Rankings</th>
-              <th style={headerCellStyle}>Submitted</th>
-              <th style={headerCellStyle}>Expires</th>
-              <th style={headerCellStyle}>Actions</th>
+              <th scope="col" style={headerCellStyle}>Family Key</th>
+              <th scope="col" style={headerCellStyle}>Status</th>
+              <th scope="col" style={headerCellStyle}>Mode</th>
+              <th scope="col" style={headerCellStyle}>Rankings</th>
+              <th scope="col" style={headerCellStyle}>Submitted</th>
+              <th scope="col" style={headerCellStyle}>Expires</th>
+              <th scope="col" style={headerCellStyle}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -148,6 +149,7 @@ export function ApprovalQueuePage() {
                   <Link
                     to={`/adaptation/approvals/${encodeURIComponent(a.id)}`}
                     style={{ color: '#2563eb', textDecoration: 'none', fontSize: '13px' }}
+                    aria-label={`View approval for ${a.familyKey}`}
                   >
                     View
                   </Link>

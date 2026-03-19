@@ -11,7 +11,7 @@ export function BridgeHealthPanel({ health, isLoading, error }: BridgeHealthPane
   if (isLoading) return <div className="panel"><p>Checking bridge health...</p></div>;
   if (error) return (
     <div className="panel">
-      <h3 className="panel__title">Bridge Health</h3>
+      <h2 className="panel__title">Bridge Health</h2>
       <StatusBadge status="unhealthy" label="Unreachable" />
       <div className="panel__note">Could not reach the Apple Intelligence bridge. Is it running on localhost:11435?</div>
     </div>
@@ -19,20 +19,18 @@ export function BridgeHealthPanel({ health, isLoading, error }: BridgeHealthPane
   if (!health) return null;
 
   return (
-    <div className="panel">
-      <h3 className="panel__title">Bridge Health</h3>
-      <div className="info-row">
-        <span className="info-row__label">Status</span>
-        <StatusBadge status={health.status === 'healthy' ? 'healthy' : 'unhealthy'} label={health.status} />
-      </div>
-      <div className="info-row">
-        <span className="info-row__label">Platform</span>
-        <span className="info-row__value">{health.platform}</span>
-      </div>
-      <div className="info-row">
-        <span className="info-row__label">Version</span>
-        <span className="info-row__value">{health.version}</span>
-      </div>
+    <div className="panel" aria-live="polite">
+      <h2 className="panel__title">Bridge Health</h2>
+      <dl className="dl-grid">
+        <dt className="dl-grid__term">Status</dt>
+        <dd className="dl-grid__value">
+          <StatusBadge status={health.status === 'healthy' ? 'healthy' : 'unhealthy'} label={health.status} />
+        </dd>
+        <dt className="dl-grid__term">Platform</dt>
+        <dd className="dl-grid__value">{health.platform}</dd>
+        <dt className="dl-grid__term">Version</dt>
+        <dd className="dl-grid__value">{health.version}</dd>
+      </dl>
     </div>
   );
 }

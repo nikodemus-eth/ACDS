@@ -1,29 +1,11 @@
 import React, { useState } from 'react';
 import type { CreateProfilePayload } from '../../features/profiles/profilesApi';
+import { FormField } from './FormField';
 
 interface ProfileFormProps {
   onSubmit: (data: CreateProfilePayload) => void;
   isSubmitting: boolean;
 }
-
-const fieldStyle: React.CSSProperties = { marginBottom: '16px' };
-
-const labelElStyle: React.CSSProperties = {
-  display: 'block',
-  marginBottom: '4px',
-  fontSize: '13px',
-  fontWeight: 500,
-  color: '#374151',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  fontSize: '14px',
-  boxSizing: 'border-box',
-};
 
 export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
   const [type, setType] = useState<'model' | 'tactic'>('model');
@@ -66,138 +48,133 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
     onSubmit(base);
   }
 
+  const typeOptions = [
+    { value: 'model', label: 'Model Profile' },
+    { value: 'tactic', label: 'Tactic Profile' },
+  ];
+
+  const vendorOptions = [
+    { value: 'openai', label: 'OpenAI' },
+    { value: 'anthropic', label: 'Anthropic' },
+    { value: 'google', label: 'Google' },
+    { value: 'ollama', label: 'Ollama (local)' },
+    { value: 'apple', label: 'Apple Intelligence (local)' },
+  ];
+
+  const gradeOptions = [
+    { value: 'basic', label: 'basic' },
+    { value: 'standard', label: 'standard' },
+    { value: 'enhanced', label: 'enhanced' },
+    { value: 'frontier', label: 'frontier' },
+    { value: 'specialized', label: 'specialized' },
+  ];
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        maxWidth: '480px',
-      }}
-    >
-      <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 600 }}>New Profile</h3>
+    <form onSubmit={handleSubmit} className="form-panel">
+      <h3 className="form-panel__title">New Profile</h3>
 
-      <div style={fieldStyle}>
-        <label htmlFor="profile-type" style={labelElStyle}>Type</label>
-        <select
-          id="profile-type"
-          style={inputStyle}
-          value={type}
-          onChange={(e) => setType(e.target.value as 'model' | 'tactic')}
-        >
-          <option value="model">Model Profile</option>
-          <option value="tactic">Tactic Profile</option>
-        </select>
-      </div>
+      <FormField
+        id="profile-type"
+        label="Type"
+        as="select"
+        value={type}
+        onChange={(e) => setType(e.target.value as 'model' | 'tactic')}
+        options={typeOptions}
+      />
 
-      <div style={fieldStyle}>
-        <label htmlFor="profile-name" style={labelElStyle}>Name</label>
-        <input
+      <fieldset className="form-fieldset">
+        <legend className="form-legend">Model Configuration</legend>
+
+        <FormField
           id="profile-name"
-          style={inputStyle}
+          label="Name"
+          required
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoComplete="off"
-          required
         />
-      </div>
 
-      <div style={fieldStyle}>
-        <label htmlFor="profile-description" style={labelElStyle}>Description</label>
-        <textarea
+        <FormField
           id="profile-description"
-          style={{ ...inputStyle, minHeight: '60px' }}
+          label="Description"
+          as="textarea"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-      </div>
+      </fieldset>
 
-      <div style={fieldStyle}>
-        <label htmlFor="profile-task-types" style={labelElStyle}>Supported Task Types (comma-separated)</label>
-        <input
+      <fieldset className="form-fieldset">
+        <legend className="form-legend">Capabilities</legend>
+
+        <FormField
           id="profile-task-types"
-          style={inputStyle}
+          label="Supported Task Types"
           value={taskTypes}
           onChange={(e) => setTaskTypes(e.target.value)}
           placeholder="completion, chat, embedding"
+          helper="Comma-separated list of task types"
         />
-      </div>
 
-      <div style={fieldStyle}>
-        <label htmlFor="profile-load-tiers" style={labelElStyle}>Supported Load Tiers (comma-separated)</label>
-        <input
+        <FormField
           id="profile-load-tiers"
-          style={inputStyle}
+          label="Supported Load Tiers"
           value={loadTiers}
           onChange={(e) => setLoadTiers(e.target.value)}
           placeholder="single_shot, batch, streaming, high_throughput"
+          helper="Comma-separated list of load tiers"
         />
-      </div>
+      </fieldset>
 
       {type === 'model' && (
-        <>
-          <div style={fieldStyle}>
-            <label htmlFor="profile-vendor" style={labelElStyle}>Vendor</label>
-            <select
-              id="profile-vendor"
-              style={inputStyle}
-              value={vendor}
-              onChange={(e) => setVendor(e.target.value)}
-            >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="google">Google</option>
-              <option value="ollama">Ollama (local)</option>
-              <option value="apple">Apple Intelligence (local)</option>
-            </select>
-          </div>
-          <div style={fieldStyle}>
-            <label htmlFor="profile-model-id" style={labelElStyle}>Model ID</label>
-            <input
-              id="profile-model-id"
-              style={inputStyle}
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-              placeholder="e.g. gpt-4.1, claude-sonnet-4-6"
-            />
-          </div>
-          <div style={fieldStyle}>
-          <label htmlFor="profile-cognitive-grade" style={labelElStyle}>Minimum Cognitive Grade</label>
-          <select
+        <fieldset className="form-fieldset">
+          <legend className="form-legend">Cost Settings</legend>
+
+          <FormField
+            id="profile-vendor"
+            label="Vendor"
+            as="select"
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+            options={vendorOptions}
+          />
+
+          <FormField
+            id="profile-model-id"
+            label="Model ID"
+            value={modelId}
+            onChange={(e) => setModelId(e.target.value)}
+            placeholder="e.g. gpt-4.1, claude-sonnet-4-6"
+          />
+
+          <FormField
             id="profile-cognitive-grade"
-            style={inputStyle}
+            label="Minimum Cognitive Grade"
+            as="select"
             value={cognitiveGrade}
             onChange={(e) => setCognitiveGrade(e.target.value)}
-          >
-            <option value="basic">basic</option>
-            <option value="standard">standard</option>
-            <option value="enhanced">enhanced</option>
-            <option value="frontier">frontier</option>
-            <option value="specialized">specialized</option>
-          </select>
-          </div>
-        </>
+            options={gradeOptions}
+          />
+        </fieldset>
       )}
 
       {type === 'tactic' && (
-        <>
-          <div style={fieldStyle}>
-            <label htmlFor="profile-execution-method" style={labelElStyle}>Execution Method</label>
-            <input
-              id="profile-execution-method"
-              style={inputStyle}
-              value={executionMethod}
-              onChange={(e) => setExecutionMethod(e.target.value)}
-              placeholder="e.g. chain_of_thought"
-              required
-            />
-          </div>
-          <div style={fieldStyle}>
+        <fieldset className="form-fieldset">
+          <legend className="form-legend">Tactic Settings</legend>
+
+          <FormField
+            id="profile-execution-method"
+            label="Execution Method"
+            required
+            value={executionMethod}
+            onChange={(e) => setExecutionMethod(e.target.value)}
+            placeholder="e.g. chain_of_thought"
+          />
+
+          <div className="form-field">
             <label
+              className="form-field__label"
               htmlFor="profile-multi-stage"
-              style={{ ...labelElStyle, display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               <input
                 id="profile-multi-stage"
@@ -208,24 +185,21 @@ export function ProfileForm({ onSubmit, isSubmitting }: ProfileFormProps) {
               Multi-Stage
             </label>
           </div>
-        </>
+        </fieldset>
       )}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        style={{
-          padding: '8px 20px',
-          backgroundColor: '#3b82f6',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '6px',
-          cursor: isSubmitting ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
-        }}
-      >
-        {isSubmitting ? 'Creating...' : 'Create Profile'}
-      </button>
+      <div className="form-actions">
+        <button
+          type="submit"
+          className="button button--primary"
+          aria-busy={isSubmitting}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Creating...' : 'Create Profile'}
+        </button>
+      </div>
+
+      <div aria-live="polite" className="form-status" />
     </form>
   );
 }

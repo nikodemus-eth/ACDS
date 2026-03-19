@@ -39,22 +39,38 @@ export function ProfilesPage() {
         </div>
       )}
 
-      <div className="segmented-control">
+      <div className="tab-list" role="tablist" aria-label="Profile types">
         <button
-          className={tab === 'model' ? 'segmented-control__button segmented-control__button--active' : 'segmented-control__button'}
+          className="tab"
+          role="tab"
+          id="profile-tab-0"
+          aria-selected={tab === 'model'}
+          aria-controls="profile-panel-0"
           onClick={() => setTab('model')}
         >
           Model Profiles
         </button>
         <button
-          className={tab === 'tactic' ? 'segmented-control__button segmented-control__button--active' : 'segmented-control__button'}
+          className="tab"
+          role="tab"
+          id="profile-tab-1"
+          aria-selected={tab === 'tactic'}
+          aria-controls="profile-panel-1"
           onClick={() => setTab('tactic')}
         >
           Tactic Profiles
         </button>
       </div>
 
-      {tab === 'model' ? <ModelProfilesPanel /> : <TacticProfilesPanel />}
+      {tab === 'model' ? (
+        <div role="tabpanel" id="profile-panel-0" aria-labelledby="profile-tab-0">
+          <ModelProfilesPanel />
+        </div>
+      ) : (
+        <div role="tabpanel" id="profile-panel-1" aria-labelledby="profile-tab-1">
+          <TacticProfilesPanel />
+        </div>
+      )}
     </div>
   );
 }

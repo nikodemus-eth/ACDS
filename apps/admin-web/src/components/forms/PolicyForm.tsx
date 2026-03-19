@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { PolicyPayload, PolicyRecord } from '../../features/policies/policiesApi';
+import { FormField } from './FormField';
 
 interface PolicyFormProps {
   initial?: PolicyRecord;
@@ -7,25 +8,6 @@ interface PolicyFormProps {
   onCancel: () => void;
   isSubmitting: boolean;
 }
-
-const fieldStyle: React.CSSProperties = { marginBottom: '16px' };
-
-const labelElStyle: React.CSSProperties = {
-  display: 'block',
-  marginBottom: '4px',
-  fontSize: '13px',
-  fontWeight: 500,
-  color: '#374151',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  fontSize: '14px',
-  boxSizing: 'border-box',
-};
 
 export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: PolicyFormProps) {
   const [level, setLevel] = useState<'global' | 'application' | 'process'>(initial?.level ?? 'global');
@@ -39,9 +21,11 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
   const [constraintsJson, setConstraintsJson] = useState(
     initial?.constraints ? JSON.stringify(initial.constraints, null, 2) : '{}',
   );
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setJsonError(null);
 
     let defaults: Record<string, unknown> = {};
     let constraints: Record<string, unknown> = {};
@@ -49,7 +33,7 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
       defaults = JSON.parse(defaultsJson) as Record<string, unknown>;
       constraints = JSON.parse(constraintsJson) as Record<string, unknown>;
     } catch {
-      alert('Invalid JSON in defaults or constraints');
+      setJsonError('Invalid JSON in defaults or constraints. Please check syntax.');
       return;
     }
 
@@ -72,138 +56,149 @@ export function PolicyForm({ initial, onSubmit, onCancel, isSubmitting }: Policy
     onSubmit(payload);
   }
 
+  const levelOptions = [
+    { value: 'global', label: 'Global' },
+    { value: 'application', label: 'Application' },
+    { value: 'process', label: 'Process' },
+  ];
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        maxWidth: '520px',
-      }}
-    >
-      <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 600 }}>
+    <form onSubmit={handleSubmit} className="form-panel">
+      <h3 className="form-panel__title">
         {initial ? 'Edit Policy' : 'New Policy'}
       </h3>
 
       {!initial && (
-        <div style={fieldStyle}>
-          <label htmlFor="policy-level" style={labelElStyle}>Level</label>
-          <select
-            id="policy-level"
-            style={inputStyle}
-            value={level}
-            onChange={(e) => setLevel(e.target.value as PolicyPayload['level'])}
-          >
-            <option value="global">Global</option>
-            <option value="application">Application</option>
-            <option value="process">Process</option>
-          </select>
-        </div>
+        <FormField
+          id="policy-level"
+          label="Level"
+          as="select"
+          value={level}
+          onChange={(e) => setLevel(e.target.value as PolicyPayload['level'])}
+          options={levelOptions}
+        />
       )}
 
       {(level === 'application' || level === 'process') && (
-        <div style={fieldStyle}>
-          <label htmlFor="policy-application" style={labelElStyle}>Application</label>
-          <input
+        <fieldset className="form-fieldset">
+          <legend className="form-legend">Scope</legend>
+
+          <FormField
             id="policy-application"
-            style={inputStyle}
+            label="Application"
+            required
             value={application}
             onChange={(e) => setApplication(e.target.value)}
             autoComplete="off"
-            required
           />
-        </div>
+
+          {level === 'process' && (
+            <FormField
+              id="policy-process"
+              label="Process"
+              required
+              value={process}
+              onChange={(e) => setProcess(e.target.value)}
+              autoComplete="off"
+            />
+          )}
+        </fieldset>
       )}
 
-      {level === 'process' && (
-        <div style={fieldStyle}>
-          <label htmlFor="policy-process" style={labelElStyle}>Process</label>
-          <input
-            id="policy-process"
-            style={inputStyle}
-            value={process}
-            onChange={(e) => setProcess(e.target.value)}
-            autoComplete="off"
-            required
-          />
-        </div>
-      )}
+      <fieldset className="form-fieldset">
+        <legend className="form-legend">Vendor Restrictions</legend>
 
-      <div style={fieldStyle}>
-        <label htmlFor="policy-allowed-vendors" style={labelElStyle}>Allowed Vendors (comma-separated)</label>
-        <input
+        <FormField
           id="policy-allowed-vendors"
-          style={inputStyle}
+          label="Allowed Vendors"
           value={allowedVendors}
           onChange={(e) => setAllowedVendors(e.target.value)}
           placeholder="ollama, openai"
+          helper="Comma-separated list of allowed vendors"
         />
-      </div>
 
-      <div style={fieldStyle}>
-        <label htmlFor="policy-blocked-vendors" style={labelElStyle}>Blocked Vendors (comma-separated)</label>
-        <input
+        <FormField
           id="policy-blocked-vendors"
-          style={inputStyle}
+          label="Blocked Vendors"
           value={blockedVendors}
           onChange={(e) => setBlockedVendors(e.target.value)}
           placeholder="Leave empty for none"
+          helper="Comma-separated list of blocked vendors"
         />
-      </div>
+      </fieldset>
 
-      <div style={fieldStyle}>
-        <label htmlFor="policy-defaults" style={labelElStyle}>Defaults (JSON)</label>
-        <textarea
+      <fieldset className="form-fieldset">
+        <legend className="form-legend">Advanced Configuration</legend>
+
+        <FormField
           id="policy-defaults"
-          style={{ ...inputStyle, minHeight: '80px', fontFamily: 'monospace', fontSize: '12px' }}
+          label="Defaults (JSON)"
+          as="textarea"
           value={defaultsJson}
-          onChange={(e) => setDefaultsJson(e.target.value)}
-        />
-      </div>
+          onChange={(e) => { setDefaultsJson(e.target.value); setJsonError(null); }}
+          error={jsonError && jsonError.includes('defaults') ? jsonError : undefined}
+          helper="Valid JSON object for default routing parameters"
+        >
+          <textarea
+            id="policy-defaults"
+            className={`form-field__input form-field__input--mono ${jsonError ? 'form-field__input--invalid' : ''}`}
+            value={defaultsJson}
+            onChange={(e) => { setDefaultsJson(e.target.value); setJsonError(null); }}
+            rows={4}
+            aria-describedby="policy-defaults-helper"
+          />
+          <div id="policy-defaults-helper" className="form-field__helper">
+            Valid JSON object, e.g. {`{"maxLatencyMs": 3000}`}
+          </div>
+        </FormField>
 
-      <div style={fieldStyle}>
-        <label htmlFor="policy-constraints" style={labelElStyle}>Constraints (JSON)</label>
-        <textarea
+        <FormField
           id="policy-constraints"
-          style={{ ...inputStyle, minHeight: '80px', fontFamily: 'monospace', fontSize: '12px' }}
+          label="Constraints (JSON)"
+          as="textarea"
           value={constraintsJson}
-          onChange={(e) => setConstraintsJson(e.target.value)}
-        />
-      </div>
+          onChange={(e) => { setConstraintsJson(e.target.value); setJsonError(null); }}
+          error={jsonError && jsonError.includes('constraints') ? jsonError : undefined}
+        >
+          <textarea
+            id="policy-constraints"
+            className={`form-field__input form-field__input--mono ${jsonError ? 'form-field__input--invalid' : ''}`}
+            value={constraintsJson}
+            onChange={(e) => { setConstraintsJson(e.target.value); setJsonError(null); }}
+            rows={4}
+            aria-describedby="policy-constraints-helper"
+          />
+          <div id="policy-constraints-helper" className="form-field__helper">
+            Valid JSON object, e.g. {`{"localOnly": true}`}
+          </div>
+        </FormField>
 
-      <div style={{ display: 'flex', gap: '8px' }}>
+        {jsonError && (
+          <div role="alert" className="form-field__error">
+            {jsonError}
+          </div>
+        )}
+      </fieldset>
+
+      <div className="form-actions">
         <button
           type="submit"
+          className="button button--primary"
+          aria-busy={isSubmitting}
           disabled={isSubmitting}
-          style={{
-            padding: '8px 20px',
-            backgroundColor: '#3b82f6',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-          }}
         >
           {isSubmitting ? 'Saving...' : initial ? 'Update Policy' : 'Create Policy'}
         </button>
         <button
           type="button"
+          className="button button--ghost"
           onClick={onCancel}
-          style={{
-            padding: '8px 20px',
-            backgroundColor: '#f3f4f6',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
         >
           Cancel
         </button>
       </div>
+
+      <div aria-live="polite" className="form-status" />
     </form>
   );
 }

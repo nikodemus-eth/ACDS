@@ -14,6 +14,9 @@ interface DataTableProps<T> {
   keyExtractor: (row: T) => string;
   onRowClick?: (row: T) => void;
   emptyMessage?: string;
+  caption?: string;
+  loading?: boolean;
+  rowLabel?: (row: T) => string;
 }
 
 export function DataTable<T>({
@@ -22,16 +25,28 @@ export function DataTable<T>({
   keyExtractor,
   onRowClick,
   emptyMessage = 'No data',
+  caption,
+  loading,
+  rowLabel,
 }: DataTableProps<T>) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortAnnouncement, setSortAnnouncement] = useState('');
 
   function handleSort(key: string) {
+    let newDirection: 'asc' | 'desc';
     if (sortColumn === key) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+      newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
-      setSortColumn(key);
-      setSortDirection('asc');
+      newDirection = 'asc';
+    }
+    setSortColumn(key);
+    setSortDirection(newDirection);
+
+    const col = columns.find((entry) => entry.key === key);
+    if (col) {
+      const dirLabel = newDirection === 'asc' ? 'ascending' : 'descending';
+      setSortAnnouncement(`Sorted by ${col.header}, ${dirLabel}`);
     }
   }
 
@@ -66,26 +81,41 @@ export function DataTable<T>({
   });
 
   return (
-    <div className="table-wrap">
-      <table className="data-table">
+    <div className="table-wrap" role="region" aria-label={caption || 'Data table'} tabIndex={0}>
+      <table className="data-table" aria-busy={loading}>
+        {caption && <caption className="sr-only">{caption}</caption>}
         <thead className="data-table__head">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
+                scope="col"
+                aria-sort={
+                  col.sortable
+                    ? sortColumn === col.key
+                      ? sortDirection === 'asc' ? 'ascending' : 'descending'
+                      : 'none'
+                    : undefined
+                }
                 onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 className={col.sortable ? 'data-table__cell data-table__cell--head data-table__cell--sortable' : 'data-table__cell data-table__cell--head'}
               >
                 {col.header}
-                {col.sortable ? sortIndicator(col.key) : ''}
+                {col.sortable && <span aria-hidden="true">{sortIndicator(col.key)}</span>}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
+          {loading ? (
             <tr>
-              <td colSpan={columns.length} className="data-table__empty">
+              <td colSpan={columns.length} className="data-table__empty" role="status" aria-live="polite">
+                Loading...
+              </td>
+            </tr>
+          ) : data.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} className="data-table__empty" role="status">
                 {emptyMessage}
               </td>
             </tr>
@@ -94,6 +124,15 @@ export function DataTable<T>({
               <tr
                 key={keyExtractor(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={onRowClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onRowClick(row);
+                  }
+                } : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? 'link' : undefined}
+                aria-label={onRowClick && rowLabel ? rowLabel(row) : undefined}
                 className={onRowClick ? 'data-table__row data-table__row--interactive' : 'data-table__row'}
               >
                 {columns.map((col) => (
@@ -106,6 +145,9 @@ export function DataTable<T>({
           )}
         </tbody>
       </table>
+      <div className="live-region" aria-live="polite" aria-atomic="true">
+        {sortAnnouncement}
+      </div>
     </div>
   );
 }

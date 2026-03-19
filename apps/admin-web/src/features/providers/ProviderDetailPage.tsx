@@ -52,37 +52,27 @@ export function ProviderDetailPage() {
       <div className="details-grid">
         <div className="panel">
           <h3 className="panel__title">Provider Info</h3>
-          <div className="info-row">
-            <span className="info-row__label">Vendor</span>
-            <span className="info-row__value">{provider.vendor}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-row__label">Auth Type</span>
-            <span className="info-row__value">{provider.authType}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-row__label">Base URL</span>
-            <span className="info-row__value">{provider.baseUrl}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-row__label">Environment</span>
-            <span className="info-row__value">{provider.environment}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-row__label">Status</span>
-            <StatusBadge
-              status={provider.enabled ? 'healthy' : 'unhealthy'}
-              label={provider.enabled ? 'Enabled' : 'Disabled'}
-            />
-          </div>
-          <div className="info-row">
-            <span className="info-row__label">Created</span>
-            <span className="info-row__value">{formatDate(provider.createdAt)}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-row__label">Updated</span>
-            <span className="info-row__value">{formatDate(provider.updatedAt)}</span>
-          </div>
+          <dl className="dl-grid">
+            <dt className="dl-grid__term">Vendor</dt>
+            <dd className="dl-grid__value">{provider.vendor}</dd>
+            <dt className="dl-grid__term">Auth Type</dt>
+            <dd className="dl-grid__value">{provider.authType}</dd>
+            <dt className="dl-grid__term">Base URL</dt>
+            <dd className="dl-grid__value">{provider.baseUrl}</dd>
+            <dt className="dl-grid__term">Environment</dt>
+            <dd className="dl-grid__value">{provider.environment}</dd>
+            <dt className="dl-grid__term">Status</dt>
+            <dd className="dl-grid__value">
+              <StatusBadge
+                status={provider.enabled ? 'healthy' : 'unhealthy'}
+                label={provider.enabled ? 'Enabled' : 'Disabled'}
+              />
+            </dd>
+            <dt className="dl-grid__term">Created</dt>
+            <dd className="dl-grid__value">{formatDate(provider.createdAt)}</dd>
+            <dt className="dl-grid__term">Updated</dt>
+            <dd className="dl-grid__value">{formatDate(provider.updatedAt)}</dd>
+          </dl>
         </div>
 
         <ProviderHealthPanel health={provider.health} />

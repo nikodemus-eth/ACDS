@@ -112,6 +112,8 @@ export function ExecutionsPage() {
           keyExtractor={(r) => r.id}
           onRowClick={(r) => navigate(`/executions/${r.id}`)}
           emptyMessage="No executions found"
+          caption="Execution records"
+          rowLabel={(r) => r.id}
         />
       )}
     </div>

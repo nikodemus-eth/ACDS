@@ -42,7 +42,7 @@ export function TestExecutionPanel({ capabilities }: TestExecutionPanelProps) {
 
   return (
     <div className="panel">
-      <h3 className="panel__title">Test Execution</h3>
+      <h2 className="panel__title">Test Execution</h2>
       <div className="panel__note" style={{ marginBottom: '0.75rem' }}>
         Calls the bridge directly at {BRIDGE_URL}
       </div>
@@ -80,6 +80,7 @@ export function TestExecutionPanel({ capabilities }: TestExecutionPanelProps) {
           onClick={() => void handleExecute()}
           disabled={isPending || !prompt.trim()}
           className="button button--primary"
+          aria-busy={isPending}
         >
           {isPending ? 'Executing...' : 'Execute'}
         </button>
@@ -92,7 +93,7 @@ export function TestExecutionPanel({ capabilities }: TestExecutionPanelProps) {
       )}
 
       {result && (
-        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem' }}>
+        <div role="region" aria-label="Test results" style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem' }}>
           <h4 style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>Response</h4>
           <pre style={{
             background: 'var(--color-bg-subtle)',

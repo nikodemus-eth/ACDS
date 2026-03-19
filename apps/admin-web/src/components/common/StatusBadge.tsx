@@ -15,6 +15,19 @@ const colorMap: Record<string, { bg: string; text: string }> = {
 
 const defaultColor = { bg: '#f3f4f6', text: '#374151' };
 
+const statusIcons: Record<string, string> = {
+  healthy: '●',
+  succeeded: '●',
+  fallback_succeeded: '◐',
+  degraded: '◑',
+  pending: '○',
+  running: '◌',
+  unhealthy: '✕',
+  failed: '✕',
+  fallback_failed: '✕',
+  unknown: '?',
+};
+
 interface StatusBadgeProps {
   status: StatusColor;
   label?: string;
@@ -22,6 +35,7 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, label }: StatusBadgeProps) {
   const colors = colorMap[status] ?? defaultColor;
+  const icon = statusIcons[status] ?? '○';
   const displayLabel =
     label ??
     status
@@ -31,8 +45,11 @@ export function StatusBadge({ status, label }: StatusBadgeProps) {
   return (
     <span
       className="status-badge"
+      role="status"
+      aria-label={displayLabel}
       style={{ backgroundColor: colors.bg, color: colors.text }}
     >
+      <span aria-hidden="true">{icon} </span>
       {displayLabel}
     </span>
   );

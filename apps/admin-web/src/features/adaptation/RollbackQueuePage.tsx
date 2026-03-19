@@ -81,14 +81,15 @@ export function RollbackQueuePage() {
         </p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '32px' }}>
+          <caption className="sr-only">Rollback candidates</caption>
           <thead>
             <tr>
-              <th style={headerCellStyle}>Family Key</th>
-              <th style={headerCellStyle}>Event ID</th>
-              <th style={headerCellStyle}>Trigger</th>
-              <th style={headerCellStyle}>Candidates</th>
-              <th style={headerCellStyle}>Event Date</th>
-              <th style={headerCellStyle}>Actions</th>
+              <th scope="col" style={headerCellStyle}>Family Key</th>
+              <th scope="col" style={headerCellStyle}>Event ID</th>
+              <th scope="col" style={headerCellStyle}>Trigger</th>
+              <th scope="col" style={headerCellStyle}>Candidates</th>
+              <th scope="col" style={headerCellStyle}>Event Date</th>
+              <th scope="col" style={headerCellStyle}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -107,6 +108,7 @@ export function RollbackQueuePage() {
                   <Link
                     to={`/adaptation/rollbacks/${encodeURIComponent(c.familyKey)}?eventId=${encodeURIComponent(c.targetAdaptationEventId)}`}
                     style={{ color: '#2563eb', textDecoration: 'none', fontSize: '13px' }}
+                    aria-label={`Review rollback for ${c.familyKey}`}
                   >
                     Review
                   </Link>
@@ -128,13 +130,14 @@ export function RollbackQueuePage() {
         <p style={{ color: '#6b7280', fontSize: '13px' }}>No rollback history available.</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <caption className="sr-only">Recent rollback history</caption>
           <thead>
             <tr>
-              <th style={headerCellStyle}>Family Key</th>
-              <th style={headerCellStyle}>Target Event</th>
-              <th style={headerCellStyle}>Actor</th>
-              <th style={headerCellStyle}>Reason</th>
-              <th style={headerCellStyle}>Rolled Back At</th>
+              <th scope="col" style={headerCellStyle}>Family Key</th>
+              <th scope="col" style={headerCellStyle}>Target Event</th>
+              <th scope="col" style={headerCellStyle}>Actor</th>
+              <th scope="col" style={headerCellStyle}>Reason</th>
+              <th scope="col" style={headerCellStyle}>Rolled Back At</th>
             </tr>
           </thead>
           <tbody>
