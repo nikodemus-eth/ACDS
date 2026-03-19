@@ -959,3 +959,138 @@ describe('Registry validation — deterministic and requiresNetwork checks', () 
     expect(() => registry.registerProvider(provider, [badMethod])).toThrow(InvalidRegistrationError);
   });
 });
+
+// ===========================================================================
+// Registry duplicate ID rejection for capability and session
+// ===========================================================================
+describe('Registry duplicate ID rejection for capability and session', () => {
+  it('rejects registering a capability with an ID already used by another capability', () => {
+    const registry = new SourceRegistry();
+    registry.registerCapability(FIXTURES_OPENAI_CAPABILITY);
+    expect(() => registry.registerCapability({
+      ...FIXTURES_OPENAI_CAPABILITY,
+      name: 'Duplicate',
+    })).toThrow(InvalidRegistrationError);
+  });
+
+  it('rejects registering a session with an ID already used by another session', () => {
+    const registry = new SourceRegistry();
+    registry.registerSession(FIXTURES_OPENAI_SESSION);
+    expect(() => registry.registerSession({
+      ...FIXTURES_OPENAI_SESSION,
+      name: 'Duplicate',
+    })).toThrow(InvalidRegistrationError);
+  });
+});
+
+// ===========================================================================
+// Orchestrator error wrapping
+// ===========================================================================
+describe('Orchestrator error wrapping', () => {
+  it('wraps non-ACDS errors from runtime.execute in executeTask', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const throwingRuntime: ProviderRuntime = {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new TypeError('native bridge crashed'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    };
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', throwingRuntime);
+
+    const orchestrator = new RuntimeOrchestrator({ registry, runtimes });
+    await expect(
+      orchestrator.executeTask('summarize this text', { input: { text: 'hi' } }),
+    ).rejects.toThrow(ProviderUnavailableError);
+  });
+
+  it('wraps non-ACDS errors from runtime.execute in executeMethod', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const throwingRuntime: ProviderRuntime = {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new Error('unexpected crash'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    };
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', throwingRuntime);
+
+    const orchestrator = new RuntimeOrchestrator({ registry, runtimes });
+    await expect(
+      orchestrator.executeMethod({
+        providerId: 'apple-intelligence-runtime',
+        methodId: 'apple.foundation_models.summarize',
+        input: { text: 'hi' },
+      }),
+    ).rejects.toThrow(ProviderUnavailableError);
+  });
+
+  it('re-throws ACDSRuntimeError from runtime.execute without wrapping', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const throwingRuntime: ProviderRuntime = {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new MethodNotAvailableError('test.method', 'test'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    };
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', throwingRuntime);
+
+    const orchestrator = new RuntimeOrchestrator({ registry, runtimes });
+    await expect(
+      orchestrator.executeTask('summarize this text', { input: { text: 'hi' } }),
+    ).rejects.toThrow(MethodNotAvailableError);
+  });
+
+  it('wraps non-ACDS errors from fallback runtime.execute', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+    registry.registerProvider({
+      id: 'ollama-local',
+      name: 'Ollama',
+      sourceClass: 'provider',
+      deterministic: true,
+      localOnly: true,
+      providerClass: 'self_hosted',
+      executionMode: 'local',
+    });
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new Error('unreachable'); },
+      async isAvailable() { return false; },
+      async healthCheck() { return { status: 'unavailable', latencyMs: 0 }; },
+    });
+    runtimes.set('ollama-local', {
+      providerId: 'ollama-local',
+      async execute() { throw new RangeError('fallback also crashed'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    });
+
+    const orchestrator = new RuntimeOrchestrator({
+      registry,
+      runtimes,
+      fallbackMap: {
+        'apple.foundation_models.summarize': {
+          fallbackProviderId: 'ollama-local',
+          fallbackMethodId: 'ollama.summarize',
+        },
+      },
+    });
+
+    await expect(
+      orchestrator.executeTask('summarize this text', { input: { text: 'hi' } }),
+    ).rejects.toThrow(ProviderUnavailableError);
+  });
+});

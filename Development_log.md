@@ -908,3 +908,77 @@ The API was crash-looping (exit code 1) because three required environment varia
 3. Unloaded/reloaded the launchd agent to reset the restart throttle
 
 **Result:** API healthy — `GET /health` returns `{"status":"ok","version":"0.1.0","environment":"production"}` on port 3100. All 7 services running, all auto-start on reboot.
+
+## 2026-03-19 — Sovereign Runtime Package
+
+### New Package: @acds/sovereign-runtime
+
+Implemented the sovereign runtime architecture as a new monorepo package. This introduces a strict 3-class taxonomy (Provider / Capability / Session) with Apple Intelligence as a first-class method-level sovereign runtime.
+
+**Architecture:**
+- Domain model with discriminated union taxonomy — TypeScript control flow enforces class boundaries at compile time
+- In-memory source registry with class boundary enforcement and duplicate-ID rejection
+- Runtime pipeline: intent resolver → method resolver → policy engine → execution planner → provider runtime → GRITS validation → response assembler
+- Apple runtime adapter dispatching to 20 methods across 8 subsystems (Foundation Models, Writing Tools, Speech, TTS, Vision, Image, Translation, Sound)
+- Structured telemetry with secret redaction
+- GRITS hooks for schema validation, latency monitoring, drift detection
+
+**Test suite:** 308 tests across 38 files
+- Unit tests for all domain, registry, runtime, adapter, telemetry modules
+- Integration tests for full execution paths
+- GRITS integrity suite (64 GRITS-* invariants)
+- Red team adversarial suite (44 tests across 9 attack categories)
+- 99.23% statement coverage, 100% function coverage
+
+### Monorepo-Wide Fixes (31 issues)
+
+**Schema mismatches fixed:**
+- Rewrote execution_records, provider_secrets, and policies migrations to match repository code
+- Fixed provider_secrets dual-definition conflict
+
+**Persistence bugs fixed:**
+- PgSecretCipherStore upsert returns correct row
+- PgFamilyPerformanceRepository null timestamp handling
+- PgAuditEventRepository fragile paramIndex
+
+**Security fixes:**
+- Gemini API key redacted from error cause chains
+- Auth middleware strips query strings before public path matching
+- Audit emitters propagate errors instead of swallowing
+
+**Application logic fixes:**
+- DispatchController.run() error handling (400 vs 500)
+- ExecutionStatusTracker startup rehydration method
+- DispatchResolver uses randomUUID instead of empty string
+- GeminiMapper passes actual model name
+- ProviderExecutionProxy configurable timeout
+
+### Data Dictionary and ERD
+
+Added comprehensive documentation:
+- `docs/architecture/data-dictionary.md` — 17 PostgreSQL tables, in-memory registry entities, all field types and relationships
+- `docs/architecture/entity-relationship-diagram.md` — PostgreSQL ERD, in-memory registry ERD, cross-layer relationships
+
+## 2026-03-19 — Accessibility Overhaul (WCAG 2.1 AA)
+
+Full UI pass on admin-web for US Federal ADA Title II and Oregon state compliance.
+
+**Foundation:**
+- Fixed color contrast: primary 4.6:1, muted 4.8:1 (all pass AA 4.5:1 minimum)
+- Added :focus-visible ring, skip-to-main link, semantic landmarks
+- Added prefers-reduced-motion media query
+
+**Components:**
+- DataTable: scope/aria-sort on headers, keyboard nav on rows, sort announcements via aria-live
+- StatusBadge: icons + role="status" (not color-alone per WCAG 1.4.1)
+- Forms: new FormField component with aria-required/aria-invalid/aria-describedby, fieldset grouping, inline error alerts (replaced alert())
+- Detail pages: semantic dl/dt/dd instead of div/span
+
+**Responsive:**
+- Mobile hamburger menu with aria-expanded, Escape-to-close, overlay dismiss
+- Scrollable table regions with keyboard tabindex
+
+**Documentation:**
+- `docs/architecture/accessibility-compliance.md` — full WCAG 2.1 AA criterion matrix
+
+**Total test count:** 191 files, 1919 tests, all passing.
