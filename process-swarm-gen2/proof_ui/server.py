@@ -1266,12 +1266,23 @@ def _make_handler(
 
         # ── Response helpers ──
 
+        def _allowed_origin(self) -> str:
+            """Return the request Origin only if it's a localhost address."""
+            origin = self.headers.get("Origin", "")
+            if origin:
+                from urllib.parse import urlparse
+                parsed = urlparse(origin)
+                if parsed.hostname in ("localhost", "127.0.0.1", "::1"):
+                    return origin
+            # No Origin header (same-origin request) — allow
+            return f"http://localhost:{self.server.server_address[1]}"
+
         def _json_response(self, data: Any, status: int = 200) -> None:
             body = json.dumps(data, default=str).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Origin", self._allowed_origin())
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
@@ -1325,7 +1336,7 @@ def _make_handler(
 
         def do_OPTIONS(self) -> None:
             self.send_response(204)
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Origin", self._allowed_origin())
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
@@ -1691,7 +1702,7 @@ def _make_handler(
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(content)))
-                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Origin", self._allowed_origin())
                 self.end_headers()
                 self.wfile.write(content)
                 return

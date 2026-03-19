@@ -359,7 +359,9 @@ class TestHTTPEndpoints:
 
     def test_cors_headers_present(self, live_server: str) -> None:
         resp = urlopen(f"{live_server}/api/swarms")
-        assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+        origin = resp.headers.get("Access-Control-Allow-Origin", "")
+        # CORS restricted to localhost only (not wildcard *)
+        assert "localhost" in origin or "127.0.0.1" in origin
 
     def test_api_swarms_returns_list(self, live_server: str) -> None:
         resp = urlopen(f"{live_server}/api/swarms")

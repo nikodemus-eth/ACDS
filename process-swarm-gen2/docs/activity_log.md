@@ -236,3 +236,9 @@ Timestamped record of what was done and when during the rebuild.
 | — | Red team gap audit | Audited 224 existing red team tests across 19 files. Found 7 gaps (spec A, G, J + TTS/creds/RSS/delivery) |
 | — | `test_rt11_uncovered_threats.py` | 30 new red team tests: unregistered commands, dry-run drift, timeout, TTS injection, credential leakage, RSS injection, delivery honesty |
 | — | **Result** | **All 10 ARGUS-Hold spec items (A-J) covered. 254 red team tests. 2139 total tests** |
+| — | Codebase audit | 7 findings: token sanitization, schema drift, missing indexes, silent exceptions, error disclosure, threading docs, SQL docs |
+| — | Data dictionary | `docs/data_dictionary.md`: 30 tables, workspace layout, ARGUS-Hold ledger, ACDS models, Mermaid ERD |
+| — | WCAG 2.1 AA pass | 9 must-fix items resolved: contrast, focus indicators, skip link, semantic headings, table scope, keyboard accessibility, ARIA roles |
+| — | CORS hardening | Replaced `Access-Control-Allow-Origin: *` with localhost-only origin validation |
+| — | `test_rt12_proofui_security.py` | 15 new red team tests: XSS protection, CORS restriction, artifact path traversal, delivery destination injection |
+| — | **Result** | **2154 total tests passing. 269 red team tests across 21 files** |
