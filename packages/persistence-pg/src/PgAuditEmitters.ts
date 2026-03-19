@@ -4,8 +4,8 @@ import type { ApprovalAuditEvent, RollbackAuditEvent } from '@acds/adaptive-opti
 export class PgApprovalAuditEmitter {
   constructor(private readonly pool: Pool) {}
 
-  emit(event: ApprovalAuditEvent): void {
-    this.pool.query(
+  async emit(event: ApprovalAuditEvent): Promise<void> {
+    await this.pool.query(
       `INSERT INTO audit_events (event_type, actor, action, resource_type, resource_id, details)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
@@ -20,17 +20,15 @@ export class PgApprovalAuditEmitter {
           timestamp: event.timestamp,
         }),
       ],
-    ).catch((err) => {
-      console.error('[approval-audit] Failed to persist audit event:', err);
-    });
+    );
   }
 }
 
 export class PgRollbackAuditEmitter {
   constructor(private readonly pool: Pool) {}
 
-  emit(event: RollbackAuditEvent): void {
-    this.pool.query(
+  async emit(event: RollbackAuditEvent): Promise<void> {
+    await this.pool.query(
       `INSERT INTO audit_events (event_type, actor, action, resource_type, resource_id, details)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
@@ -46,8 +44,6 @@ export class PgRollbackAuditEmitter {
           timestamp: event.timestamp,
         }),
       ],
-    ).catch((err) => {
-      console.error('[rollback-audit] Failed to persist audit event:', err);
-    });
+    );
   }
 }

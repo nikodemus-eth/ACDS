@@ -47,11 +47,6 @@ async function waitForRow(
   throw new Error(`Row for resource_id=${resourceId} not found within ${maxMs}ms`);
 }
 
-// ── Console capture (no vi.spyOn) ───────────────────────────────────────────
-
-let capturedErrors: string[] = [];
-const originalError = console.error;
-
 // ── PgApprovalAuditEmitter ──────────────────────────────────────────────────
 
 describe('PgApprovalAuditEmitter', () => {
@@ -152,12 +147,7 @@ describe('PgApprovalAuditEmitter', () => {
     }
   });
 
-  it('does not throw on database error (fire-and-forget)', async () => {
-    capturedErrors = [];
-    console.error = (...args: unknown[]) => {
-      capturedErrors.push(args.map(String).join(' '));
-    };
-
+  it('rejects with an error on database failure (callers can handle)', async () => {
     try {
       // Drop the table so the INSERT fails
       await pool.query('DROP TABLE audit_events CASCADE');
@@ -169,19 +159,9 @@ describe('PgApprovalAuditEmitter', () => {
         timestamp: '2026-03-16T14:00:00.000Z',
       };
 
-      // Should not throw
-      emitter.emit(event);
-
-      // Wait for the error to be caught and logged
-      const deadline = Date.now() + 2000;
-      while (Date.now() < deadline && capturedErrors.length === 0) {
-        await new Promise((r) => setTimeout(r, 50));
-      }
-
-      expect(capturedErrors.length).toBeGreaterThan(0);
-      expect(capturedErrors[0]).toContain('[approval-audit]');
+      // emit() is now async and propagates database errors
+      await expect(emitter.emit(event)).rejects.toThrow();
     } finally {
-      console.error = originalError;
       // Recreate the audit_events table only (not full migrations which would fail on existing tables)
       await pool.execSQL(`
         CREATE TABLE IF NOT EXISTS audit_events (
@@ -269,17 +249,13 @@ describe('PgRollbackAuditEmitter', () => {
     expect(row.event_type).toBe('rollback_previewed');
   });
 
-  it('does not throw on database error (fire-and-forget)', async () => {
-    capturedErrors = [];
-    console.error = (...args: unknown[]) => {
-      capturedErrors.push(args.map(String).join(' '));
-    };
-
+  it('rejects with an error on database failure (callers can handle)', async () => {
     try {
       // Drop the table so the INSERT fails
       await pool.query('DROP TABLE audit_events CASCADE');
 
-      emitter.emit({
+      // emit() is now async and propagates database errors
+      await expect(emitter.emit({
         type: 'rollback_executed',
         rollbackId: 'rb-err',
         familyKey: 'app/proc/step',
@@ -287,18 +263,8 @@ describe('PgRollbackAuditEmitter', () => {
         actor: 'admin',
         reason: 'Emergency',
         timestamp: '2026-03-16T14:00:00.000Z',
-      });
-
-      // Wait for the error to be caught and logged
-      const deadline = Date.now() + 2000;
-      while (Date.now() < deadline && capturedErrors.length === 0) {
-        await new Promise((r) => setTimeout(r, 50));
-      }
-
-      expect(capturedErrors.length).toBeGreaterThan(0);
-      expect(capturedErrors[0]).toContain('[rollback-audit]');
+      })).rejects.toThrow();
     } finally {
-      console.error = originalError;
       // Recreate the audit_events table only
       await pool.execSQL(`
         CREATE TABLE IF NOT EXISTS audit_events (

@@ -9,13 +9,14 @@ export class PgSecretCipherStore implements SecretCipherStore {
   async store(providerId: string, envelope: EncryptedEnvelope): Promise<StoredSecret> {
     const id = randomUUID();
     const now = new Date();
-    await this.pool.query(
+    const result = await this.pool.query(
       `INSERT INTO provider_secrets (id, provider_id, envelope, created_at)
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (provider_id) DO UPDATE SET envelope = $3, rotated_at = $4`,
+       ON CONFLICT (provider_id) DO UPDATE SET envelope = $3, rotated_at = $4
+       RETURNING *`,
       [id, providerId, JSON.stringify(envelope), now],
     );
-    return { id, providerId, envelope, createdAt: now, rotatedAt: null, expiresAt: null };
+    return this.mapRow(result.rows[0]);
   }
 
   async retrieve(providerId: string): Promise<StoredSecret | null> {

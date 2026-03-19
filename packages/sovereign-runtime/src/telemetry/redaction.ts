@@ -7,7 +7,9 @@
 const TOKEN_PATTERNS = [
   /\b(sk-[a-zA-Z0-9]{20,})\b/g,       // OpenAI-style keys
   /\b(Bearer\s+[a-zA-Z0-9\-._~+/]+=*)\b/g, // Bearer tokens
-  /\b([a-zA-Z0-9]{32,})\b/g,           // Long alphanumeric strings (possible keys)
+  /\b(ghp_[a-zA-Z0-9]{36,})\b/g,     // GitHub personal access tokens
+  /\b(gho_[a-zA-Z0-9]{36,})\b/g,     // GitHub OAuth tokens
+  /\b(xox[bpsa]-[a-zA-Z0-9\-]+)\b/g, // Slack tokens
   /\b(eyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_.+/=]*)\b/g, // JWT tokens
 ];
 

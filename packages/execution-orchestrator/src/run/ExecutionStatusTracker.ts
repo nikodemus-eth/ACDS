@@ -10,8 +10,32 @@ export interface TrackedExecution {
   updatedAt: Date;
 }
 
+/**
+ * In-memory execution status tracker.
+ *
+ * LIMITATION: All state is held in memory and lost on process restart.
+ * In-flight executions will be orphaned if the process crashes.
+ * Call `hydrateFromRecords()` on startup to restore known executions
+ * from a persistent store (e.g. database query of incomplete records).
+ */
 export class ExecutionStatusTracker {
   private readonly executions = new Map<string, TrackedExecution>();
+
+  /**
+   * Populate the in-memory map from externally persisted records.
+   * Intended to be called once at startup to restore in-flight executions.
+   */
+  hydrateFromRecords(records: Array<{ id: string; status: string }>): void {
+    for (const record of records) {
+      this.executions.set(record.id, {
+        id: record.id,
+        routingDecisionId: '',
+        status: record.status as ExecutionStatus,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  }
 
   async create(decision: RoutingDecision, _request: RoutingRequest): Promise<string> {
     const id = randomUUID();

@@ -19,19 +19,6 @@ CREATE TABLE providers (
 );
 
 -- ---------------------------------------------------------------------------
--- provider_secrets
--- ---------------------------------------------------------------------------
-CREATE TABLE provider_secrets (
-    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    provider_id     UUID        NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
-    ciphertext_blob TEXT        NOT NULL,
-    key_id          VARCHAR     NOT NULL,
-    algorithm       VARCHAR     DEFAULT 'aes-256-gcm',
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    rotated_at      TIMESTAMPTZ
-);
-
--- ---------------------------------------------------------------------------
 -- admin_sessions
 -- ---------------------------------------------------------------------------
 CREATE TABLE admin_sessions (

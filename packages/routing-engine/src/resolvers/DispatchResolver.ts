@@ -1,5 +1,6 @@
 import type { RoutingRequest, RoutingDecision, ModelProfile, TacticProfile } from '@acds/core-types';
 import type { EffectivePolicy } from '@acds/policy-engine';
+import { randomUUID } from 'node:crypto';
 import { RoutingRequestValidator } from '../intake/RoutingRequestValidator.js';
 import { RoutingRequestNormalizer } from '../intake/RoutingRequestNormalizer.js';
 import { EligibleProfilesService } from '../eligibility/EligibleProfilesService.js';
@@ -60,7 +61,7 @@ export class DispatchResolver {
     );
 
     const rationale = this.rationaleBuilder.build(
-      '', normalized, selectedProfile, selectedTactic, selectedProviderId,
+      randomUUID(), normalized, selectedProfile, selectedTactic, selectedProviderId,
       effectivePolicy, eligibleProfileList.length, eligibleTacticList.length
     );
 

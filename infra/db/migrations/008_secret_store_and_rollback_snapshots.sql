@@ -6,7 +6,7 @@ BEGIN;
 
 -- ─── Provider Secrets ─────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS provider_secrets (
+CREATE TABLE provider_secrets (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     provider_id     VARCHAR     NOT NULL UNIQUE,
     envelope        JSONB       NOT NULL,

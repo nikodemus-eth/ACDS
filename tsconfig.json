@@ -32,7 +32,9 @@
       "@acds/grits": ["packages/grits/src/index.ts"],
       "@acds/grits/*": ["packages/grits/src/*"],
       "@acds/sovereign-runtime": ["packages/sovereign-runtime/src/index.ts"],
-      "@acds/sovereign-runtime/*": ["packages/sovereign-runtime/src/*"]
+      "@acds/sovereign-runtime/*": ["packages/sovereign-runtime/src/*"],
+      "@acds/observability": ["packages/observability/src/index.ts"],
+      "@acds/observability/*": ["packages/observability/src/*"]
     },
     "rootDir": ".",
     "jsx": "react-jsx",

@@ -22,6 +22,7 @@ export default defineConfig({
       '@acds/persistence-pg': resolve('persistence-pg'),
       '@acds/grits': resolve('grits'),
       '@acds/sovereign-runtime': resolve('sovereign-runtime'),
+      '@acds/observability': resolve('observability'),
     },
   },
   test: {

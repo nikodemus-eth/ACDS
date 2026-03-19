@@ -8,6 +8,7 @@ import { evaluatePolicy } from './policy-engine.js';
 import { buildExecutionPlan } from './execution-planner.js';
 import { assembleResponse } from './response-assembler.js';
 import {
+  ACDSRuntimeError,
   MethodUnresolvedError,
   ProviderUnavailableError,
   PolicyBlockedError,
@@ -92,41 +93,55 @@ export class RuntimeOrchestrator {
       if (plan.fallback) {
         const fallbackRuntime = this.runtimes.get(plan.fallback.providerId);
         if (fallbackRuntime && (await fallbackRuntime.isAvailable())) {
-          const result = await fallbackRuntime.execute(plan.fallback.methodId, fullRequest.input);
-          const response = assembleResponse(result, {
-            ...plan,
-            primary: plan.fallback,
-          }, true);
+          try {
+            const result = await fallbackRuntime.execute(plan.fallback.methodId, fullRequest.input);
+            const response = assembleResponse(result, {
+              ...plan,
+              primary: plan.fallback,
+            }, true);
 
-          if (this.onValidate) {
-            const validation = this.onValidate(response);
-            response.metadata.validated = validation.validated;
-            if (validation.warnings.length > 0) {
-              response.metadata.warnings = validation.warnings;
+            if (this.onValidate) {
+              const validation = this.onValidate(response);
+              response.metadata.validated = validation.validated;
+              if (validation.warnings.length > 0) {
+                response.metadata.warnings = validation.warnings;
+              }
             }
-          }
 
-          return response;
+            return response;
+          } catch (error) {
+            if (error instanceof ACDSRuntimeError) {
+              throw error;
+            }
+            throw new ProviderUnavailableError(plan.fallback.providerId);
+          }
         }
       }
       throw new ProviderUnavailableError(plan.primary.providerId);
     }
 
-    const result = await runtime.execute(plan.primary.methodId, fullRequest.input);
+    try {
+      const result = await runtime.execute(plan.primary.methodId, fullRequest.input);
 
-    // 6. Assemble response
-    const response = assembleResponse(result, plan, true);
+      // 6. Assemble response
+      const response = assembleResponse(result, plan, true);
 
-    // 7. GRITS validation hook
-    if (this.onValidate) {
-      const validation = this.onValidate(response);
-      response.metadata.validated = validation.validated;
-      if (validation.warnings.length > 0) {
-        response.metadata.warnings = validation.warnings;
+      // 7. GRITS validation hook
+      if (this.onValidate) {
+        const validation = this.onValidate(response);
+        response.metadata.validated = validation.validated;
+        if (validation.warnings.length > 0) {
+          response.metadata.warnings = validation.warnings;
+        }
       }
-    }
 
-    return response;
+      return response;
+    } catch (error) {
+      if (error instanceof ACDSRuntimeError) {
+        throw error;
+      }
+      throw new ProviderUnavailableError(plan.primary.providerId);
+    }
   }
 
   /**
@@ -155,17 +170,24 @@ export class RuntimeOrchestrator {
       throw new ProviderUnavailableError(plan.primary.providerId);
     }
 
-    const result = await runtime.execute(plan.primary.methodId, request.input);
-    const response = assembleResponse(result, plan, true);
+    try {
+      const result = await runtime.execute(plan.primary.methodId, request.input);
+      const response = assembleResponse(result, plan, true);
 
-    if (this.onValidate) {
-      const validation = this.onValidate(response);
-      response.metadata.validated = validation.validated;
-      if (validation.warnings.length > 0) {
-        response.metadata.warnings = validation.warnings;
+      if (this.onValidate) {
+        const validation = this.onValidate(response);
+        response.metadata.validated = validation.validated;
+        if (validation.warnings.length > 0) {
+          response.metadata.warnings = validation.warnings;
+        }
       }
-    }
 
-    return response;
+      return response;
+    } catch (error) {
+      if (error instanceof ACDSRuntimeError) {
+        throw error;
+      }
+      throw new ProviderUnavailableError(plan.primary.providerId);
+    }
   }
 }

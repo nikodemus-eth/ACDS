@@ -187,18 +187,19 @@ describe('Red Team: Taxonomy Corruption Attacks', () => {
     expect(registry.getMethod('target.method.find_me')!.providerId).toBe('target-provider');
   });
 
-  it('overwrites source when registering a capability with the same id as an existing provider', () => {
+  it('rejects registering a capability with the same id as an existing provider', () => {
     const provider = validProvider('shared-id');
     registry.registerProvider(provider);
     expect(registry.getSource('shared-id')!.sourceClass).toBe('provider');
 
-    // Register a capability with the same id — the registry.set() call will overwrite
+    // Register a capability with the same id — should now throw InvalidRegistrationError
     const capability = validCapability('shared-id');
-    registry.registerCapability(capability);
+    expect(() => registry.registerCapability(capability)).toThrow(InvalidRegistrationError);
 
+    // Original provider should still be intact
     const source = registry.getSource('shared-id');
     expect(source).toBeDefined();
-    expect(source!.sourceClass).toBe('capability');
+    expect(source!.sourceClass).toBe('provider');
   });
 });
 

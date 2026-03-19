@@ -4,12 +4,17 @@ import type { AdapterResolver } from './AdapterResolver.js';
 import { ProviderExecutionError } from './ProviderExecutionError.js';
 
 export class ProviderExecutionProxy {
-  constructor(private readonly adapterResolver: AdapterResolver) {}
+  private readonly defaultTimeoutMs: number;
+
+  constructor(private readonly adapterResolver: AdapterResolver, defaultTimeoutMs?: number) {
+    this.defaultTimeoutMs = defaultTimeoutMs ?? 30000;
+  }
 
   async execute(
     provider: Provider,
     request: AdapterRequest,
-    apiKey?: string
+    apiKey?: string,
+    timeoutMs?: number,
   ): Promise<AdapterResponse> {
     if (!provider.enabled) {
       throw new ProviderExecutionError({
@@ -24,7 +29,7 @@ export class ProviderExecutionProxy {
     const config: AdapterConfig = {
       baseUrl: provider.baseUrl,
       apiKey,
-      timeout: 30000,
+      timeout: timeoutMs ?? this.defaultTimeoutMs,
     };
 
     const validation = adapter.validateConfig(config);

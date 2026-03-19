@@ -170,14 +170,21 @@ describe('GeminiMapper', () => {
   it('maps MAX_TOKENS finishReason to length', () => {
     const result = fromGeminiResponse({
       candidates: [{ content: { parts: [{ text: 'partial' }] }, finishReason: 'MAX_TOKENS' }],
-    }, 10);
+    }, 10, 'gemini-pro');
     expect(result.finishReason).toBe('length');
   });
 
   it('maps unknown finishReason to unknown', () => {
     const result = fromGeminiResponse({
       candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'OTHER' }],
-    }, 10);
+    }, 10, 'gemini-pro');
     expect(result.finishReason).toBe('unknown');
+  });
+
+  it('uses the requestModel parameter instead of hardcoded value', () => {
+    const result = fromGeminiResponse({
+      candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+    }, 10, 'gemini-1.5-flash');
+    expect(result.model).toBe('gemini-1.5-flash');
   });
 });

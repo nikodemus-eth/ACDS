@@ -2,6 +2,8 @@ import type { Intent } from './intent-resolver.js';
 import type { MethodDefinition } from '../domain/method-registry.js';
 import type { SourceRegistry } from '../registry/registry.js';
 import { MethodUnresolvedError } from '../domain/errors.js';
+import { PolicyTier } from '../domain/policy-tiers.js';
+import { z } from 'zod';
 
 /**
  * Default intent-to-method mapping for the Apple sovereign runtime.
@@ -51,15 +53,17 @@ export function resolveMethod(
           methodId: `capability.${options.useCapability}.${intent}`,
           providerId: options.useCapability,
           subsystem: 'foundation_models',
-          policyTier: 'A' as any, // Policy engine will evaluate separately
+          policyTier: PolicyTier.A,
           deterministic: false,
           requiresNetwork: true,
-          inputSchema: {} as any,
-          outputSchema: {} as any,
+          inputSchema: z.unknown(),
+          outputSchema: z.unknown(),
         },
         isOverride: true,
       };
     }
+    // Capability was requested but not found — throw instead of falling through
+    throw new MethodUnresolvedError('Requested capability not found: ' + options.useCapability);
   }
 
   const methodId = DEFAULT_METHOD_MAP[intent];

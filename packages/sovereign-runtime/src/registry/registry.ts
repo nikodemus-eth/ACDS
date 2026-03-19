@@ -36,6 +36,10 @@ export class SourceRegistry {
       }
     }
 
+    if (this.sources.has(source.id)) {
+      throw new InvalidRegistrationError(`Source ID ${source.id} is already registered`, { sourceId: source.id });
+    }
+
     this.sources.set(source.id, { source, methods });
     for (const method of methods) {
       this.methodIndex.set(method.methodId, method);
@@ -49,6 +53,9 @@ export class SourceRegistry {
   registerCapability(source: SourceDefinition): void {
     rejectMixedClassRegistration(source, 'capability');
     validateSourceDefinition(source);
+    if (this.sources.has(source.id)) {
+      throw new InvalidRegistrationError(`Source ID ${source.id} is already registered`, { sourceId: source.id });
+    }
     this.sources.set(source.id, { source, methods: [] });
   }
 
@@ -58,6 +65,9 @@ export class SourceRegistry {
   registerSession(source: SourceDefinition): void {
     rejectMixedClassRegistration(source, 'session');
     validateSourceDefinition(source);
+    if (this.sources.has(source.id)) {
+      throw new InvalidRegistrationError(`Source ID ${source.id} is already registered`, { sourceId: source.id });
+    }
     this.sources.set(source.id, { source, methods: [] });
   }
 

@@ -79,7 +79,9 @@ export class PgAuditEventRepository implements AuditEventReader {
     const limit = filters.limit ?? 100;
     const offset = filters.offset ?? 0;
 
-    const query = `SELECT * FROM audit_events ${where} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    const limitIdx = paramIndex++;
+    const offsetIdx = paramIndex++;
+    const query = `SELECT * FROM audit_events ${where} ORDER BY created_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
     params.push(limit, offset);
 
     const result = await this.pool.query(query, params);

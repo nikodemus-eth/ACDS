@@ -4,6 +4,7 @@
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { RoutingRequest, DispatchRunRequest } from '@acds/core-types';
+import { NotFoundError, ValidationError } from '@acds/core-types';
 import type { DispatchRunService } from '@acds/execution-orchestrator';
 import { RoutingDecisionPresenter } from '../presenters/RoutingDecisionPresenter.js';
 
@@ -42,7 +43,24 @@ export class DispatchController {
     request: FastifyRequest<{ Body: DispatchRunRequest }>,
     reply: FastifyReply,
   ): Promise<void> {
-    const response = await this.runService.run(request.body);
-    reply.send(response);
+    try {
+      const response = await this.runService.run(request.body);
+      reply.send(response);
+    } catch (error) {
+      if (error instanceof NotFoundError || error instanceof ValidationError) {
+        const message = error instanceof Error ? error.message : String(error);
+        reply.status(400).send({
+          error: 'Bad Request',
+          message,
+          statusCode: 400,
+        });
+      } else {
+        reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'An unexpected error occurred while executing the dispatch',
+          statusCode: 500,
+        });
+      }
+    }
   }
 }

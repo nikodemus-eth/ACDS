@@ -12,7 +12,7 @@ import { executeSound } from './methods/sound.js';
 /**
  * Subsystem dispatch table. Maps method ID prefixes to subsystem handlers.
  */
-const SUBSYSTEM_DISPATCH: Record<string, (method: string, input: unknown) => unknown> = {
+const SUBSYSTEM_DISPATCH: Record<string, (method: string, input: unknown) => unknown | Promise<unknown>> = {
   'apple.foundation_models.': executeFoundationModel,
   'apple.writing_tools.': executeWritingTool,
   'apple.speech.': executeSpeech,
@@ -45,7 +45,7 @@ export class AppleRuntimeAdapter implements ProviderRuntime {
     }
 
     const start = performance.now();
-    const output = handler(methodId, input);
+    const output = await handler(methodId, input);
     const latencyMs = Math.round(performance.now() - start);
 
     return {
@@ -77,7 +77,7 @@ export class AppleRuntimeAdapter implements ProviderRuntime {
     this._available = available;
   }
 
-  private findHandler(methodId: string): ((method: string, input: unknown) => unknown) | undefined {
+  private findHandler(methodId: string): ((method: string, input: unknown) => unknown | Promise<unknown>) | undefined {
     for (const [prefix, handler] of Object.entries(SUBSYSTEM_DISPATCH)) {
       if (methodId.startsWith(prefix)) {
         return handler;

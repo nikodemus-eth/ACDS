@@ -46,15 +46,21 @@ export class GeminiAdapter implements ProviderAdapter {
       const latencyMs = Date.now() - start;
       if (!response.ok) throw new AdapterError({ message: `Gemini returned HTTP ${response.status}`, code: 'HTTP_ERROR', retryable: response.status >= 500 });
       const data = await response.json() as GeminiGenerateResponse;
-      return fromGeminiResponse(data, latencyMs);
+      return fromGeminiResponse(data, latencyMs, request.model);
     } catch (error) {
       if (error instanceof AdapterError) throw error;
       const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+      const redact = (s: string) => s.replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
+      const causeError = error instanceof Error ? error : undefined;
+      // Sanitize the cause error message to prevent API key leakage
+      const sanitizedCause = causeError
+        ? Object.assign(new Error(redact(causeError.message)), { stack: causeError.stack ? redact(causeError.stack) : undefined })
+        : undefined;
       throw new AdapterError({
-        message: isTimeout ? `Gemini request timed out for ${baseEndpoint}` : `Gemini execution failed for ${baseEndpoint}`,
+        message: redact(isTimeout ? `Gemini request timed out for ${baseEndpoint}` : `Gemini execution failed for ${baseEndpoint}`),
         code: isTimeout ? 'TIMEOUT' : 'EXECUTION_FAILED',
         retryable: !isTimeout && !(error instanceof TypeError),
-        cause: error instanceof Error ? error : undefined,
+        cause: sanitizedCause,
       });
     }
   }

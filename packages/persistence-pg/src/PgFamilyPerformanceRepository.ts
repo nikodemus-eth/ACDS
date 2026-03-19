@@ -49,7 +49,7 @@ export class PgFamilyPerformanceRepository implements FamilyPerformanceReader {
       metricTrends: [],
       runCount: Number(row.total_run_count),
       recentFailureCount: 0,
-      lastUpdated: new Date(row.last_adaptation_at as string),
+      lastUpdated: row.last_adaptation_at ? new Date(row.last_adaptation_at as string) : null,
     };
   }
 }

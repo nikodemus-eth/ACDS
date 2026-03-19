@@ -33,14 +33,14 @@ export function evaluatePolicy(
     if (!capSource || capSource.sourceClass !== 'capability') {
       return blocked('Requested capability not found in registry', {
         capabilityId: request.useCapability,
-      });
+      }, 'capability');
     }
 
     // local_only constraint blocks any capability
     if (request.constraints?.localOnly) {
       return blocked('Capability invocation blocked by local_only constraint', {
         capabilityId: request.useCapability,
-      });
+      }, 'capability');
     }
 
     // Capabilities must be explicitly approved (the mere presence of useCapability is approval)
@@ -53,20 +53,20 @@ export function evaluatePolicy(
     if (!sessionSource || sessionSource.sourceClass !== 'session') {
       return blocked('Requested session not found in registry', {
         sessionId: request.useSession,
-      });
+      }, 'session');
     }
 
     if (!request.riskAcknowledged) {
       return blocked('Session invocation requires explicit risk acknowledgment', {
         sessionId: request.useSession,
-      });
+      }, 'session');
     }
 
     // local_only constraint blocks any session
     if (request.constraints?.localOnly) {
       return blocked('Session invocation blocked by local_only constraint', {
         sessionId: request.useSession,
-      });
+      }, 'session');
     }
 
     return allowed('session');
@@ -125,6 +125,6 @@ function allowed(executionClass: SourceClass): PolicyDecision {
   return { allowed: true, executionClass };
 }
 
-function blocked(reason: string, details?: Record<string, unknown>): PolicyDecision {
-  return { allowed: false, reason, executionClass: 'provider', details };
+function blocked(reason: string, details?: Record<string, unknown>, executionClass: SourceClass = 'provider'): PolicyDecision {
+  return { allowed: false, reason, executionClass, details };
 }

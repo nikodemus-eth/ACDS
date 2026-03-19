@@ -37,13 +37,13 @@ export function toGeminiRequest(request: AdapterRequest): GeminiGenerateRequest 
   return result;
 }
 
-export function fromGeminiResponse(response: GeminiGenerateResponse, latencyMs: number): AdapterResponse {
+export function fromGeminiResponse(response: GeminiGenerateResponse, latencyMs: number, requestModel: string): AdapterResponse {
   const candidate = response.candidates?.[0];
   const text = candidate?.content.parts.map((p) => p.text).join('') ?? '';
   const fr = candidate?.finishReason;
   return {
     content: text,
-    model: 'gemini',
+    model: requestModel,
     inputTokens: response.usageMetadata?.promptTokenCount ?? null,
     outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
     finishReason: fr === 'STOP' ? 'stop' : fr === 'MAX_TOKENS' ? 'length' : 'unknown',

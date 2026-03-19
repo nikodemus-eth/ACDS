@@ -25,8 +25,9 @@ export function authPreHandler(
   reply: FastifyReply,
   done: (err?: Error) => void,
 ): void {
-  // Allow public endpoints
-  if (PUBLIC_PATHS.has(request.url)) {
+  // Allow public endpoints (strip query string to prevent bypass)
+  const path = request.url.split('?')[0];
+  if (PUBLIC_PATHS.has(path)) {
     done();
     return;
   }

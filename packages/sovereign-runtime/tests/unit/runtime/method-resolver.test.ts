@@ -111,13 +111,11 @@ describe('Method Resolver', () => {
     expect(method.providerId).toBe('openai-api');
   });
 
-  it('capability override with non-existent capability falls through to provider', () => {
-    const { method, isOverride } = resolveMethod('summarization', registry, {
-      useCapability: 'nonexistent',
-    });
-
-    // Falls through to default provider path
-    expect(isOverride).toBe(false);
-    expect(method.methodId).toBe('apple.foundation_models.summarize');
+  it('capability override with non-existent capability throws MethodUnresolvedError', () => {
+    expect(() =>
+      resolveMethod('summarization', registry, {
+        useCapability: 'nonexistent',
+      }),
+    ).toThrow(MethodUnresolvedError);
   });
 });
