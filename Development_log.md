@@ -1193,3 +1193,31 @@ Action family defaults to `dry_run: true` and `requires_confirmation: true` for 
 - Failed/blocked artifacts produce valid envelopes for auditability
 
 **Total test count:** 219 files, 2222 tests, all passing.
+
+## 2026-03-19 — Artifact Registry Admin UI
+
+Exposed the artifact pipeline through the admin-web UI and API server, completing the operational surface for the 20 artifact types.
+
+### API Endpoints (apps/api)
+
+- `GET /artifacts` — list all 20 artifact entries
+- `GET /artifacts/stats` — aggregate stats (by disposition, modality, quality tier)
+- `GET /artifacts/families` — family summaries with counts
+- `GET /artifacts/families/:family` — entries for a specific family
+- `GET /artifacts/type/*` — detail for a single artifact type (wildcard for dotted names)
+- New controller (`ArtifactsController`), presenter (`ArtifactPresenter`), route plugin (`artifactsRoutes`)
+- Read-only catalog: instantiates `createDefaultArtifactRegistry()` from `@acds/sovereign-runtime` — no database required
+
+### Admin-Web Feature (apps/admin-web)
+
+- **ArtifactsPage** — stats cards (total artifacts, families, dispositions), family filter pills, sortable DataTable with monospace type labels, capability codes, and color-coded disposition/quality badges
+- **ArtifactDetailPage** — 5-section detail view: Identity, Provider Configuration, Capability Mapping, Quality & Policy, Pipeline Stages (7-stage numbered visualization)
+- API client (`artifactsApi.ts`), TanStack Query hooks (`useArtifacts.ts`)
+- "Artifacts" nav item added to sidebar between Executions and Apple Intelligence
+- Artifact-specific CSS: stats cards, filter pills, type labels, tag pills, pipeline stage badges
+
+### Infrastructure
+
+- Updated API launchd agent (`com.m4.acds-api.plist`) to use `tsx` with `.env` sourcing for monorepo-compatible runtime
+- Both `com.m4.acds-admin-web` and `com.m4.acds-api` launchd agents confirmed with `RunAtLoad: true` and `KeepAlive: true`
+- All code verified: zero mocks, stubs, or fake data — every data path flows from real `ArtifactRegistry` through real API calls

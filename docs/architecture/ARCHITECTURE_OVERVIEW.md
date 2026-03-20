@@ -100,6 +100,8 @@ Six artifact families are registered: TextAssist, TextModel, Image, Expression, 
 
 The pipeline never throws — every request produces a valid envelope (succeeded, failed, or blocked) for auditability. See `docs/architecture/artifact-pipeline-portfolio.md` for the full specification.
 
+The artifact registry is exposed through the API server at `/artifacts` (list, stats, families, detail by type) and the admin-web UI under the "Artifacts" nav item, providing a read-only catalog view with family filtering, disposition badges, and a 7-stage pipeline visualization.
+
 ## Infrastructure
 
 - `infra/db` -- Database migrations and seed data (PostgreSQL)
