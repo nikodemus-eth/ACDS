@@ -9,7 +9,7 @@ export interface ExecutionRecordFilters {
 }
 
 export interface ExecutionRecordRepository {
-  create(record: Omit<ExecutionRecord, 'id'>): Promise<ExecutionRecord>;
+  create(record: Omit<ExecutionRecord, 'id'> & { id?: string }): Promise<ExecutionRecord>;
   findById(id: string): Promise<ExecutionRecord | null>;
   findByFamily(familyKey: string, limit?: number): Promise<ExecutionRecord[]>;
   findRecent(limit?: number): Promise<ExecutionRecord[]>;

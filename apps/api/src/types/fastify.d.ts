@@ -4,6 +4,7 @@ import type { SecretRotationService } from '@acds/security';
 import type { DispatchRunService, ExecutionRecordService } from '@acds/execution-orchestrator';
 import type { AdaptationRollbackService, AdaptationApprovalRepository, ApprovalAuditEmitter } from '@acds/adaptive-optimizer';
 import type { PgPolicyRepository } from '@acds/persistence-pg';
+import type { RoutingAuditWriter, ProviderAuditWriter } from '@acds/audit-ledger';
 import type { ProfileCatalogService } from '../services/ProfileCatalogService.js';
 import type { AuditEventReader } from '../controllers/AuditController.js';
 import type {
@@ -30,6 +31,8 @@ interface DiContainer {
   adaptationApprovalRepository: AdaptationApprovalRepository;
   approvalAuditEmitter: ApprovalAuditEmitter;
   adaptationRollbackService: AdaptationRollbackService;
+  routingAuditWriter: RoutingAuditWriter;
+  providerAuditWriter: ProviderAuditWriter;
   resolve<T>(name: string): T;
   [key: string]: unknown;
 }

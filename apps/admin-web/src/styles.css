@@ -266,6 +266,28 @@ textarea {
   box-shadow: 0 14px 30px rgba(198, 55, 55, 0.18);
 }
 
+.button--small {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.button--danger-ghost {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.button--danger-ghost:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.table-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
 .segmented-control {
   display: inline-flex;
   gap: 0.45rem;

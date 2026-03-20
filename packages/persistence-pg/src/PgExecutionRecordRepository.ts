@@ -5,38 +5,45 @@ import type { ExecutionRecordFilters, ExecutionRecordRepository } from '@acds/ex
 export class PgExecutionRecordRepository implements ExecutionRecordRepository {
   constructor(private readonly pool: Pool) {}
 
-  async create(record: Omit<ExecutionRecord, 'id'>): Promise<ExecutionRecord> {
+  async create(record: Omit<ExecutionRecord, 'id'> & { id?: string }): Promise<ExecutionRecord> {
+    const hasId = record.id !== undefined;
+    const columns = [
+      ...(hasId ? ['id'] : []),
+      'application', 'process', 'step', 'decision_posture', 'cognitive_grade',
+      'routing_decision_id', 'selected_model_profile_id',
+      'selected_tactic_profile_id', 'selected_provider_id',
+      'status', 'input_tokens', 'output_tokens', 'latency_ms',
+      'cost_estimate', 'normalized_output', 'error_message',
+      'fallback_attempts', 'completed_at',
+    ];
+    const values = [
+      ...(hasId ? [record.id] : []),
+      record.executionFamily.application,
+      record.executionFamily.process,
+      record.executionFamily.step,
+      record.executionFamily.decisionPosture,
+      record.executionFamily.cognitiveGrade,
+      record.routingDecisionId,
+      record.selectedModelProfileId,
+      record.selectedTacticProfileId,
+      record.selectedProviderId,
+      record.status,
+      record.inputTokens,
+      record.outputTokens,
+      record.latencyMs,
+      record.costEstimate,
+      record.normalizedOutput,
+      record.errorMessage,
+      record.fallbackAttempts,
+      record.completedAt,
+    ];
+    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
     const result = await this.pool.query(
-      `INSERT INTO execution_records (
-         application, process, step, decision_posture, cognitive_grade,
-         routing_decision_id, selected_model_profile_id,
-         selected_tactic_profile_id, selected_provider_id,
-         status, input_tokens, output_tokens, latency_ms,
-         cost_estimate, normalized_output, error_message,
-         fallback_attempts, completed_at
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      `INSERT INTO execution_records (${columns.join(', ')})
+       VALUES (${placeholders})
        RETURNING *`,
-      [
-        record.executionFamily.application,
-        record.executionFamily.process,
-        record.executionFamily.step,
-        record.executionFamily.decisionPosture,
-        record.executionFamily.cognitiveGrade,
-        record.routingDecisionId,
-        record.selectedModelProfileId,
-        record.selectedTacticProfileId,
-        record.selectedProviderId,
-        record.status,
-        record.inputTokens,
-        record.outputTokens,
-        record.latencyMs,
-        record.costEstimate,
-        record.normalizedOutput,
-        record.errorMessage,
-        record.fallbackAttempts,
-        record.completedAt,
-      ],
+      values,
     );
     return this.mapRow(result.rows[0]);
   }

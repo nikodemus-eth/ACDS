@@ -1221,3 +1221,113 @@ Exposed the artifact pipeline through the admin-web UI and API server, completin
 - Updated API launchd agent (`com.m4.acds-api.plist`) to use `tsx` with `.env` sourcing for monorepo-compatible runtime
 - Both `com.m4.acds-admin-web` and `com.m4.acds-api` launchd agents confirmed with `RunAtLoad: true` and `KeepAlive: true`
 - All code verified: zero mocks, stubs, or fake data — every data path flows from real `ArtifactRegistry` through real API calls
+
+## 2026-03-20 — Schema Drift Remediation & Persistence Fixes
+
+Comprehensive audit of live PostgreSQL database revealed schema drift across 5 tables and 2 unapplied migrations. All policy tables, execution records, and secret storage were broken for writes.
+
+### Schema Drift (Migrations 011–012)
+
+**Migration 011 — `align_global_policies_columns`:**
+- `global_policies`: Renamed 4 abbreviated columns (`cost_sensitivity` → `default_cost_sensitivity`, etc.), added 3 missing columns (`local_preferred_task_types`, `cloud_required_load_tiers`, `enabled`)
+- `application_policies`: Exploded `overrides` JSONB into 9 individual columns with data migration
+- `process_policies`: Exploded `overrides` JSONB into 9 individual columns with data migration
+
+**Migration 012 — `align_execution_and_secrets`:**
+- `execution_records`: Added 15 flat columns expected by `PgExecutionRecordRepository` (application, process, step, decision_posture, cognitive_grade, routing_decision_id, selected_*_id, input/output_tokens, cost_estimate, normalized_output, error_message, fallback_attempts, completed_at). Migrated data from old JSONB columns.
+- `provider_secrets`: Added `envelope` JSONB column, `expires_at`, and UNIQUE constraint on `provider_id` (required for `ON CONFLICT`)
+- Applied unapplied migration 009 (`plateau_signals` table)
+- Applied unapplied migration 010 (`scored_at` column on `execution_records`)
+
+**Root cause:** Migration files (004, 005, 008) were rewritten in-place with more descriptive column names after initial DB creation. PostgreSQL `CREATE TABLE` is idempotent — the originals persisted.
+
+### Policy Update Bug Fix
+
+- `PATCH /policies/:id` was returning 500 (`column "default_cost_sensitivity" does not exist`)
+- Fixed by migration 011 aligning the live column names with the code
+
+### Policy UI: Edit & Delete for Application/Process Policies
+
+- `ApplicationPolicyPanel` and `ProcessPolicyPanel` were read-only DataTables
+- Added Edit and Delete buttons to both panels, using the existing `PolicyForm` + `useUpdatePolicy`/`useDeletePolicy` hooks
+- New CSS: `.button--small`, `.button--danger-ghost`, `.table-actions`
+
+### Execution Persistence
+
+- **Root cause:** `ExecutionStatusTracker` was in-memory only — dispatch lifecycle never persisted execution records to the database
+- Created `PersistingExecutionStatusTracker` — extends the in-memory tracker, writes to `PgExecutionRecordRepository` on every lifecycle transition (create, markRunning, markSucceeded, markFailed, markFallbackSucceeded, markFallbackFailed)
+- Created `PersistingFallbackDecisionTracker` — extends the in-memory `FallbackDecisionTracker`, writes each fallback attempt to the `fallback_attempts` table
+- Modified `DispatchRunService` constructor to accept optional `FallbackDecisionTracker` injection
+- Wired both persisting trackers in `createDiContainer.ts`
+
+### In-Memory Audit Summary
+
+Full codebase audit of in-memory state holders:
+
+| Component | Status | Action |
+|-----------|--------|--------|
+| `ExecutionStatusTracker` | Fixed | `PersistingExecutionStatusTracker` writes to PG |
+| `FallbackDecisionTracker` | Fixed | `PersistingFallbackDecisionTracker` writes to PG |
+| `ExecutionLogger` | Not wired | sovereign-runtime internal, not used in API/worker |
+| `GRITSHookRunner` | Not wired | sovereign-runtime internal, not used in API/worker |
+| `LeaseManager` | Not wired | provider-broker, not yet in DI container |
+| `SourceRegistry` | OK | Rebuilt from static config at startup |
+| `CapabilityRegistry` | OK | Rebuilt from static config at startup |
+| `ArtifactRegistry` | OK | Rebuilt from code-defined artifact definitions |
+| `AdapterResolver` | OK | Static vendor→adapter mapping |
+| `ExecutionHistoryAggregator` | OK | Transient computation, not persistent state |
+
+## 2026-03-20 — Audit Event Pipeline & GRITS Persistence
+
+### Problem
+- Audit events were never written to the database: the `AuditEventWriter` interface and domain writers (`ExecutionAuditWriter`, `RoutingAuditWriter`, `ProviderAuditWriter`) existed in `audit-ledger`, but no production implementation of `AuditEventWriter` was ever created. The interface lived only in test files.
+- GRITS integrity snapshots silently failed to persist: the `integrity_snapshots` table was only created in test setup, not in any production migration. GRITS runs would succeed but `PgIntegritySnapshotRepository.save()` would fail against production PostgreSQL.
+
+### Fixes Applied
+
+**1. PgAuditEventWriter** (`packages/persistence-pg/src/PgAuditEventWriter.ts`)
+- Production implementation of the `AuditEventWriter` interface
+- `write()` inserts a single audit event; `writeBatch()` wraps multiple inserts in a transaction
+- Exported from `@acds/persistence-pg`
+
+**2. Audit writers wired into DI container** (`apps/api/src/bootstrap/createDiContainer.ts`)
+- Instantiates `PgAuditEventWriter`, `ExecutionAuditWriter`, `RoutingAuditWriter`, `ProviderAuditWriter`
+- `PersistingExecutionStatusTracker` now accepts optional `ExecutionAuditWriter` — emits `execution.started`, `execution.completed`, `execution.failed` on lifecycle transitions
+- Routing lambda emits `routing.resolved` on every dispatch
+- `routingAuditWriter` and `providerAuditWriter` exposed on DI container for controller use
+- All audit writes are fire-and-forget with error logging — never block the dispatch path
+
+**3. Migration 013: integrity_snapshots** (`infra/db/migrations/013_integrity_snapshots.sql`)
+- Creates the `integrity_snapshots` table with indexes for cadence lookups and time-range queries
+- Applied to production database
+
+## 2026-03-20 — Process Swarm ACDS Integration
+
+Integrated Process Swarm Gen2 with ACDS so that swarm runs create execution records and audit events visible in the ACDS admin UI.
+
+### Execution Persistence Fixes
+
+**Migration 014 — `nullable_legacy_jsonb_columns`:**
+- Root cause: Migration 012 moved `execution_records` from JSONB-packed columns (`routing_request`, `routing_decision`) to flat columns, but never made the JSONB columns nullable. Repository writes only flat columns, so every INSERT violated the NOT NULL constraint. Error silently swallowed by `PersistingExecutionStatusTracker.create()`.
+- Fix: `ALTER COLUMN routing_request DROP NOT NULL; ALTER COLUMN routing_decision DROP NOT NULL`
+
+**Dual-ID mismatch fix:**
+- `ExecutionStatusTracker.create()` generated a UUID via `randomUUID()`, but `PgExecutionRecordRepository.create()` let PostgreSQL generate a different UUID via `gen_random_uuid()`. All subsequent status updates (`markRunning`, `markSucceeded`) used the in-memory UUID which didn't match the DB row.
+- Fix: `ExecutionRecordRepository` interface now accepts optional `id` in `create()`. `PersistingExecutionStatusTracker` passes the in-memory ID through. `PgExecutionRecordRepository` uses provided ID when given.
+
+### Model Profile Updates
+
+- `local_fast_advisory`: `llama3.2:3b` → `llama3.3:latest`, added `planning`/`generation` to task types, contextWindow 8192→131072
+- `local_balanced_reasoning`: `llama3.1:8b` → `qwen3:8b`, added `reasoning`/`generation`/`extraction`/`classification`/`transformation` to task types
+
+### DispatchController Error Logging
+
+- 500 handler was returning generic "An unexpected error occurred" without logging the actual error
+- Now logs `console.error('[dispatch/run] Unhandled error:', errMsg, stack)` and passes actual error message in response
+
+### Verification
+
+- Process Swarm run `run-18fe7406c397` created execution record `dbcda452-...` in ACDS
+- Both `/executions` and `/audit` API endpoints return Process Swarm data
+- ACDS admin UI Executions page shows `process_swarm` application with `Oregon AI Governance Intelligence Brief` process
+- Audit Log page shows `routing.resolved`, `execution.started`, `execution.completed`/`execution.failed` events

@@ -36,6 +36,10 @@ Additional worker applications:
 
 - `apps/grits-worker` -- GRITS (Governed Runtime Integrity Tracking System): read-only runtime integrity verification. Monitors 8 system invariants via 7 checker modules across 3 cadences (fast/daily/release). Never modifies system state — reads through repository interfaces only. See `docs/grits/` for full documentation.
 
+## External Integrations
+
+- **Process Swarm Gen2** (`/ACDS - Process Swarm Integration/process-swarm-gen2/`) — Workflow execution engine that dispatches inference requests through ACDS via `POST /dispatch/run`. The `SwarmRunner` creates ACDS execution records at run start, and individual tool adapters route LLM calls through `ACDSInferenceProvider.infer()` which maps to `RoutingRequest` contracts. Fallback: adapters call Ollama/Apple Intelligence directly if ACDS is unavailable. Environment config: `INFERENCE_PROVIDER=acds`, `ACDS_BASE_URL`, `ACDS_AUTH_TOKEN`.
+
 ## Dependency Direction
 
 Dependencies flow strictly downward. A package at layer N may import from any package at layer N-1 or below, but never from a package at the same layer or above. This rule is what makes each layer independently testable and replaceable.
@@ -102,9 +106,29 @@ The pipeline never throws — every request produces a valid envelope (succeeded
 
 The artifact registry is exposed through the API server at `/artifacts` (list, stats, families, detail by type) and the admin-web UI under the "Artifacts" nav item, providing a read-only catalog view with family filtering, disposition badges, and a 7-stage pipeline visualization.
 
+## Execution Persistence
+
+The dispatch lifecycle persists all state to PostgreSQL through two wrapper classes:
+
+- `PersistingExecutionStatusTracker` extends the in-memory `ExecutionStatusTracker` and writes every status transition (pending → running → succeeded/failed) to the `execution_records` table via `PgExecutionRecordRepository`. It also emits audit events (`execution.started`, `execution.completed`, `execution.failed`) through `ExecutionAuditWriter`.
+- `PersistingFallbackDecisionTracker` extends the in-memory `FallbackDecisionTracker` and writes each fallback attempt to the `fallback_attempts` table with attempt number, provider, status, and error details.
+
+Both are injected via `createDiContainer.ts` — the `DispatchRunService` constructor accepts an optional `FallbackDecisionTracker` for DI.
+
+## Audit Event Pipeline
+
+Audit events are written to the `audit_events` table through a layered architecture:
+
+1. **`AuditEventWriter` interface** (audit-ledger) — defines `write()` and `writeBatch()` contracts.
+2. **`PgAuditEventWriter`** (persistence-pg) — production PostgreSQL implementation.
+3. **Domain-specific writers** (audit-ledger) — `ExecutionAuditWriter`, `RoutingAuditWriter`, `ProviderAuditWriter` construct typed events and delegate to `AuditEventWriter`.
+4. **Integration points** — `PersistingExecutionStatusTracker` emits execution events on lifecycle transitions; the routing lambda in `createDiContainer.ts` emits `routing.resolved` events on every dispatch.
+
+All audit writes are fire-and-forget with error logging — audit failures never block the dispatch path.
+
 ## Infrastructure
 
-- `infra/db` -- Database migrations and seed data (PostgreSQL)
+- `infra/db` -- Database migrations and seed data (PostgreSQL). Migrations 001–013 cover all tables. Migrations are append-only — never modify an applied migration; create a new ALTER migration instead.
 - `infra/docker` -- Container definitions for local and production deployments
 - `infra/config` -- Profile and policy configuration files
 - `infra/scripts` -- Operational scripts (backup, migration, health checks)

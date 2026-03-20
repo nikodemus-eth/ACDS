@@ -10,6 +10,7 @@ export { PgPolicyRepository } from './PgPolicyRepository.js';
 export type { PolicyRepository } from './PgPolicyRepository.js';
 export { PgAuditEventRepository } from './PgAuditEventRepository.js';
 export type { AuditEventReader, AuditListFilters } from './PgAuditEventRepository.js';
+export { PgAuditEventWriter } from './PgAuditEventWriter.js';
 export { PgFamilyPerformanceRepository } from './PgFamilyPerformanceRepository.js';
 export type { FamilyPerformanceReader, FamilyPerformanceSummary } from './PgFamilyPerformanceRepository.js';
 export { PgAdaptationEventRepository, PgAdaptationRecommendationRepository } from './PgAdaptationEventRepository.js';

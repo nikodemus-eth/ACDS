@@ -13,13 +13,15 @@ export interface DispatchRunDeps {
 }
 
 export class DispatchRunService {
-  private readonly fallbackTracker = new FallbackDecisionTracker();
+  private readonly fallbackTracker: FallbackDecisionTracker;
   private readonly fallbackService: FallbackExecutionService;
 
   constructor(
     private readonly statusTracker: ExecutionStatusTracker,
-    private readonly deps: DispatchRunDeps
+    private readonly deps: DispatchRunDeps,
+    fallbackTracker?: FallbackDecisionTracker,
   ) {
+    this.fallbackTracker = fallbackTracker ?? new FallbackDecisionTracker();
     this.fallbackService = new FallbackExecutionService(
       this.statusTracker,
       this.fallbackTracker,

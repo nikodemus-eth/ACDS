@@ -55,9 +55,12 @@ export class DispatchController {
           statusCode: 400,
         });
       } else {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const stack = error instanceof Error ? error.stack : '';
+        console.error('[dispatch/run] Unhandled error:', errMsg, stack);
         reply.status(500).send({
           error: 'Internal Server Error',
-          message: 'An unexpected error occurred while executing the dispatch',
+          message: errMsg,
           statusCode: 500,
         });
       }
