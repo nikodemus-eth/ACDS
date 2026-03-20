@@ -1,109 +1,44 @@
 // ---------------------------------------------------------------------------
-// Integration Tests – Adaptation Rollback (Prompt 68)
+// Integration Tests -- Adaptation Rollback (Prompt 68)
+// PGlite-backed: no InMemory/Mock/Stub classes.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import {
   AdaptationRollbackService,
-  type RollbackAuditEvent,
-  type RollbackAuditEmitter,
-  type RollbackRecordWriter,
 } from '@acds/adaptive-optimizer';
 import type {
   AdaptationEvent,
-  AdaptationLedgerWriter,
-  AdaptationEventFilters,
-  OptimizerStateRepository,
-  FamilySelectionState,
   CandidatePerformanceState,
-  AdaptationRollbackRecord,
   RankedCandidate,
 } from '@acds/adaptive-optimizer';
+import {
+  PgAdaptationEventRepository,
+  PgOptimizerStateRepository,
+  PgRollbackRecordWriter,
+  PgRollbackAuditEmitter,
+} from '@acds/persistence-pg';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../__test-support__/pglitePool.js';
 
-// ── In-memory ledger ──────────────────────────────────────────────────────
+// -- PGlite lifecycle --------------------------------------------------------
 
-class InMemoryLedger implements AdaptationLedgerWriter {
-  private events = new Map<string, AdaptationEvent>();
+let pool: PoolLike;
 
-  addEvent(event: AdaptationEvent) {
-    this.events.set(event.id, event);
-  }
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
 
-  async writeEvent(event: AdaptationEvent): Promise<void> {
-    this.events.set(event.id, event);
-  }
+beforeEach(async () => {
+  await truncateAll(pool);
+});
 
-  async getEvent(id: string): Promise<AdaptationEvent | undefined> {
-    return this.events.get(id);
-  }
+afterAll(async () => {
+  await closePool();
+});
 
-  async listEvents(_familyKey: string, _filters?: AdaptationEventFilters): Promise<AdaptationEvent[]> {
-    return [...this.events.values()];
-  }
-}
-
-// ── In-memory optimizer state ─────────────────────────────────────────────
-
-class InMemoryOptimizerRepo implements OptimizerStateRepository {
-  private familyStates = new Map<string, FamilySelectionState>();
-  private candidateStates = new Map<string, CandidatePerformanceState[]>();
-
-  setFamilyState(state: FamilySelectionState) {
-    this.familyStates.set(state.familyKey, state);
-  }
-
-  setCandidateStates(familyKey: string, states: CandidatePerformanceState[]) {
-    this.candidateStates.set(familyKey, states);
-  }
-
-  async getFamilyState(familyKey: string): Promise<FamilySelectionState | undefined> {
-    return this.familyStates.get(familyKey);
-  }
-
-  async getCandidateStates(familyKey: string): Promise<CandidatePerformanceState[]> {
-    return this.candidateStates.get(familyKey) ?? [];
-  }
-
-  async saveFamilyState(state: FamilySelectionState): Promise<void> {
-    this.familyStates.set(state.familyKey, state);
-  }
-
-  async saveCandidateState(state: CandidatePerformanceState): Promise<void> {
-    const existing = this.candidateStates.get(state.familyKey) ?? [];
-    const idx = existing.findIndex((c) => c.candidateId === state.candidateId);
-    if (idx >= 0) {
-      existing[idx] = state;
-    } else {
-      existing.push(state);
-    }
-    this.candidateStates.set(state.familyKey, existing);
-  }
-
-  async listFamilies(): Promise<string[]> {
-    return [...this.familyStates.keys()];
-  }
-}
-
-// ── Collecting helpers ────────────────────────────────────────────────────
-
-class CollectingRollbackWriter implements RollbackRecordWriter {
-  readonly records: AdaptationRollbackRecord[] = [];
-
-  async save(record: AdaptationRollbackRecord): Promise<void> {
-    this.records.push(record);
-  }
-}
-
-class CollectingRollbackAuditEmitter implements RollbackAuditEmitter {
-  readonly events: RollbackAuditEvent[] = [];
-
-  emit(event: RollbackAuditEvent): void {
-    this.events.push(event);
-  }
-}
-
-// ── Fixtures ──────────────────────────────────────────────────────────────
+// -- Fixtures ----------------------------------------------------------------
 
 const FAMILY_KEY = 'test.family.advisory';
 const EVENT_ID = randomUUID();
@@ -158,13 +93,20 @@ function makeAdaptationEvent(overrides?: Partial<AdaptationEvent>): AdaptationEv
   } as AdaptationEvent;
 }
 
-function setupDefaults(
-  ledger: InMemoryLedger,
-  optimizerRepo: InMemoryOptimizerRepo,
-) {
-  ledger.addEvent(makeAdaptationEvent());
+function createDeps() {
+  const pgPool = pool as any;
+  const ledger = new PgAdaptationEventRepository(pgPool);
+  const optimizerRepo = new PgOptimizerStateRepository(pgPool);
+  const rollbackWriter = new PgRollbackRecordWriter(pgPool);
+  const auditEmitter = new PgRollbackAuditEmitter(pgPool);
+  const service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
+  return { ledger, optimizerRepo, rollbackWriter, auditEmitter, service };
+}
 
-  optimizerRepo.setFamilyState({
+async function setupDefaults(deps: ReturnType<typeof createDeps>) {
+  await deps.ledger.writeEvent(makeAdaptationEvent());
+
+  await deps.optimizerRepo.saveFamilyState({
     familyKey: FAMILY_KEY,
     currentCandidateId: 'candidate-b',
     rollingScore: 0.85,
@@ -174,44 +116,34 @@ function setupDefaults(
     recentTrend: 'stable',
   });
 
-  optimizerRepo.setCandidateStates(FAMILY_KEY, [
-    makeCandidate('candidate-b', 0.85),
-    makeCandidate('candidate-a', 0.75),
-  ]);
+  await deps.optimizerRepo.saveCandidateState(makeCandidate('candidate-b', 0.85));
+  await deps.optimizerRepo.saveCandidateState(makeCandidate('candidate-a', 0.75));
 }
 
 // ===========================================================================
 // Rollback Preview
 // ===========================================================================
 
-describe('Adaptation Rollback – Preview', () => {
-  let ledger: InMemoryLedger;
-  let optimizerRepo: InMemoryOptimizerRepo;
-  let rollbackWriter: CollectingRollbackWriter;
-  let auditEmitter: CollectingRollbackAuditEmitter;
-  let service: AdaptationRollbackService;
-
-  beforeEach(() => {
-    ledger = new InMemoryLedger();
-    optimizerRepo = new InMemoryOptimizerRepo();
-    rollbackWriter = new CollectingRollbackWriter();
-    auditEmitter = new CollectingRollbackAuditEmitter();
-    service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
-    setupDefaults(ledger, optimizerRepo);
-  });
-
+describe('Adaptation Rollback -- Preview', () => {
   it('returns a preview without mutating state', async () => {
-    const preview = await service.previewRollback(FAMILY_KEY, EVENT_ID);
+    const deps = createDeps();
+    await setupDefaults(deps);
+
+    const preview = await deps.service.previewRollback(FAMILY_KEY, EVENT_ID);
 
     expect(preview).toBeDefined();
     expect(preview.preview.familyKey).toBe(FAMILY_KEY);
     expect(preview.preview.targetAdaptationEventId).toBe(EVENT_ID);
-    // No records should be persisted from preview
-    expect(rollbackWriter.records).toHaveLength(0);
+    // No rollback records should be persisted from preview
+    const result = await pool.query('SELECT count(*) FROM adaptation_rollback_records');
+    expect(Number(result.rows[0].count)).toBe(0);
   });
 
   it('includes current and restored snapshots', async () => {
-    const preview = await service.previewRollback(FAMILY_KEY, EVENT_ID);
+    const deps = createDeps();
+    await setupDefaults(deps);
+
+    const preview = await deps.service.previewRollback(FAMILY_KEY, EVENT_ID);
 
     expect(preview.preview.previousSnapshot.familyKey).toBe(FAMILY_KEY);
     expect(preview.preview.previousSnapshot.candidateRankings.length).toBeGreaterThan(0);
@@ -220,17 +152,23 @@ describe('Adaptation Rollback – Preview', () => {
   });
 
   it('marks a recent event as safe', async () => {
-    const preview = await service.previewRollback(FAMILY_KEY, EVENT_ID);
+    const deps = createDeps();
+    await setupDefaults(deps);
+
+    const preview = await deps.service.previewRollback(FAMILY_KEY, EVENT_ID);
 
     expect(preview.safe).toBe(true);
     expect(preview.warnings).toHaveLength(0);
   });
 
   it('flags a very old event as unsafe', async () => {
-    const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
-    ledger.addEvent(makeAdaptationEvent({ id: 'old-event', createdAt: oldDate }));
+    const deps = createDeps();
+    await setupDefaults(deps);
 
-    const preview = await service.previewRollback(FAMILY_KEY, 'old-event');
+    const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    await deps.ledger.writeEvent(makeAdaptationEvent({ id: 'old-event', createdAt: oldDate }));
+
+    const preview = await deps.service.previewRollback(FAMILY_KEY, 'old-event');
 
     expect(preview.safe).toBe(false);
     expect(preview.warnings.length).toBeGreaterThan(0);
@@ -242,24 +180,12 @@ describe('Adaptation Rollback – Preview', () => {
 // Rollback Execution
 // ===========================================================================
 
-describe('Adaptation Rollback – Execution', () => {
-  let ledger: InMemoryLedger;
-  let optimizerRepo: InMemoryOptimizerRepo;
-  let rollbackWriter: CollectingRollbackWriter;
-  let auditEmitter: CollectingRollbackAuditEmitter;
-  let service: AdaptationRollbackService;
-
-  beforeEach(() => {
-    ledger = new InMemoryLedger();
-    optimizerRepo = new InMemoryOptimizerRepo();
-    rollbackWriter = new CollectingRollbackWriter();
-    auditEmitter = new CollectingRollbackAuditEmitter();
-    service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
-    setupDefaults(ledger, optimizerRepo);
-  });
-
+describe('Adaptation Rollback -- Execution', () => {
   it('executes a safe rollback successfully', async () => {
-    const record = await service.executeRollback(
+    const deps = createDeps();
+    await setupDefaults(deps);
+
+    const record = await deps.service.executeRollback(
       FAMILY_KEY,
       EVENT_ID,
       'operator@acds',
@@ -274,10 +200,13 @@ describe('Adaptation Rollback – Execution', () => {
   });
 
   it('persists the rollback record', async () => {
-    await service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', 'Rolling back');
+    const deps = createDeps();
+    await setupDefaults(deps);
 
-    expect(rollbackWriter.records).toHaveLength(1);
-    expect(rollbackWriter.records[0].familyKey).toBe(FAMILY_KEY);
+    await deps.service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', 'Rolling back');
+
+    const result = await pool.query('SELECT * FROM adaptation_rollback_records WHERE family_key = $1', [FAMILY_KEY]);
+    expect(result.rows.length).toBe(1);
   });
 });
 
@@ -285,50 +214,44 @@ describe('Adaptation Rollback – Execution', () => {
 // Invalid Rollback Rejection
 // ===========================================================================
 
-describe('Adaptation Rollback – Invalid Rejection', () => {
-  let ledger: InMemoryLedger;
-  let optimizerRepo: InMemoryOptimizerRepo;
-  let rollbackWriter: CollectingRollbackWriter;
-  let auditEmitter: CollectingRollbackAuditEmitter;
-  let service: AdaptationRollbackService;
-
-  beforeEach(() => {
-    ledger = new InMemoryLedger();
-    optimizerRepo = new InMemoryOptimizerRepo();
-    rollbackWriter = new CollectingRollbackWriter();
-    auditEmitter = new CollectingRollbackAuditEmitter();
-    service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
-    setupDefaults(ledger, optimizerRepo);
-  });
-
+describe('Adaptation Rollback -- Invalid Rejection', () => {
   it('throws when the target event does not exist', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
+
     await expect(
-      service.executeRollback(FAMILY_KEY, 'nonexistent', 'operator@acds', 'Test'),
+      deps.service.executeRollback(FAMILY_KEY, 'nonexistent', 'operator@acds', 'Test'),
     ).rejects.toThrow(/not found/);
   });
 
   it('throws when the event belongs to a different family', async () => {
-    ledger.addEvent(makeAdaptationEvent({ id: 'other-event', familyKey: 'other.family' }));
+    const deps = createDeps();
+    await setupDefaults(deps);
+    await deps.ledger.writeEvent(makeAdaptationEvent({ id: 'other-event', familyKey: 'other.family' }));
 
     await expect(
-      service.executeRollback(FAMILY_KEY, 'other-event', 'operator@acds', 'Test'),
+      deps.service.executeRollback(FAMILY_KEY, 'other-event', 'operator@acds', 'Test'),
     ).rejects.toThrow(/belongs to family/);
   });
 
   it('throws when family state does not exist', async () => {
-    ledger.addEvent(makeAdaptationEvent({ id: 'orphan-event', familyKey: 'orphan.family' }));
+    const deps = createDeps();
+    await setupDefaults(deps);
+    await deps.ledger.writeEvent(makeAdaptationEvent({ id: 'orphan-event', familyKey: 'orphan.family' }));
 
     await expect(
-      service.executeRollback('orphan.family', 'orphan-event', 'operator@acds', 'Test'),
+      deps.service.executeRollback('orphan.family', 'orphan-event', 'operator@acds', 'Test'),
     ).rejects.toThrow(/state not found/);
   });
 
   it('refuses execution for unsafe rollbacks (old events)', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
     const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
-    ledger.addEvent(makeAdaptationEvent({ id: 'old-event', createdAt: oldDate }));
+    await deps.ledger.writeEvent(makeAdaptationEvent({ id: 'old-event', createdAt: oldDate }));
 
     await expect(
-      service.executeRollback(FAMILY_KEY, 'old-event', 'operator@acds', 'Test'),
+      deps.service.executeRollback(FAMILY_KEY, 'old-event', 'operator@acds', 'Test'),
     ).rejects.toThrow(/not safe/);
   });
 });
@@ -337,42 +260,33 @@ describe('Adaptation Rollback – Invalid Rejection', () => {
 // Rollback Audit Emission
 // ===========================================================================
 
-describe('Adaptation Rollback – Audit Emission', () => {
-  let ledger: InMemoryLedger;
-  let optimizerRepo: InMemoryOptimizerRepo;
-  let rollbackWriter: CollectingRollbackWriter;
-  let auditEmitter: CollectingRollbackAuditEmitter;
-  let service: AdaptationRollbackService;
-
-  beforeEach(() => {
-    ledger = new InMemoryLedger();
-    optimizerRepo = new InMemoryOptimizerRepo();
-    rollbackWriter = new CollectingRollbackWriter();
-    auditEmitter = new CollectingRollbackAuditEmitter();
-    service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
-    setupDefaults(ledger, optimizerRepo);
-  });
-
+describe('Adaptation Rollback -- Audit Emission', () => {
   it('emits a rollback_executed audit event on successful execution', async () => {
-    await service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', 'Performance issue');
+    const deps = createDeps();
+    await setupDefaults(deps);
 
-    const executedEvents = auditEmitter.events.filter((e) => e.type === 'rollback_executed');
-    expect(executedEvents).toHaveLength(1);
-    expect(executedEvents[0].familyKey).toBe(FAMILY_KEY);
-    expect(executedEvents[0].targetAdaptationEventId).toBe(EVENT_ID);
-    expect(executedEvents[0].actor).toBe('operator@acds');
-    expect(executedEvents[0].reason).toBe('Performance issue');
-    expect(executedEvents[0].timestamp).toBeDefined();
+    await deps.service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', 'Performance issue');
+
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE resource_type = 'rollback' AND action = 'rollback_executed'`,
+    );
+    expect(result.rows.length).toBe(1);
   });
 
   it('does not emit audit events for failed rollbacks', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
+
     try {
-      await service.executeRollback(FAMILY_KEY, 'nonexistent', 'operator@acds', 'Test');
+      await deps.service.executeRollback(FAMILY_KEY, 'nonexistent', 'operator@acds', 'Test');
     } catch {
       // Expected
     }
 
-    expect(auditEmitter.events).toHaveLength(0);
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE resource_type = 'rollback'`,
+    );
+    expect(result.rows.length).toBe(0);
   });
 });
 
@@ -380,53 +294,52 @@ describe('Adaptation Rollback – Audit Emission', () => {
 // Rollback Input Validation
 // ===========================================================================
 
-describe('Adaptation Rollback – Input Validation', () => {
-  let ledger: InMemoryLedger;
-  let optimizerRepo: InMemoryOptimizerRepo;
-  let rollbackWriter: CollectingRollbackWriter;
-  let auditEmitter: CollectingRollbackAuditEmitter;
-  let service: AdaptationRollbackService;
-
-  beforeEach(() => {
-    ledger = new InMemoryLedger();
-    optimizerRepo = new InMemoryOptimizerRepo();
-    rollbackWriter = new CollectingRollbackWriter();
-    auditEmitter = new CollectingRollbackAuditEmitter();
-    service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, auditEmitter);
-    setupDefaults(ledger, optimizerRepo);
-  });
-
+describe('Adaptation Rollback -- Input Validation', () => {
   it('throws when actor is empty', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
+
     await expect(
-      service.executeRollback(FAMILY_KEY, EVENT_ID, '', 'Reason'),
+      deps.service.executeRollback(FAMILY_KEY, EVENT_ID, '', 'Reason'),
     ).rejects.toThrow('actor is required');
   });
 
   it('throws when actor is whitespace only', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
+
     await expect(
-      service.executeRollback(FAMILY_KEY, EVENT_ID, '   ', 'Reason'),
+      deps.service.executeRollback(FAMILY_KEY, EVENT_ID, '   ', 'Reason'),
     ).rejects.toThrow('actor is required');
   });
 
   it('throws when reason is empty', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
+
     await expect(
-      service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', ''),
+      deps.service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', ''),
     ).rejects.toThrow('reason is required');
   });
 
   it('throws when reason is whitespace only', async () => {
+    const deps = createDeps();
+    await setupDefaults(deps);
+
     await expect(
-      service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', '   '),
+      deps.service.executeRollback(FAMILY_KEY, EVENT_ID, 'operator@acds', '   '),
     ).rejects.toThrow('reason is required');
   });
 
   it('flags event with empty previous ranking as unsafe', async () => {
-    ledger.addEvent(makeAdaptationEvent({
+    const deps = createDeps();
+    await setupDefaults(deps);
+    await deps.ledger.writeEvent(makeAdaptationEvent({
       id: 'empty-ranking-event',
       previousRanking: [],
     }));
 
-    const preview = await service.previewRollback(FAMILY_KEY, 'empty-ranking-event');
+    const preview = await deps.service.previewRollback(FAMILY_KEY, 'empty-ranking-event');
     expect(preview.safe).toBe(false);
     expect(preview.warnings.some((w) => w.includes('empty previous ranking'))).toBe(true);
   });

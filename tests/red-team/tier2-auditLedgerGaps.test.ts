@@ -3,9 +3,10 @@
  *
  * Tests that audit events, adaptation events, and rollback/approval
  * audit trails have missing entries, unredacted data, and integrity gaps.
+ * PGlite-backed: uses real PG repositories.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import {
   buildAdaptationEvent,
   AdaptationApprovalService,
@@ -16,15 +17,34 @@ import {
   makeRankedCandidate,
   makeAdaptationEvent,
   makeRecommendation,
-  InMemoryAdaptationLedger,
-  InMemoryApprovalRepository,
-  InMemoryOptimizerStateRepository,
-  InMemoryRollbackRecordWriter,
-  CollectingApprovalAuditEmitter,
-  CollectingRollbackAuditEmitter,
   makeFamilyState,
   makeCandidateState,
+  getRedTeamPool,
+  truncateRedTeamTables,
+  teardownRedTeamPool,
+  createPgAdaptationLedger,
+  createPgApprovalRepository,
+  createPgOptimizerStateRepository,
+  createPgRollbackRecordWriter,
+  createPgApprovalAuditEmitter,
+  CollectingApprovalAuditEmitter,
+  CollectingRollbackAuditEmitter,
 } from './_fixtures.js';
+import type { PoolLike } from '../__test-support__/pglitePool.js';
+
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await getRedTeamPool();
+});
+
+beforeEach(async () => {
+  await truncateRedTeamTables();
+});
+
+afterAll(async () => {
+  await teardownRedTeamPool();
+});
 
 describe('ARGUS E1-E4: Audit Ledger Gaps', () => {
 
@@ -95,33 +115,33 @@ describe('ARGUS E1-E4: Audit Ledger Gaps', () => {
 
   describe('AdaptationApprovalService — audit completeness', () => {
 
-    it('emits approval_submitted but not superseded on re-submission', () => {
+    it('emits approval_submitted but not superseded on re-submission', async () => {
       // VULN: superseded status type exists but is never set via the service API
-      const repo = new InMemoryApprovalRepository();
+      const repo = createPgApprovalRepository(pool);
       const emitter = new CollectingApprovalAuditEmitter();
       const service = new AdaptationApprovalService(repo, emitter);
 
       const rec1 = makeRecommendation({ id: 'rec-1' });
       const rec2 = makeRecommendation({ id: 'rec-2' });
 
-      service.submitForApproval(rec1);
-      service.submitForApproval(rec2);
+      await service.submitForApproval(rec1);
+      await service.submitForApproval(rec2);
 
       const eventTypes = emitter.events.map(e => e.type);
       expect(eventTypes).not.toContain('approval_superseded');
       // Both are 'approval_submitted' — first is never superseded
     });
 
-    it('emits approval_expired with no actor field', () => {
+    it('emits approval_expired with no actor field', async () => {
       // VULN: expired events have no actor — no attribution
-      const repo = new InMemoryApprovalRepository();
+      const repo = createPgApprovalRepository(pool);
       const emitter = new CollectingApprovalAuditEmitter();
       const service = new AdaptationApprovalService(repo, emitter);
 
       const rec = makeRecommendation({ id: 'rec-exp' });
-      service.submitForApproval(rec, 1); // 1ms TTL — instantly expirable
-      // Wait a tick then expire
-      return new Promise<void>((resolve) => {
+      await service.submitForApproval(rec, 1); // 1ms TTL — instantly expirable
+
+      await new Promise<void>((resolve) => {
         setTimeout(async () => {
           await service.expireStale();
           const expiredEvents = emitter.events.filter(e => e.type === 'approval_expired');
@@ -136,55 +156,55 @@ describe('ARGUS E1-E4: Audit Ledger Gaps', () => {
 
   describe('AdaptationRollbackService — audit completeness', () => {
 
-    it('does not emit rollback_previewed event during previewRollback', () => {
+    it('does not emit rollback_previewed event during previewRollback', async () => {
       // VULN: rollback_previewed type is defined but never emitted
-      const ledger = new InMemoryAdaptationLedger();
-      const optimizerRepo = new InMemoryOptimizerStateRepository();
-      const rollbackWriter = new InMemoryRollbackRecordWriter();
+      const ledger = createPgAdaptationLedger(pool);
+      const optimizerRepo = createPgOptimizerStateRepository(pool);
+      const rollbackWriter = createPgRollbackRecordWriter(pool);
       const emitter = new CollectingRollbackAuditEmitter();
 
       const event = makeAdaptationEvent({ id: 'evt-for-preview', createdAt: new Date().toISOString() });
-      ledger.events.push(event);
+      await ledger.writeEvent(event);
 
       const state = makeFamilyState({ familyKey: event.familyKey });
-      optimizerRepo.familyStates.set(event.familyKey, state);
-      optimizerRepo.candidateStates.set(event.familyKey, [
+      await optimizerRepo.saveFamilyState(state);
+      await optimizerRepo.saveCandidateState(
         makeCandidateState({ familyKey: event.familyKey }),
-      ]);
+      );
 
       const service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, emitter);
-      return service.previewRollback(event.familyKey, event.id).then(() => {
-        const previewEvents = emitter.events.filter(
-          (e: RollbackAuditEvent) => e.type === 'rollback_previewed'
-        );
-        expect(previewEvents).toHaveLength(0);
-      });
+      await service.previewRollback(event.familyKey, event.id);
+
+      const previewEvents = emitter.events.filter(
+        (e: RollbackAuditEvent) => e.type === 'rollback_previewed'
+      );
+      expect(previewEvents).toHaveLength(0);
     });
 
-    it('emits rollback_executed with user-supplied actor — no authorization', () => {
+    it('emits rollback_executed with user-supplied actor — no authorization', async () => {
       // VULN: any string accepted as actor — no authorization check
-      const ledger = new InMemoryAdaptationLedger();
-      const optimizerRepo = new InMemoryOptimizerStateRepository();
-      const rollbackWriter = new InMemoryRollbackRecordWriter();
+      const ledger = createPgAdaptationLedger(pool);
+      const optimizerRepo = createPgOptimizerStateRepository(pool);
+      const rollbackWriter = createPgRollbackRecordWriter(pool);
       const emitter = new CollectingRollbackAuditEmitter();
 
       const event = makeAdaptationEvent({ id: 'evt-rb', createdAt: new Date().toISOString() });
-      ledger.events.push(event);
+      await ledger.writeEvent(event);
 
       const state = makeFamilyState({ familyKey: event.familyKey });
-      optimizerRepo.familyStates.set(event.familyKey, state);
-      optimizerRepo.candidateStates.set(event.familyKey, [
+      await optimizerRepo.saveFamilyState(state);
+      await optimizerRepo.saveCandidateState(
         makeCandidateState({ familyKey: event.familyKey }),
-      ]);
+      );
 
       const service = new AdaptationRollbackService(ledger, optimizerRepo, rollbackWriter, emitter);
-      return service.executeRollback(event.familyKey, event.id, 'anyone', 'any reason').then(() => {
-        const executedEvents = emitter.events.filter(
-          (e: RollbackAuditEvent) => e.type === 'rollback_executed'
-        );
-        expect(executedEvents).toHaveLength(1);
-        expect(executedEvents[0].actor).toBe('anyone');
-      });
+      await service.executeRollback(event.familyKey, event.id, 'anyone', 'any reason');
+
+      const executedEvents = emitter.events.filter(
+        (e: RollbackAuditEvent) => e.type === 'rollback_executed'
+      );
+      expect(executedEvents).toHaveLength(1);
+      expect(executedEvents[0].actor).toBe('anyone');
     });
   });
 

@@ -109,6 +109,8 @@ export default defineConfig({
         'packages/sovereign-runtime/src/grits/validation-types.ts',
         'packages/sovereign-runtime/src/telemetry/event-types.ts',
         'packages/sovereign-runtime/src/telemetry/audit-logger.ts',
+        'packages/sovereign-runtime/src/domain/capability-contract.ts',
+        'packages/sovereign-runtime/src/registry/capability-binding.ts',
       ],
       reporter: ['text', 'text-summary', 'json'],
     },

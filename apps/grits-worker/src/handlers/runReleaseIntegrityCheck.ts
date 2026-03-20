@@ -14,11 +14,11 @@ import { AuditIntegrityChecker } from '../checkers/AuditIntegrityChecker.js';
 import { BoundaryIntegrityChecker } from '../checkers/BoundaryIntegrityChecker.js';
 import { PolicyIntegrityChecker } from '../checkers/PolicyIntegrityChecker.js';
 import { OperationalIntegrityChecker } from '../checkers/OperationalIntegrityChecker.js';
-import { getExecutionRecordReadRepository } from '../repositories/InMemoryExecutionRecordReadRepository.js';
-import { getRoutingDecisionReadRepository } from '../repositories/InMemoryRoutingDecisionReadRepository.js';
-import { getAuditEventReadRepository } from '../repositories/InMemoryAuditEventReadRepository.js';
-import { getAdaptationRollbackReadRepository } from '../repositories/InMemoryAdaptationRollbackReadRepository.js';
-import { getIntegritySnapshotRepository } from '../repositories/InMemoryIntegritySnapshotRepository.js';
+import { getExecutionRecordReadRepository } from '../repositories/PgExecutionRecordReadRepository.js';
+import { getRoutingDecisionReadRepository } from '../repositories/PgRoutingDecisionReadRepository.js';
+import { getAuditEventReadRepository } from '../repositories/PgAuditEventReadRepository.js';
+import { getAdaptationRollbackReadRepository } from '../repositories/PgAdaptationRollbackReadRepository.js';
+import { getIntegritySnapshotRepository } from '../repositories/PgIntegritySnapshotRepository.js';
 import { getSharedOptimizerStateRepository, getSharedApprovalRepository, getSharedLedger, getSharedProviderRepository, getSharedPolicyRepository } from '../repositories/sharedRepositories.js';
 
 export async function runReleaseIntegrityCheck(): Promise<void> {

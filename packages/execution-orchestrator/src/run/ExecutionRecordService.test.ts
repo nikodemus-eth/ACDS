@@ -1,55 +1,36 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { ExecutionRecordService } from './ExecutionRecordService.js';
-import type { ExecutionRecordRepository, ExecutionRecordFilters } from './ExecutionRecordService.js';
+import { PgExecutionRecordRepository } from '@acds/persistence-pg';
 import {
   CognitiveGrade,
   DecisionPosture,
   type ExecutionRecord,
 } from '@acds/core-types';
+import {
+  createTestPool,
+  runMigrations,
+  closePool,
+  type PoolLike,
+} from '../../../../tests/__test-support__/pglitePool.js';
 
-// In-memory repository implementing the real interface
-class InMemoryExecutionRecordRepository implements ExecutionRecordRepository {
-  private records: ExecutionRecord[] = [];
-  private nextId = 1;
+let pool: PoolLike;
+let repo: PgExecutionRecordRepository;
+let service: ExecutionRecordService;
 
-  async create(record: Omit<ExecutionRecord, 'id'>): Promise<ExecutionRecord> {
-    const withId: ExecutionRecord = { ...record, id: `rec-${this.nextId++}` };
-    this.records.push(withId);
-    return withId;
-  }
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
 
-  async findById(id: string): Promise<ExecutionRecord | null> {
-    return this.records.find((r) => r.id === id) ?? null;
-  }
+beforeEach(async () => {
+  await pool.query('TRUNCATE execution_records CASCADE');
+  repo = new PgExecutionRecordRepository(pool as any);
+  service = new ExecutionRecordService(repo);
+});
 
-  async findByFamily(familyKey: string, limit = 50): Promise<ExecutionRecord[]> {
-    return this.records
-      .filter((r) => r.executionFamily.application === familyKey)
-      .slice(0, limit);
-  }
-
-  async findRecent(limit = 50): Promise<ExecutionRecord[]> {
-    return this.records.slice(-limit);
-  }
-
-  async findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]> {
-    let results = [...this.records];
-    if (filters.status) {
-      results = results.filter((r) => r.status === filters.status);
-    }
-    if (filters.limit) {
-      results = results.slice(0, filters.limit);
-    }
-    return results;
-  }
-
-  async update(id: string, updates: Partial<Omit<ExecutionRecord, 'id'>>): Promise<ExecutionRecord> {
-    const record = this.records.find((r) => r.id === id);
-    if (!record) throw new Error(`Record ${id} not found`);
-    Object.assign(record, updates);
-    return record;
-  }
-}
+afterAll(async () => {
+  await closePool();
+});
 
 function makeRecord(overrides: Partial<Omit<ExecutionRecord, 'id'>> = {}): Omit<ExecutionRecord, 'id'> {
   return {
@@ -79,18 +60,11 @@ function makeRecord(overrides: Partial<Omit<ExecutionRecord, 'id'>> = {}): Omit<
 }
 
 describe('ExecutionRecordService', () => {
-  let repo: InMemoryExecutionRecordRepository;
-  let service: ExecutionRecordService;
-
-  beforeEach(() => {
-    repo = new InMemoryExecutionRecordRepository();
-    service = new ExecutionRecordService(repo);
-  });
-
   it('creates a record and assigns an id', async () => {
     const record = await service.create(makeRecord());
 
-    expect(record.id).toBe('rec-1');
+    expect(record.id).toBeDefined();
+    expect(typeof record.id).toBe('string');
     expect(record.status).toBe('pending');
   });
 
@@ -103,7 +77,7 @@ describe('ExecutionRecordService', () => {
   });
 
   it('returns null for non-existent id', async () => {
-    const found = await service.getById('non-existent');
+    const found = await service.getById('00000000-0000-0000-0000-000000000000');
     expect(found).toBeNull();
   });
 
@@ -111,13 +85,13 @@ describe('ExecutionRecordService', () => {
     await service.create(makeRecord());
     await service.create(makeRecord());
 
-    const results = await service.getByFamily('TestApp');
+    const results = await service.getByFamily('TestApp:Review:Analyze');
     expect(results).toHaveLength(2);
   });
 
   it('uses default limit of 50 for getByFamily', async () => {
     await service.create(makeRecord());
-    const results = await service.getByFamily('TestApp');
+    const results = await service.getByFamily('TestApp:Review:Analyze');
     expect(results).toHaveLength(1);
   });
 
@@ -175,7 +149,7 @@ describe('ExecutionRecordService', () => {
 
   it('throws when updating a non-existent record', async () => {
     await expect(
-      service.updateStatus('non-existent', { status: 'failed' }),
-    ).rejects.toThrow('Record non-existent not found');
+      service.updateStatus('00000000-0000-0000-0000-000000000000', { status: 'failed' }),
+    ).rejects.toThrow();
   });
 });

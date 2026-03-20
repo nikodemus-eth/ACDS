@@ -35,4 +35,50 @@ describe('Foundation Models Methods', () => {
     expect(output.entities[0]).toHaveProperty('value');
     expect(output.entities[0]).toHaveProperty('confidence');
   });
+
+  it('extract falls back to text_fragment when no proper nouns or numbers found', async () => {
+    const result = await adapter.execute('apple.foundation_models.extract', {
+      text: 'just lowercase words without any names or digits here',
+    });
+    const output = result.output as { entities: Array<{ type: string; value: string; confidence: number }> };
+    expect(output.entities).toBeInstanceOf(Array);
+    expect(output.entities.length).toBe(1);
+    expect(output.entities[0].type).toBe('text_fragment');
+    expect(output.entities[0].confidence).toBe(0.75);
+  });
+
+  it('extract returns empty entities for empty text', async () => {
+    const result = await adapter.execute('apple.foundation_models.extract', {
+      text: '',
+    });
+    const output = result.output as { entities: Array<{ type: string; value: string; confidence: number }> };
+    expect(output.entities).toBeInstanceOf(Array);
+    expect(output.entities.length).toBe(0);
+  });
+
+  it('summarize with empty text returns fallback message', async () => {
+    const result = await adapter.execute('apple.foundation_models.summarize', {
+      text: '',
+    });
+    const output = result.output as { summary: string; tokenCount: number };
+    expect(output.summary).toBe('No content provided.');
+    expect(output.tokenCount).toBeGreaterThan(0);
+  });
+
+  it('summarize with whitespace-only text returns fallback message', async () => {
+    const result = await adapter.execute('apple.foundation_models.summarize', {
+      text: '   ',
+    });
+    const output = result.output as { summary: string; tokenCount: number };
+    expect(output.summary).toBe('No content provided.');
+  });
+
+  it('extract detects numbers as entities', async () => {
+    const result = await adapter.execute('apple.foundation_models.extract', {
+      text: 'the value is 42 and also 3.14',
+    });
+    const output = result.output as { entities: Array<{ type: string; value: string; confidence: number }> };
+    const numbers = output.entities.filter(e => e.type === 'number');
+    expect(numbers.length).toBeGreaterThanOrEqual(2);
+  });
 });

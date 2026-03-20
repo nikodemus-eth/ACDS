@@ -1049,3 +1049,93 @@ Major refactoring by user:
 5. **`createDiContainer.test.ts` misclassified as unit test** — Requires live PostgreSQL. Updated header to clarify it's an integration test requiring a running database.
 
 **Total test count:** 199 files, 2010 tests, all passing.
+
+## 2026-03-19 — Complete Mock Eradication and Database Pipeline Fix
+
+### Admin UI → Database Pipeline Fixed
+
+Four cascading bugs prevented the Admin Providers screen from displaying data:
+
+1. **`buildUrl` threw on relative URLs** (`apiClient.ts:41`) — `new URL('/api/providers')` throws TypeError without a base parameter. Fixed with string concatenation + URLSearchParams.
+2. **Vite proxy didn't strip `/api` prefix** (`vite.config.ts`) — proxy forwarded `/api/providers` to the API server which expects `/providers`. Added `rewrite: (path) => path.replace(/^\/api/, '')`.
+3. **No provider seed data** — created `seedProviders.ts`, `seedModelProfiles.ts`, `seedTacticProfiles.ts`, `seedPolicies.ts`, and the `applySeed.ts` runner to populate PostgreSQL from JSON configs.
+4. **Auth token not sent in dev** — frontend sends `x-admin-session` header from `VITE_ADMIN_SESSION_SECRET` env var (set in `.env.development.local`).
+
+### Mock/Stub/Fake Eradication (60+ classes removed)
+
+**Philosophy:** Every InMemory, Mock, Stub, and Fake class was replaced with real PostgreSQL-backed implementations using PGlite (real embedded PostgreSQL) for tests and `pg.Pool` for production.
+
+**Frontend:**
+- Deleted `mockApi.ts` and all `USE_MOCKS` flag references from `apiClient.ts`
+- Removed "Admin Web (Mock API)" launch config
+
+**Worker production code (data-loss fixes):**
+- `runFamilyAggregation.ts` — InMemoryFamilyScoreRepository/InMemoryFamilyPerformanceRepository → PG repos
+- `runPlateauDetection.ts` — InMemoryPerformanceSummaryRepository/InMemoryPlateauSignalRepository → PG repos
+- `runLowRiskAutoApply.ts` — InMemoryPendingRecommendationReader → PG-backed reader
+- `runExecutionScoring.ts` — InMemoryUnscoredExecutionRepository → PG with status filter
+- `runAdaptationRecommendations.ts` — InMemoryPlateauSignalReader/InMemoryAdaptationRecommendationRepository → PG repos
+
+**GRITS worker:**
+- Replaced 5 InMemory read repositories with PG-backed equivalents
+- Deleted 2 InMemory test doubles from `__test-support__/`
+- Created `createGritsPool.ts` for shared PG connection
+
+**Test files (30+ files):**
+- All controller tests, package tests, integration tests, and red team fixtures migrated from InMemory/Mock doubles to PGlite-backed real repositories
+- Created `tests/__test-support__/createTestRepositories.ts` shared test helper
+
+### Bugs Discovered by Mock Removal
+
+Removing mocks exposed real bugs that mocks had hidden:
+
+1. **`PgAdaptationEventRepository` mapper bug** — `mapRow()` read `row.created_at` (auto-generated DEFAULT NOW()) instead of `row.applied_at` (where event timestamp is stored). Events always appeared recent, breaking 7-day staleness checks in adaptation recommendations.
+2. **Column name mismatch** — `adaptationApprovalWorkflow.test.ts` referenced `ORDER BY timestamp` but the actual column is `created_at`.
+3. **Missing NOT NULL columns** — Several INSERT statements in tests omitted `decision_posture` and `cognitive_grade` columns that PostgreSQL requires.
+4. **UUID format enforcement** — 83 tests used string IDs like `"prov-3"` in PostgreSQL UUID columns. All replaced with deterministic UUIDs.
+
+### Vendor Consolidation
+
+- Removed Google Gemini, OpenAI, and LM Studio provider entries from database
+- Cleaned config files: `defaultProviders.json`, `modelProfiles.json`, `globalPolicy.json`, `processSwarmPolicy.json`, `thingsteadPolicy.json`
+- Updated `PROVIDER_SETUP.md` documentation for Ollama + Apple Intelligence only
+- Active providers: Ollama (`http://localhost:11434`) and Apple Intelligence (`http://localhost:11435`)
+
+### Seed Infrastructure Refactoring
+
+- Renamed `runSeeds.ts` → `validateSeeds.ts` (validation-only, no DB writes)
+- `applySeed.ts` is the actual DB seeder calling `seedProviders()`, `seedPolicies()`, `seedModelProfiles()`, `seedTacticProfiles()`
+- Updated VALID_VENDORS lists to `['ollama', 'apple']`
+
+### New Database Migrations
+
+- `009_plateau_signals.sql` — plateau detection signal storage
+- `010_execution_scoring_marker.sql` — execution scoring status tracking
+
+### New PG Repository Implementations
+
+| Repository | Location | Purpose |
+|-----------|----------|---------|
+| PgPlateauSignalRepository | `apps/worker/src/repositories/` | Store/read plateau detection signals |
+| PgExecutionRecordReadRepository | `apps/grits-worker/src/repositories/` | Read execution records for GRITS |
+| PgAuditEventReadRepository | `apps/grits-worker/src/repositories/` | Read audit events for GRITS |
+| PgAdaptationRollbackReadRepository | `apps/grits-worker/src/repositories/` | Read rollback records for GRITS |
+| PgRoutingDecisionReadRepository | `apps/grits-worker/src/repositories/` | Read routing decisions for GRITS |
+| PgIntegritySnapshotRepository | `apps/grits-worker/src/repositories/` | Store GRITS integrity snapshots |
+
+### Coverage
+
+- **Statements:** 99.11% (9594/9680)
+- **Branches:** 92.98% (2334/2510)
+- **Functions:** 99.84% (625/626)
+- **Lines:** 99.11% (9594/9680)
+
+### Documentation Updates
+
+- Updated `PROVIDER_SETUP.md` — removed LM Studio, Gemini, OpenAI sections; added Apple Intelligence section
+- Updated `ARCHITECTURE_OVERVIEW.md` — provider adapter list now reflects Ollama + Apple Intelligence only
+- Updated `apple-intelligence.md` — removed stale LMStudio/cloud references, fixed task type "generation" → "creative"
+- Updated `TEST_ARCHITECTURE.md` — migration count corrected to 10
+- Updated `ADMIN_GUIDE.md`, `EXECUTION_FLOW.md`, `COMPONENT_BOUNDARIES.md`, `POLICY_CONFIGURATION.md`, `TROUBLESHOOTING.md`, `data-dictionary.md` — removed all OpenAI/Gemini/LMStudio vendor references
+
+**Total test count:** 199 files, 2026 tests, all passing.

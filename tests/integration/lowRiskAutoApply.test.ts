@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
-// Integration Tests – Low-Risk Auto-Apply (Prompt 68)
+// Integration Tests -- Low-Risk Auto-Apply (Prompt 68)
+// PGlite-backed where applicable. Static* providers for domain defaults.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import {
   LowRiskAutoApplyService,
@@ -19,10 +20,28 @@ import type {
   CandidatePerformanceState,
   AutoApplyDecisionRecord,
 } from '@acds/adaptive-optimizer';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../__test-support__/pglitePool.js';
 
-// ── Test helpers ──────────────────────────────────────────────────────────
+// -- PGlite lifecycle --------------------------------------------------------
 
-class MockRiskProvider implements FamilyRiskProvider {
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+afterAll(async () => {
+  await closePool();
+});
+
+// -- Static providers (legitimate defaults, not mocks) -----------------------
+
+class StaticRiskProvider implements FamilyRiskProvider {
   private risks = new Map<string, FamilyRiskLevel>();
 
   setRisk(familyKey: string, level: FamilyRiskLevel) {
@@ -34,7 +53,7 @@ class MockRiskProvider implements FamilyRiskProvider {
   }
 }
 
-class MockPostureProvider implements FamilyPostureProvider {
+class StaticPostureProvider implements FamilyPostureProvider {
   private postures = new Map<string, string>();
 
   setPosture(familyKey: string, posture: string) {
@@ -46,7 +65,7 @@ class MockPostureProvider implements FamilyPostureProvider {
   }
 }
 
-class MockFailureCounter implements RecentFailureCounter {
+class StaticFailureCounter implements RecentFailureCounter {
   private counts = new Map<string, number>();
 
   setCount(familyKey: string, count: number) {
@@ -58,13 +77,43 @@ class MockFailureCounter implements RecentFailureCounter {
   }
 }
 
-class CollectingDecisionWriter implements AutoApplyDecisionWriter {
-  readonly records: AutoApplyDecisionRecord[] = [];
+/**
+ * PG-backed decision writer: persists to auto_apply_decision_records
+ * and exposes records for assertion.
+ */
+class PgAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
+  constructor(private readonly pgPool: PoolLike) {}
 
   async save(record: AutoApplyDecisionRecord): Promise<void> {
-    this.records.push(record);
+    await this.pgPool.query(
+      `INSERT INTO auto_apply_decision_records
+        (id, family_key, previous_ranking, new_ranking, reason, mode, risk_basis, applied_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        record.id,
+        record.familyKey,
+        JSON.stringify(record.previousRanking),
+        JSON.stringify(record.newRanking),
+        record.reason,
+        record.mode,
+        record.riskBasis,
+        record.appliedAt,
+      ],
+    );
+  }
+
+  async count(): Promise<number> {
+    const result = await this.pgPool.query('SELECT count(*) FROM auto_apply_decision_records');
+    return Number(result.rows[0].count);
+  }
+
+  async findAll(): Promise<Record<string, unknown>[]> {
+    const result = await this.pgPool.query('SELECT * FROM auto_apply_decision_records ORDER BY created_at');
+    return result.rows;
   }
 }
+
+// -- Test fixtures -----------------------------------------------------------
 
 function makeFamilyState(overrides?: Partial<FamilySelectionState>): FamilySelectionState {
   return {
@@ -123,18 +172,18 @@ function makeRecommendation(overrides?: Partial<AdaptationRecommendation>): Adap
 // Low-Risk Qualification
 // ===========================================================================
 
-describe('Low-Risk Auto-Apply – Qualification', () => {
-  let riskProvider: MockRiskProvider;
-  let postureProvider: MockPostureProvider;
-  let failureCounter: MockFailureCounter;
-  let decisionWriter: CollectingDecisionWriter;
+describe('Low-Risk Auto-Apply -- Qualification', () => {
+  let riskProvider: StaticRiskProvider;
+  let postureProvider: StaticPostureProvider;
+  let failureCounter: StaticFailureCounter;
+  let decisionWriter: PgAutoApplyDecisionWriter;
   let service: LowRiskAutoApplyService;
 
   beforeEach(() => {
-    riskProvider = new MockRiskProvider();
-    postureProvider = new MockPostureProvider();
-    failureCounter = new MockFailureCounter();
-    decisionWriter = new CollectingDecisionWriter();
+    riskProvider = new StaticRiskProvider();
+    postureProvider = new StaticPostureProvider();
+    failureCounter = new StaticFailureCounter();
+    decisionWriter = new PgAutoApplyDecisionWriter(pool);
     service = new LowRiskAutoApplyService(
       riskProvider,
       postureProvider,
@@ -195,18 +244,18 @@ describe('Low-Risk Auto-Apply – Qualification', () => {
 // Adaptive Reordering
 // ===========================================================================
 
-describe('Low-Risk Auto-Apply – Adaptive Reordering', () => {
-  let riskProvider: MockRiskProvider;
-  let postureProvider: MockPostureProvider;
-  let failureCounter: MockFailureCounter;
-  let decisionWriter: CollectingDecisionWriter;
+describe('Low-Risk Auto-Apply -- Adaptive Reordering', () => {
+  let riskProvider: StaticRiskProvider;
+  let postureProvider: StaticPostureProvider;
+  let failureCounter: StaticFailureCounter;
+  let decisionWriter: PgAutoApplyDecisionWriter;
   let service: LowRiskAutoApplyService;
 
   beforeEach(() => {
-    riskProvider = new MockRiskProvider();
-    postureProvider = new MockPostureProvider();
-    failureCounter = new MockFailureCounter();
-    decisionWriter = new CollectingDecisionWriter();
+    riskProvider = new StaticRiskProvider();
+    postureProvider = new StaticPostureProvider();
+    failureCounter = new StaticFailureCounter();
+    decisionWriter = new PgAutoApplyDecisionWriter(pool);
     service = new LowRiskAutoApplyService(
       riskProvider,
       postureProvider,
@@ -241,8 +290,10 @@ describe('Low-Risk Auto-Apply – Adaptive Reordering', () => {
       'auto_apply_low_risk',
     );
 
-    expect(decisionWriter.records).toHaveLength(1);
-    expect(decisionWriter.records[0].familyKey).toBe('test.family.advisory');
+    const count = await decisionWriter.count();
+    expect(count).toBe(1);
+    const rows = await decisionWriter.findAll();
+    expect(rows[0].family_key).toBe('test.family.advisory');
   });
 });
 
@@ -250,18 +301,18 @@ describe('Low-Risk Auto-Apply – Adaptive Reordering', () => {
 // Refusal for High-Consequence Families
 // ===========================================================================
 
-describe('Low-Risk Auto-Apply – High-Consequence Refusal', () => {
-  let riskProvider: MockRiskProvider;
-  let postureProvider: MockPostureProvider;
-  let failureCounter: MockFailureCounter;
-  let decisionWriter: CollectingDecisionWriter;
+describe('Low-Risk Auto-Apply -- High-Consequence Refusal', () => {
+  let riskProvider: StaticRiskProvider;
+  let postureProvider: StaticPostureProvider;
+  let failureCounter: StaticFailureCounter;
+  let decisionWriter: PgAutoApplyDecisionWriter;
   let service: LowRiskAutoApplyService;
 
   beforeEach(() => {
-    riskProvider = new MockRiskProvider();
-    postureProvider = new MockPostureProvider();
-    failureCounter = new MockFailureCounter();
-    decisionWriter = new CollectingDecisionWriter();
+    riskProvider = new StaticRiskProvider();
+    postureProvider = new StaticPostureProvider();
+    failureCounter = new StaticFailureCounter();
+    decisionWriter = new PgAutoApplyDecisionWriter(pool);
     service = new LowRiskAutoApplyService(
       riskProvider,
       postureProvider,
@@ -357,18 +408,18 @@ describe('Low-Risk Auto-Apply – High-Consequence Refusal', () => {
 // Audit Recording
 // ===========================================================================
 
-describe('Low-Risk Auto-Apply – Audit Recording', () => {
-  let riskProvider: MockRiskProvider;
-  let postureProvider: MockPostureProvider;
-  let failureCounter: MockFailureCounter;
-  let decisionWriter: CollectingDecisionWriter;
+describe('Low-Risk Auto-Apply -- Audit Recording', () => {
+  let riskProvider: StaticRiskProvider;
+  let postureProvider: StaticPostureProvider;
+  let failureCounter: StaticFailureCounter;
+  let decisionWriter: PgAutoApplyDecisionWriter;
   let service: LowRiskAutoApplyService;
 
   beforeEach(() => {
-    riskProvider = new MockRiskProvider();
-    postureProvider = new MockPostureProvider();
-    failureCounter = new MockFailureCounter();
-    decisionWriter = new CollectingDecisionWriter();
+    riskProvider = new StaticRiskProvider();
+    postureProvider = new StaticPostureProvider();
+    failureCounter = new StaticFailureCounter();
+    decisionWriter = new PgAutoApplyDecisionWriter(pool);
     service = new LowRiskAutoApplyService(
       riskProvider,
       postureProvider,
@@ -409,7 +460,8 @@ describe('Low-Risk Auto-Apply – Audit Recording', () => {
       'auto_apply_low_risk',
     );
 
-    expect(decisionWriter.records).toHaveLength(0);
+    const count = await decisionWriter.count();
+    expect(count).toBe(0);
   });
 });
 
@@ -417,14 +469,14 @@ describe('Low-Risk Auto-Apply – Audit Recording', () => {
 // Config Validation
 // ===========================================================================
 
-describe('Low-Risk Auto-Apply – Config Validation', () => {
+describe('Low-Risk Auto-Apply -- Config Validation', () => {
   it('throws when rollingScoreThreshold is out of range (> 1)', () => {
     expect(() =>
       new LowRiskAutoApplyService(
-        new MockRiskProvider(),
-        new MockPostureProvider(),
-        new MockFailureCounter(),
-        new CollectingDecisionWriter(),
+        new StaticRiskProvider(),
+        new StaticPostureProvider(),
+        new StaticFailureCounter(),
+        new PgAutoApplyDecisionWriter(pool),
         { rollingScoreThreshold: 1.5 },
       ),
     ).toThrow('rollingScoreThreshold must be between 0 and 1');
@@ -433,10 +485,10 @@ describe('Low-Risk Auto-Apply – Config Validation', () => {
   it('throws when rollingScoreThreshold is negative', () => {
     expect(() =>
       new LowRiskAutoApplyService(
-        new MockRiskProvider(),
-        new MockPostureProvider(),
-        new MockFailureCounter(),
-        new CollectingDecisionWriter(),
+        new StaticRiskProvider(),
+        new StaticPostureProvider(),
+        new StaticFailureCounter(),
+        new PgAutoApplyDecisionWriter(pool),
         { rollingScoreThreshold: -0.1 },
       ),
     ).toThrow('rollingScoreThreshold must be between 0 and 1');
@@ -445,10 +497,10 @@ describe('Low-Risk Auto-Apply – Config Validation', () => {
   it('throws when maxRecentFailures is negative', () => {
     expect(() =>
       new LowRiskAutoApplyService(
-        new MockRiskProvider(),
-        new MockPostureProvider(),
-        new MockFailureCounter(),
-        new CollectingDecisionWriter(),
+        new StaticRiskProvider(),
+        new StaticPostureProvider(),
+        new StaticFailureCounter(),
+        new PgAutoApplyDecisionWriter(pool),
         { maxRecentFailures: -1 },
       ),
     ).toThrow('maxRecentFailures must be a non-negative integer');
@@ -457,10 +509,10 @@ describe('Low-Risk Auto-Apply – Config Validation', () => {
   it('throws when maxRecentFailures is not an integer', () => {
     expect(() =>
       new LowRiskAutoApplyService(
-        new MockRiskProvider(),
-        new MockPostureProvider(),
-        new MockFailureCounter(),
-        new CollectingDecisionWriter(),
+        new StaticRiskProvider(),
+        new StaticPostureProvider(),
+        new StaticFailureCounter(),
+        new PgAutoApplyDecisionWriter(pool),
         { maxRecentFailures: 1.5 },
       ),
     ).toThrow('maxRecentFailures must be a non-negative integer');

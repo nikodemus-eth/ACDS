@@ -22,6 +22,15 @@ describe('Writing Tools Methods', () => {
     expect(output.corrections).toBeInstanceOf(Array);
   });
 
+  it('proofread with empty text returns empty corrected text', async () => {
+    const result = await adapter.execute('apple.writing_tools.proofread', {
+      text: '',
+    });
+    const output = result.output as { correctedText: string; corrections: unknown[] };
+    expect(output.correctedText).toBe('');
+    expect(output.corrections).toEqual([]);
+  });
+
   it('summarize returns summary', async () => {
     const result = await adapter.execute('apple.writing_tools.summarize', {
       text: 'A long paragraph that needs to be shortened.',

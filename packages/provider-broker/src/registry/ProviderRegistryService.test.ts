@@ -1,57 +1,29 @@
-import { describe, it, expect } from 'vitest';
-import { randomUUID } from 'node:crypto';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { ProviderRegistryService } from './ProviderRegistryService.js';
-import type { ProviderRepository } from './ProviderRepository.js';
 import type { ProviderValidationService } from './ProviderValidationService.js';
-import type { Provider } from '@acds/core-types';
+import { PgProviderRepository } from '@acds/persistence-pg';
 import { ProviderVendor, AuthType } from '@acds/core-types';
+import {
+  createTestPool,
+  runMigrations,
+  closePool,
+  type PoolLike,
+} from '../../../../tests/__test-support__/pglitePool.js';
 
-class InMemoryProviderRepository implements ProviderRepository {
-  private providers: Provider[] = [];
+let pool: PoolLike;
 
-  async create(input: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>): Promise<Provider> {
-    const provider: Provider = {
-      ...input,
-      id: randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.providers.push(provider);
-    return provider;
-  }
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
 
-  async findById(id: string): Promise<Provider | null> {
-    return this.providers.find(p => p.id === id) ?? null;
-  }
+beforeEach(async () => {
+  await pool.query('TRUNCATE providers CASCADE');
+});
 
-  async findAll(): Promise<Provider[]> {
-    return [...this.providers];
-  }
-
-  async findByVendor(vendor: string): Promise<Provider[]> {
-    return this.providers.filter(p => p.vendor === vendor);
-  }
-
-  async findEnabled(): Promise<Provider[]> {
-    return this.providers.filter(p => p.enabled);
-  }
-
-  async update(id: string, updates: Partial<Omit<Provider, 'id' | 'createdAt'>>): Promise<Provider> {
-    const idx = this.providers.findIndex(p => p.id === id);
-    if (idx === -1) throw new Error(`Not found: ${id}`);
-    const updated = { ...this.providers[idx]!, ...updates, updatedAt: new Date() };
-    this.providers[idx] = updated;
-    return updated;
-  }
-
-  async disable(id: string): Promise<Provider> {
-    return this.update(id, { enabled: false });
-  }
-
-  async delete(id: string): Promise<void> {
-    this.providers = this.providers.filter(p => p.id !== id);
-  }
-}
+afterAll(async () => {
+  await closePool();
+});
 
 class AlwaysValidValidator {
   validate(): string[] {
@@ -81,7 +53,7 @@ const validInput = {
 describe('ProviderRegistryService', () => {
   describe('create', () => {
     it('creates a provider when validation passes', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
       const result = await service.create(validInput);
@@ -92,7 +64,7 @@ describe('ProviderRegistryService', () => {
     });
 
     it('throws when validation fails', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const validator = new FailingValidator(['Name required', 'URL invalid']);
       const service = new ProviderRegistryService(repo, validator as unknown as ProviderValidationService);
 
@@ -103,7 +75,7 @@ describe('ProviderRegistryService', () => {
 
   describe('getById', () => {
     it('returns the provider when it exists', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
       const created = await service.create(validInput);
@@ -114,17 +86,17 @@ describe('ProviderRegistryService', () => {
     });
 
     it('returns null when provider does not exist', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
-      const result = await service.getById('nonexistent');
+      const result = await service.getById('00000000-0000-0000-0000-000000000000');
       expect(result).toBeNull();
     });
   });
 
   describe('listAll', () => {
     it('returns all providers', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
       await service.create(validInput);
@@ -137,7 +109,7 @@ describe('ProviderRegistryService', () => {
 
   describe('listEnabled', () => {
     it('returns only enabled providers', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
       const p1 = await service.create(validInput);
@@ -151,7 +123,7 @@ describe('ProviderRegistryService', () => {
 
   describe('update', () => {
     it('updates an existing provider', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
       const created = await service.create(validInput);
@@ -162,16 +134,16 @@ describe('ProviderRegistryService', () => {
     });
 
     it('throws when provider does not exist', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
-      await expect(service.update('nonexistent', { name: 'X' })).rejects.toThrow('Provider not found');
+      await expect(service.update('00000000-0000-0000-0000-000000000000', { name: 'X' })).rejects.toThrow('Provider not found');
     });
   });
 
   describe('disable', () => {
     it('disables an existing provider', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
       const created = await service.create(validInput);
@@ -181,10 +153,10 @@ describe('ProviderRegistryService', () => {
     });
 
     it('throws when provider does not exist', async () => {
-      const repo = new InMemoryProviderRepository();
+      const repo = new PgProviderRepository(pool as any);
       const service = new ProviderRegistryService(repo, new AlwaysValidValidator() as unknown as ProviderValidationService);
 
-      await expect(service.disable('nonexistent')).rejects.toThrow('Provider not found');
+      await expect(service.disable('00000000-0000-0000-0000-000000000000')).rejects.toThrow('Provider not found');
     });
   });
 });

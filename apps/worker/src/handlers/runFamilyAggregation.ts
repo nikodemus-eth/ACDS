@@ -2,8 +2,7 @@
  * runFamilyAggregation - Updates family performance summaries via
  * ExecutionHistoryAggregator for all active families.
  *
- * In a full implementation, the repository instances would be injected
- * via a DI container.
+ * All repositories are backed by PostgreSQL via the shared worker pool.
  */
 
 import {
@@ -12,6 +11,8 @@ import {
   type ExecutionScore,
   type FamilyPerformanceSummary,
 } from '@acds/evaluation';
+import type { Pool } from '@acds/persistence-pg';
+import { getWorkerPool } from '../repositories/createWorkerPool.js';
 
 // ── Abstract repository interfaces ────────────────────────────────────────
 
@@ -84,52 +85,73 @@ export async function runFamilyAggregation(): Promise<void> {
   }
 }
 
-/**
- * In-memory FamilyScoreRepository.
- * Tracks scored executions per family key.
- */
-class InMemoryFamilyScoreRepository implements FamilyScoreRepository {
-  private readonly scoresByFamily = new Map<string, ExecutionScore[]>();
+// ── PG-backed FamilyScoreRepository ───────────────────────────────────────
 
-  addScore(familyKey: string, score: ExecutionScore): void {
-    const scores = this.scoresByFamily.get(familyKey) ?? [];
-    scores.push(score);
-    this.scoresByFamily.set(familyKey, scores);
-  }
+class PgFamilyScoreRepository implements FamilyScoreRepository {
+  constructor(private readonly pool: Pool) {}
 
   async listActiveFamilies(): Promise<string[]> {
-    return [...this.scoresByFamily.keys()];
+    const result = await this.pool.query(
+      `SELECT DISTINCT family_key FROM family_selection_states ORDER BY family_key`,
+    );
+    return result.rows.map((r: Record<string, unknown>) => r.family_key as string);
   }
 
   async getRecentScores(familyKey: string, limit: number): Promise<ExecutionScore[]> {
-    const scores = this.scoresByFamily.get(familyKey) ?? [];
-    return scores.slice(-limit);
+    const parts = familyKey.split(':');
+    const application = parts[0] ?? '';
+    const process = parts[1] ?? '';
+    const step = parts[2] ?? '';
+
+    const result = await this.pool.query(
+      `SELECT
+         COALESCE(cost_estimate, 0) AS cost_estimate,
+         COALESCE(latency_ms, 0) AS latency_ms,
+         status,
+         normalized_output,
+         created_at
+       FROM execution_records
+       WHERE application = $1 AND process = $2 AND step = $3
+         AND status IN ('succeeded', 'failed')
+       ORDER BY created_at DESC
+       LIMIT $4`,
+      [application, process, step, limit],
+    );
+
+    return result.rows.map((r: Record<string, unknown>) => ({
+      compositeScore: r.status === 'succeeded' ? 1.0 : 0.0,
+      metricResults: [],
+      resolvedWeights: {},
+    }));
   }
 }
 
-/**
- * In-memory FamilyPerformanceRepository.
- * Stores the latest performance summary per family.
- */
-class InMemoryFamilyPerformanceRepository implements FamilyPerformanceRepository {
-  private readonly summaries = new Map<string, FamilyPerformanceSummary>();
+// ── PG-backed FamilyPerformanceRepository ─────────────────────────────────
+
+class PgFamilyPerformanceWriter implements FamilyPerformanceRepository {
+  constructor(private readonly pool: Pool) {}
 
   async saveSummary(summary: FamilyPerformanceSummary): Promise<void> {
-    this.summaries.set(summary.familyKey, summary);
-  }
-
-  getSummary(familyKey: string): FamilyPerformanceSummary | undefined {
-    return this.summaries.get(familyKey);
+    await this.pool.query(
+      `INSERT INTO family_selection_states (family_key, current_candidate_id, rolling_score, recent_trend, last_adaptation_at)
+       VALUES ($1, '', $2, 'stable', $3)
+       ON CONFLICT (family_key) DO UPDATE SET
+         rolling_score = EXCLUDED.rolling_score,
+         last_adaptation_at = EXCLUDED.last_adaptation_at`,
+      [summary.familyKey, summary.rollingScore, summary.lastUpdated.toISOString()],
+    );
   }
 }
 
-const familyScoreRepo = new InMemoryFamilyScoreRepository();
-const familyPerfRepo = new InMemoryFamilyPerformanceRepository();
+// ── Singleton instances ───────────────────────────────────────────────────
 
-export function getFamilyScoreRepository(): FamilyScoreRepository & { addScore(familyKey: string, score: ExecutionScore): void } {
+const familyScoreRepo = new PgFamilyScoreRepository(getWorkerPool());
+const familyPerfRepo = new PgFamilyPerformanceWriter(getWorkerPool());
+
+export function getFamilyScoreRepository(): FamilyScoreRepository {
   return familyScoreRepo;
 }
 
-export function getFamilyPerformanceRepository(): FamilyPerformanceRepository & { getSummary(familyKey: string): FamilyPerformanceSummary | undefined } {
+export function getFamilyPerformanceRepository(): FamilyPerformanceRepository {
   return familyPerfRepo;
 }

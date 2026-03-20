@@ -1,6 +1,6 @@
 # Provider Setup
 
-ACDS supports four provider vendors. This guide covers the configuration requirements for each.
+ACDS supports two provider vendors: Ollama (local open-source models) and Apple Intelligence (on-device Foundation Models). This guide covers the configuration requirements for each.
 
 ## Ollama (Local)
 
@@ -43,122 +43,60 @@ After registering, the health check scheduler will periodically verify connectiv
 
 ---
 
-## LM Studio (Local)
+## Apple Intelligence (Local, On-Device)
 
-LM Studio provides a local OpenAI-compatible API for running models on your machine.
+Apple Intelligence uses Apple's Foundation Models framework to run language models directly on Apple Silicon. No API keys, no cloud, no downloads — the models ship with macOS 26+.
 
 ### Prerequisites
 
-- Install LM Studio from [lmstudio.ai](https://lmstudio.ai)
-- Download and load a model within LM Studio
-- Start the local server from LM Studio's server tab
+- macOS 26 (Tahoe) or later on Apple Silicon (M1/M2/M3/M4)
+- Apple Intelligence Bridge running (Swift server at `http://localhost:11435`)
 
 ### Configuration
 
 | Setting   | Value                          |
 | --------- | ------------------------------ |
-| Vendor    | `lmstudio`                     |
-| Base URL  | `http://localhost:1234`        |
+| Vendor    | `apple`                        |
+| Base URL  | `http://localhost:11435`       |
 | Auth Type | `none`                         |
 | Timeout   | `30000` ms (default)           |
 
+### Starting the Bridge
+
+```bash
+swift run --package-path apps/apple-intelligence-bridge
+```
+
+Or via the launch configuration:
+```bash
+# Uses .claude/launch.json "Apple Intelligence Bridge" config
+```
+
 ### Registration via Admin UI
 
 1. Navigate to the Providers page.
-2. Click add and select vendor **LM Studio**.
-3. Set the base URL to `http://localhost:1234` (the default LM Studio server port).
+2. Click add and select vendor **Apple**.
+3. Set the base URL to `http://localhost:11435` (the default bridge port).
 4. Leave auth type as **None**.
 5. Save and run a connection test.
 
-### Environment Variables
+### Capabilities
 
-```
-LMSTUDIO_BASE_URL=http://localhost:1234
-LMSTUDIO_TIMEOUT_MS=30000
-```
+Apple Intelligence supports 7 capability categories through the bridge:
+- **Text**: Summarization, extraction, classification
+- **Translation**: Multi-language translation
+- **Speech**: Speech-to-text transcription
+- **Sound**: Audio event classification
+- **Image**: Describe, tag, and segment images
+- **Vision**: Visual reasoning and analysis
+- **Writing Tools**: Rewrite, proofread, and transform text
 
 ### Notes
 
-LM Studio exposes an OpenAI-compatible API, so the LM Studio adapter uses the OpenAI chat completions format. Make sure the LM Studio local server is running before testing connectivity.
-
----
-
-## Gemini (Cloud)
-
-Google Gemini requires an API key for authentication.
-
-### Prerequisites
-
-- A Google Cloud account or Google AI Studio account
-- A Gemini API key (generate at [aistudio.google.com](https://aistudio.google.com))
-
-### Configuration
-
-| Setting   | Value                                              |
-| --------- | -------------------------------------------------- |
-| Vendor    | `gemini`                                           |
-| Base URL  | `https://generativelanguage.googleapis.com`        |
-| Auth Type | `api_key`                                          |
-| API Key   | Your Gemini API key (encrypted at rest)            |
-| Timeout   | `30000` ms (default)                               |
-
-### Registration via Admin UI
-
-1. Navigate to the Providers page.
-2. Click add and select vendor **Gemini**.
-3. The base URL defaults to `https://generativelanguage.googleapis.com`.
-4. Set auth type to **API Key** and enter your Gemini API key.
-5. Save and run a connection test.
-
-The API key is encrypted using AES-256-GCM envelope encryption before being stored. It is never exposed in API responses or logs.
-
-### Environment Variables
-
-```
-GEMINI_BASE_URL=https://generativelanguage.googleapis.com
-GEMINI_API_KEY=your-api-key-here
-GEMINI_TIMEOUT_MS=30000
-```
-
----
-
-## OpenAI (Cloud)
-
-OpenAI requires an API key and optionally accepts an organization ID.
-
-### Prerequisites
-
-- An OpenAI account with API access
-- An API key (generate at [platform.openai.com](https://platform.openai.com))
-
-### Configuration
-
-| Setting      | Value                              |
-| ------------ | ---------------------------------- |
-| Vendor       | `openai`                           |
-| Base URL     | `https://api.openai.com`           |
-| Auth Type    | `api_key`                          |
-| API Key      | Your OpenAI API key (encrypted)    |
-| Organization | Optional organization ID           |
-| Timeout      | `30000` ms (default)               |
-
-### Registration via Admin UI
-
-1. Navigate to the Providers page.
-2. Click add and select vendor **OpenAI**.
-3. The base URL defaults to `https://api.openai.com`.
-4. Set auth type to **API Key** and enter your OpenAI API key.
-5. Optionally enter your organization ID if you belong to multiple organizations.
-6. Save and run a connection test.
-
-### Environment Variables
-
-```
-OPENAI_BASE_URL=https://api.openai.com
-OPENAI_API_KEY=your-api-key-here
-OPENAI_ORGANIZATION=your-org-id
-OPENAI_TIMEOUT_MS=30000
-```
+- All inference runs on-device — zero cost, zero data exposure
+- Context window is limited to 4096 tokens (smaller than cloud models)
+- Best suited for low-to-medium complexity tasks where privacy matters
+- Falls back to Ollama automatically when Apple Intelligence is unavailable
 
 ---
 
@@ -184,4 +122,4 @@ The default timeout for all providers is 30 seconds (`DEFAULT_PROVIDER_TIMEOUT_M
 
 ### Multiple Instances
 
-You can register multiple instances of the same vendor (e.g., two Ollama instances on different machines, or separate OpenAI registrations for different API keys). Each registration is a distinct provider with its own health tracking and usage audit.
+You can register multiple instances of the same vendor (e.g., two Ollama instances on different machines). Each registration is a distinct provider with its own health tracking and usage audit.

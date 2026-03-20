@@ -54,6 +54,8 @@ export async function runMigrations(pool: PoolLike): Promise<void> {
     '006_audit_events.sql',
     '007_adaptation_state.sql',
     '008_secret_store_and_rollback_snapshots.sql',
+    '009_plateau_signals.sql',
+    '010_execution_scoring_marker.sql',
   ];
 
   for (const file of files) {
@@ -66,6 +68,7 @@ export async function runMigrations(pool: PoolLike): Promise<void> {
 export async function truncateAll(pool: PoolLike): Promise<void> {
   await pool.query(`
     TRUNCATE
+      plateau_signals,
       auto_apply_decision_records,
       audit_events,
       adaptation_rollback_records,
@@ -73,7 +76,15 @@ export async function truncateAll(pool: PoolLike): Promise<void> {
       adaptation_approval_records,
       candidate_performance_states,
       family_selection_states,
-      escalation_tuning_states
+      escalation_tuning_states,
+      execution_records,
+      providers,
+      provider_health,
+      model_profiles,
+      tactic_profiles,
+      global_policies,
+      application_policies,
+      process_policies
     CASCADE
   `);
 }

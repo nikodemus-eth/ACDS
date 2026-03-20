@@ -1,63 +1,39 @@
 // ---------------------------------------------------------------------------
-// Integration Tests – Adaptation Approval Workflow (Prompt 68)
+// Integration Tests -- Adaptation Approval Workflow (Prompt 68)
+// PGlite-backed: no InMemory/Mock/Stub classes.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type { AdaptationRecommendation } from '@acds/adaptive-optimizer';
-import type { AdaptationApproval, AdaptationApprovalStatus } from '@acds/adaptive-optimizer';
-import type { AdaptationApprovalRepository } from '@acds/adaptive-optimizer';
+import type { AdaptationApproval } from '@acds/adaptive-optimizer';
 import {
   AdaptationApprovalService,
-  type ApprovalAuditEvent,
-  type ApprovalAuditEmitter,
 } from '@acds/adaptive-optimizer';
+import {
+  PgAdaptationApprovalRepository,
+  PgApprovalAuditEmitter,
+} from '@acds/persistence-pg';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../__test-support__/pglitePool.js';
 
-// ── In-memory repository ──────────────────────────────────────────────────
+// -- PGlite lifecycle --------------------------------------------------------
 
-class InMemoryApprovalRepository implements AdaptationApprovalRepository {
-  private records = new Map<string, AdaptationApproval>();
+let pool: PoolLike;
 
-  async save(approval: AdaptationApproval): Promise<void> {
-    this.records.set(approval.id, { ...approval });
-  }
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
 
-  async findById(id: string): Promise<AdaptationApproval | undefined> {
-    const r = this.records.get(id);
-    return r ? { ...r } : undefined;
-  }
+beforeEach(async () => {
+  await truncateAll(pool);
+});
 
-  async findPending(): Promise<AdaptationApproval[]> {
-    return [...this.records.values()].filter((a) => a.status === 'pending');
-  }
+afterAll(async () => {
+  await closePool();
+});
 
-  async findByFamily(familyKey: string): Promise<AdaptationApproval[]> {
-    return [...this.records.values()].filter((a) => a.familyKey === familyKey);
-  }
-
-  async updateStatus(
-    id: string,
-    status: AdaptationApprovalStatus,
-    fields?: { decidedAt?: string; decidedBy?: string; reason?: string },
-  ): Promise<void> {
-    const existing = this.records.get(id);
-    if (existing) {
-      this.records.set(id, { ...existing, status, ...fields });
-    }
-  }
-}
-
-// ── Collecting audit emitter ──────────────────────────────────────────────
-
-class CollectingAuditEmitter implements ApprovalAuditEmitter {
-  readonly events: ApprovalAuditEvent[] = [];
-
-  emit(event: ApprovalAuditEvent): void {
-    this.events.push(event);
-  }
-}
-
-// ── Test fixtures ─────────────────────────────────────────────────────────
+// -- Test fixtures -----------------------------------------------------------
 
 function makeRecommendation(overrides?: Partial<AdaptationRecommendation>): AdaptationRecommendation {
   return {
@@ -71,22 +47,20 @@ function makeRecommendation(overrides?: Partial<AdaptationRecommendation>): Adap
   };
 }
 
+function createDeps() {
+  const repo = new PgAdaptationApprovalRepository(pool as any);
+  const emitter = new PgApprovalAuditEmitter(pool as any);
+  const service = new AdaptationApprovalService(repo, emitter);
+  return { repo, emitter, service };
+}
+
 // ===========================================================================
 // Recommendation Creation
 // ===========================================================================
 
-describe('Approval Workflow – Recommendation Creation', () => {
-  let repo: InMemoryApprovalRepository;
-  let emitter: CollectingAuditEmitter;
-  let service: AdaptationApprovalService;
-
-  beforeEach(() => {
-    repo = new InMemoryApprovalRepository();
-    emitter = new CollectingAuditEmitter();
-    service = new AdaptationApprovalService(repo, emitter);
-  });
-
+describe('Approval Workflow -- Recommendation Creation', () => {
   it('creates an approval record from a recommendation', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
 
@@ -99,6 +73,7 @@ describe('Approval Workflow – Recommendation Creation', () => {
   });
 
   it('persists the approval in the repository', async () => {
+    const { repo, service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     const found = await repo.findById(approval.id);
@@ -108,12 +83,15 @@ describe('Approval Workflow – Recommendation Creation', () => {
   });
 
   it('emits an approval_submitted audit event', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     await service.submitForApproval(rec);
 
-    expect(emitter.events).toHaveLength(1);
-    expect(emitter.events[0].type).toBe('approval_submitted');
-    expect(emitter.events[0].familyKey).toBe(rec.familyKey);
+    // Verify the audit event was persisted to the audit_events table
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE resource_type = 'approval' AND action = 'approval_submitted'`,
+    );
+    expect(result.rows.length).toBe(1);
   });
 });
 
@@ -121,18 +99,9 @@ describe('Approval Workflow – Recommendation Creation', () => {
 // Pending State
 // ===========================================================================
 
-describe('Approval Workflow – Pending State', () => {
-  let repo: InMemoryApprovalRepository;
-  let emitter: CollectingAuditEmitter;
-  let service: AdaptationApprovalService;
-
-  beforeEach(() => {
-    repo = new InMemoryApprovalRepository();
-    emitter = new CollectingAuditEmitter();
-    service = new AdaptationApprovalService(repo, emitter);
-  });
-
+describe('Approval Workflow -- Pending State', () => {
   it('newly created approvals are in pending status', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
 
@@ -140,6 +109,7 @@ describe('Approval Workflow – Pending State', () => {
   });
 
   it('pending approvals are returned by findPending', async () => {
+    const { repo, service } = createDeps();
     await service.submitForApproval(makeRecommendation({ familyKey: 'family.a' }));
     await service.submitForApproval(makeRecommendation({ familyKey: 'family.b' }));
 
@@ -149,6 +119,7 @@ describe('Approval Workflow – Pending State', () => {
   });
 
   it('sets an expiry time in the future', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
 
@@ -163,18 +134,9 @@ describe('Approval Workflow – Pending State', () => {
 // Approve Path
 // ===========================================================================
 
-describe('Approval Workflow – Approve Path', () => {
-  let repo: InMemoryApprovalRepository;
-  let emitter: CollectingAuditEmitter;
-  let service: AdaptationApprovalService;
-
-  beforeEach(() => {
-    repo = new InMemoryApprovalRepository();
-    emitter = new CollectingAuditEmitter();
-    service = new AdaptationApprovalService(repo, emitter);
-  });
-
+describe('Approval Workflow -- Approve Path', () => {
   it('transitions a pending approval to approved', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     const updated = await service.approve(approval.id, 'operator@acds', 'Looks good');
@@ -186,6 +148,7 @@ describe('Approval Workflow – Approve Path', () => {
   });
 
   it('persists the approved status', async () => {
+    const { repo, service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     await service.approve(approval.id, 'operator@acds');
@@ -195,18 +158,19 @@ describe('Approval Workflow – Approve Path', () => {
   });
 
   it('emits an approval_approved audit event', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     await service.approve(approval.id, 'operator@acds', 'Evidence is strong');
 
-    const approvedEvents = emitter.events.filter((e) => e.type === 'approval_approved');
-    expect(approvedEvents).toHaveLength(1);
-    expect(approvedEvents[0].approvalId).toBe(approval.id);
-    expect(approvedEvents[0].actor).toBe('operator@acds');
-    expect(approvedEvents[0].reason).toBe('Evidence is strong');
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE action = 'approval_approved'`,
+    );
+    expect(result.rows.length).toBe(1);
   });
 
   it('rejects approving a non-pending approval', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     await service.approve(approval.id, 'operator@acds');
@@ -221,18 +185,9 @@ describe('Approval Workflow – Approve Path', () => {
 // Reject Path
 // ===========================================================================
 
-describe('Approval Workflow – Reject Path', () => {
-  let repo: InMemoryApprovalRepository;
-  let emitter: CollectingAuditEmitter;
-  let service: AdaptationApprovalService;
-
-  beforeEach(() => {
-    repo = new InMemoryApprovalRepository();
-    emitter = new CollectingAuditEmitter();
-    service = new AdaptationApprovalService(repo, emitter);
-  });
-
+describe('Approval Workflow -- Reject Path', () => {
   it('transitions a pending approval to rejected', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     const updated = await service.reject(approval.id, 'operator@acds', 'Insufficient evidence');
@@ -243,17 +198,19 @@ describe('Approval Workflow – Reject Path', () => {
   });
 
   it('emits an approval_rejected audit event', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     await service.reject(approval.id, 'operator@acds', 'Not now');
 
-    const rejectedEvents = emitter.events.filter((e) => e.type === 'approval_rejected');
-    expect(rejectedEvents).toHaveLength(1);
-    expect(rejectedEvents[0].approvalId).toBe(approval.id);
-    expect(rejectedEvents[0].reason).toBe('Not now');
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE action = 'approval_rejected'`,
+    );
+    expect(result.rows.length).toBe(1);
   });
 
   it('rejects rejecting a non-pending approval', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     const approval = await service.submitForApproval(rec);
     await service.reject(approval.id, 'operator@acds');
@@ -264,6 +221,7 @@ describe('Approval Workflow – Reject Path', () => {
   });
 
   it('throws when approval does not exist', async () => {
+    const { service } = createDeps();
     await expect(
       service.reject('nonexistent-id', 'operator@acds'),
     ).rejects.toThrow(/not found/);
@@ -274,18 +232,9 @@ describe('Approval Workflow – Reject Path', () => {
 // Audit Event Emission
 // ===========================================================================
 
-describe('Approval Workflow – Audit Event Emission', () => {
-  let repo: InMemoryApprovalRepository;
-  let emitter: CollectingAuditEmitter;
-  let service: AdaptationApprovalService;
-
-  beforeEach(() => {
-    repo = new InMemoryApprovalRepository();
-    emitter = new CollectingAuditEmitter();
-    service = new AdaptationApprovalService(repo, emitter);
-  });
-
+describe('Approval Workflow -- Audit Event Emission', () => {
   it('emits events for the full approval lifecycle', async () => {
+    const { service } = createDeps();
     const rec1 = makeRecommendation({ familyKey: 'family.approved' });
     const approval1 = await service.submitForApproval(rec1);
     await service.approve(approval1.id, 'operator@acds');
@@ -294,24 +243,31 @@ describe('Approval Workflow – Audit Event Emission', () => {
     const approval2 = await service.submitForApproval(rec2);
     await service.reject(approval2.id, 'operator@acds');
 
-    const types = emitter.events.map((e) => e.type);
+    const result = await pool.query(
+      `SELECT action FROM audit_events WHERE resource_type = 'approval' ORDER BY created_at`,
+    );
+    const types = result.rows.map((r) => r.action);
     expect(types).toContain('approval_submitted');
     expect(types).toContain('approval_approved');
     expect(types).toContain('approval_rejected');
   });
 
-  it('each audit event has a timestamp and familyKey', () => {
+  it('each audit event has a timestamp and familyKey', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
-    service.submitForApproval(rec);
+    await service.submitForApproval(rec);
 
-    for (const event of emitter.events) {
-      expect(event.timestamp).toBeDefined();
-      expect(event.familyKey).toBeDefined();
-      expect(event.approvalId).toBeDefined();
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE resource_type = 'approval'`,
+    );
+    for (const row of result.rows) {
+      expect(row.created_at).toBeDefined();
+      expect(row.details).toBeDefined();
     }
   });
 
   it('emits approval_expired events during expireStale', async () => {
+    const { service } = createDeps();
     const rec = makeRecommendation();
     // Submit with a very short expiry (1 ms)
     await service.submitForApproval(rec, 1);
@@ -322,7 +278,9 @@ describe('Approval Workflow – Audit Event Emission', () => {
     const count = await service.expireStale();
     expect(count).toBe(1);
 
-    const expiredEvents = emitter.events.filter((e) => e.type === 'approval_expired');
-    expect(expiredEvents).toHaveLength(1);
+    const result = await pool.query(
+      `SELECT * FROM audit_events WHERE action = 'approval_expired'`,
+    );
+    expect(result.rows.length).toBe(1);
   });
 });

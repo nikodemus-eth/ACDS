@@ -796,6 +796,70 @@ describe('Orchestrator fallback execution path', () => {
     expect(response.metadata.warnings).toContain('fallback-warning');
   });
 
+  it('fallback with onValidate hook returning no warnings omits warnings', async () => {
+    const registry = new SourceRegistry();
+    const ollamaProvider = {
+      id: 'ollama-local',
+      name: 'Ollama',
+      sourceClass: 'provider' as const,
+      deterministic: true,
+      localOnly: true,
+      providerClass: 'self_hosted' as const,
+      executionMode: 'local' as const,
+    };
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+    registry.registerProvider(ollamaProvider);
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new Error('unreachable'); },
+      async isAvailable() { return false; },
+      async healthCheck() { return { status: 'unavailable', latencyMs: 0 }; },
+    });
+    runtimes.set('ollama-local', makeFakeRuntime('ollama-local'));
+
+    const orchestrator = new RuntimeOrchestrator({
+      registry,
+      runtimes,
+      fallbackMap: {
+        'apple.foundation_models.summarize': {
+          fallbackProviderId: 'ollama-local',
+          fallbackMethodId: 'ollama.summarize',
+        },
+      },
+      onValidate: () => ({ validated: true, warnings: [] }),
+    });
+
+    const response = await orchestrator.executeTask('summarize this text', {
+      input: { text: 'hello' },
+    });
+
+    expect(response.metadata.validated).toBe(true);
+    expect(response.metadata.warnings).toBeUndefined();
+  });
+
+  it('executeTask with onValidate hook returning no warnings omits warnings', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', makeFakeRuntime('apple-intelligence-runtime'));
+
+    const orchestrator = new RuntimeOrchestrator({
+      registry,
+      runtimes,
+      onValidate: () => ({ validated: true, warnings: [] }),
+    });
+
+    const response = await orchestrator.executeTask('summarize this text', {
+      input: { text: 'hello' },
+    });
+
+    expect(response.metadata.validated).toBe(true);
+    expect(response.metadata.warnings).toBeUndefined();
+  });
+
   it('fallback with unavailable fallback runtime still throws', async () => {
     const registry = new SourceRegistry();
     const ollamaProvider = {
@@ -1092,5 +1156,198 @@ describe('Orchestrator error wrapping', () => {
     await expect(
       orchestrator.executeTask('summarize this text', { input: { text: 'hi' } }),
     ).rejects.toThrow(ProviderUnavailableError);
+  });
+
+  it('re-throws ACDSRuntimeError from fallback runtime.execute without wrapping', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+    registry.registerProvider({
+      id: 'ollama-local',
+      name: 'Ollama',
+      sourceClass: 'provider',
+      deterministic: true,
+      localOnly: true,
+      providerClass: 'self_hosted',
+      executionMode: 'local',
+    });
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new Error('unreachable'); },
+      async isAvailable() { return false; },
+      async healthCheck() { return { status: 'unavailable', latencyMs: 0 }; },
+    });
+    runtimes.set('ollama-local', {
+      providerId: 'ollama-local',
+      async execute() { throw new MethodNotAvailableError('ollama.summarize', 'ollama-local'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    });
+
+    const orchestrator = new RuntimeOrchestrator({
+      registry,
+      runtimes,
+      fallbackMap: {
+        'apple.foundation_models.summarize': {
+          fallbackProviderId: 'ollama-local',
+          fallbackMethodId: 'ollama.summarize',
+        },
+      },
+    });
+
+    await expect(
+      orchestrator.executeTask('summarize this text', { input: { text: 'hi' } }),
+    ).rejects.toThrow(MethodNotAvailableError);
+  });
+
+  it('re-throws ACDSRuntimeError from executeMethod without wrapping', async () => {
+    const registry = new SourceRegistry();
+    registry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const throwingRuntime: ProviderRuntime = {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new MethodNotAvailableError('apple.foundation_models.summarize', 'apple-intelligence-runtime'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    };
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', throwingRuntime);
+
+    const orchestrator = new RuntimeOrchestrator({ registry, runtimes });
+    await expect(
+      orchestrator.executeMethod({
+        providerId: 'apple-intelligence-runtime',
+        methodId: 'apple.foundation_models.summarize',
+        input: { text: 'hi' },
+      }),
+    ).rejects.toThrow(MethodNotAvailableError);
+  });
+});
+
+// ===========================================================================
+// CapabilityOrchestrator — uncovered branches
+// ===========================================================================
+describe('CapabilityOrchestrator — error re-throw and onValidate warnings', () => {
+  it('re-throws errors with code property from primary execution', async () => {
+    const { CapabilityOrchestrator } = await import('../../src/runtime/capability-orchestrator.js');
+    const { createDefaultCapabilityRegistry } = await import('../../src/registry/default-registry.js');
+
+    const capabilityRegistry = createDefaultCapabilityRegistry();
+    const sourceRegistry = new SourceRegistry();
+    sourceRegistry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const codedError = Object.assign(new Error('coded failure'), { code: 'ACDS_ERROR' });
+    const throwingRuntime: ProviderRuntime = {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw codedError; },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    };
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', throwingRuntime);
+
+    const orchestrator = new CapabilityOrchestrator({
+      capabilityRegistry,
+      sourceRegistry,
+      runtimes,
+    });
+
+    await expect(
+      orchestrator.request({
+        capability: 'text.summarize',
+        input: { text: 'hello' },
+      }),
+    ).rejects.toThrow('coded failure');
+  });
+
+  it('wraps non-coded errors from primary execution as ProviderUnavailableError', async () => {
+    const { CapabilityOrchestrator } = await import('../../src/runtime/capability-orchestrator.js');
+    const { createDefaultCapabilityRegistry } = await import('../../src/registry/default-registry.js');
+
+    const capabilityRegistry = createDefaultCapabilityRegistry();
+    const sourceRegistry = new SourceRegistry();
+    sourceRegistry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const throwingRuntime: ProviderRuntime = {
+      providerId: 'apple-intelligence-runtime',
+      async execute() { throw new TypeError('native crash'); },
+      async isAvailable() { return true; },
+      async healthCheck() { return { status: 'healthy', latencyMs: 1 }; },
+    };
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', throwingRuntime);
+
+    const orchestrator = new CapabilityOrchestrator({
+      capabilityRegistry,
+      sourceRegistry,
+      runtimes,
+    });
+
+    await expect(
+      orchestrator.request({
+        capability: 'text.summarize',
+        input: { text: 'hello' },
+      }),
+    ).rejects.toThrow(ProviderUnavailableError);
+  });
+
+  it('onValidate hook with warnings attaches them to response', async () => {
+    const { CapabilityOrchestrator } = await import('../../src/runtime/capability-orchestrator.js');
+    const { createDefaultCapabilityRegistry } = await import('../../src/registry/default-registry.js');
+    const { AppleRuntimeAdapter } = await import('../../src/providers/apple/apple-runtime-adapter.js');
+
+    const capabilityRegistry = createDefaultCapabilityRegistry();
+    const sourceRegistry = new SourceRegistry();
+    sourceRegistry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', new AppleRuntimeAdapter());
+
+    const orchestrator = new CapabilityOrchestrator({
+      capabilityRegistry,
+      sourceRegistry,
+      runtimes,
+      onValidate: () => ({ validated: true, warnings: ['cap-warning'] }),
+    });
+
+    const response = await orchestrator.request({
+      capability: 'text.summarize',
+      input: { text: 'hello world test' },
+    });
+
+    expect(response.metadata.validated).toBe(true);
+    expect(response.metadata.warnings).toContain('cap-warning');
+  });
+
+  it('onValidate hook with empty warnings omits warnings', async () => {
+    const { CapabilityOrchestrator } = await import('../../src/runtime/capability-orchestrator.js');
+    const { createDefaultCapabilityRegistry } = await import('../../src/registry/default-registry.js');
+    const { AppleRuntimeAdapter } = await import('../../src/providers/apple/apple-runtime-adapter.js');
+
+    const capabilityRegistry = createDefaultCapabilityRegistry();
+    const sourceRegistry = new SourceRegistry();
+    sourceRegistry.registerProvider(APPLE_RUNTIME_PROVIDER, APPLE_METHODS);
+
+    const runtimes = new Map<string, ProviderRuntime>();
+    runtimes.set('apple-intelligence-runtime', new AppleRuntimeAdapter());
+
+    const orchestrator = new CapabilityOrchestrator({
+      capabilityRegistry,
+      sourceRegistry,
+      runtimes,
+      onValidate: () => ({ validated: true, warnings: [] }),
+    });
+
+    const response = await orchestrator.request({
+      capability: 'text.summarize',
+      input: { text: 'hello world test' },
+    });
+
+    expect(response.metadata.validated).toBe(true);
+    expect(response.metadata.warnings).toBeUndefined();
   });
 });

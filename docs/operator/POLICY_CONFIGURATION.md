@@ -37,11 +37,11 @@ The global policy defines the system-wide baseline. There is exactly one active 
 
 ### Example
 
-A global policy that allows all vendors, prefers local execution, and requires structured output for high-grade tasks:
+A global policy that allows both vendors, prefers local execution, and requires structured output for high-grade tasks:
 
 ```json
 {
-  "allowedVendors": ["ollama", "lmstudio", "gemini", "openai"],
+  "allowedVendors": ["ollama", "apple"],
   "blockedVendors": [],
   "defaultPrivacy": "local_only",
   "defaultCostSensitivity": "medium",
@@ -79,13 +79,13 @@ Application policies provide per-application overrides. Each application (identi
 
 ### Example
 
-An application policy for Thingstead that restricts to local-only execution and blocks OpenAI:
+An application policy for Thingstead that restricts to Ollama-only execution:
 
 ```json
 {
   "application": "thingstead",
-  "allowedVendors": ["ollama", "lmstudio"],
-  "blockedVendors": ["openai"],
+  "allowedVendors": ["ollama"],
+  "blockedVendors": [],
   "privacyOverride": "local_only",
   "costSensitivityOverride": null,
   "preferredModelProfileIds": ["local_fast_advisory"],
@@ -117,15 +117,15 @@ Process policies provide the most granular control, applying to a specific proce
 
 ### Example
 
-A process policy that forces cloud providers for the `content_review` process in Process Swarm, and uses `draft_then_critique` tactic for the `final_review` step:
+A process policy that sets a preferred model for the `content_review` process in Process Swarm, and uses `draft_then_critique` tactic for the `final_review` step:
 
 ```json
 {
   "application": "process_swarm",
   "process": "content_review",
   "step": null,
-  "privacyOverride": "cloud_preferred",
-  "defaultModelProfileId": "cloud_frontier_reasoning",
+  "privacyOverride": "local_only",
+  "defaultModelProfileId": "local_frontier_reasoning",
   "defaultTacticProfileId": null,
   "enabled": true
 }
@@ -148,7 +148,7 @@ When a routing request arrives for `process_swarm / content_review / final_revie
 
 1. The global policy provides the baseline (all vendors allowed, `local_only` default, medium cost sensitivity).
 2. No application policy exists for `process_swarm` in this example, so global defaults carry through.
-3. The process-level policy for `content_review` overrides privacy to `cloud_preferred` and sets the default model profile to `cloud_frontier_reasoning`.
+3. The process-level policy for `content_review` overrides privacy to `local_only` and sets the default model profile to `local_frontier_reasoning`.
 4. The step-level policy for `final_review` adds the `draft_then_critique` tactic default and forces escalation for expert/frontier grades.
 
 The `PolicyMergeResolver` merges these layers into a single `EffectivePolicy` that the routing engine uses for eligibility computation and selection.

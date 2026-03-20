@@ -1,7 +1,5 @@
-import { mockRequest } from './mockApi';
-
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
+const ADMIN_SESSION_SECRET = import.meta.env.VITE_ADMIN_SESSION_SECRET ?? 'dev-secret';
 
 export interface ApiError {
   status: number;
@@ -34,26 +32,26 @@ function authHeaders(): Record<string, string> {
   if (token) {
     return { Authorization: `Bearer ${token}` };
   }
-  return {};
+  return { 'x-admin-session': ADMIN_SESSION_SECRET };
 }
 
 function buildUrl(path: string, params?: Record<string, string | undefined>): string {
-  const url = new URL(`${BASE_URL}${path}`);
+  let url = `${BASE_URL}${path}`;
   if (params) {
+    const searchParams = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') {
-        url.searchParams.set(key, value);
+        searchParams.set(key, value);
       }
     }
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
   }
-  return url.toString();
+  return url;
 }
 
 export const apiClient = {
   async get<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {
-    if (USE_MOCKS) {
-      return mockRequest<T>('GET', path, undefined, params);
-    }
     const url = buildUrl(path, params);
     const response = await fetch(url, {
       method: 'GET',
@@ -66,9 +64,6 @@ export const apiClient = {
   },
 
   async post<T>(path: string, body?: unknown): Promise<T> {
-    if (USE_MOCKS) {
-      return mockRequest<T>('POST', path, body);
-    }
     const response = await fetch(buildUrl(path), {
       method: 'POST',
       headers: {
@@ -82,9 +77,6 @@ export const apiClient = {
   },
 
   async put<T>(path: string, body?: unknown): Promise<T> {
-    if (USE_MOCKS) {
-      return mockRequest<T>('PUT', path, body);
-    }
     const response = await fetch(buildUrl(path), {
       method: 'PUT',
       headers: {
@@ -98,9 +90,6 @@ export const apiClient = {
   },
 
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    if (USE_MOCKS) {
-      return mockRequest<T>('PATCH', path, body);
-    }
     const response = await fetch(buildUrl(path), {
       method: 'PATCH',
       headers: {
@@ -114,9 +103,6 @@ export const apiClient = {
   },
 
   async delete<T>(path: string): Promise<T> {
-    if (USE_MOCKS) {
-      return mockRequest<T>('DELETE', path);
-    }
     const response = await fetch(buildUrl(path), {
       method: 'DELETE',
       headers: {

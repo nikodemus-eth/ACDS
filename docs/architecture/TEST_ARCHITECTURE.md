@@ -18,7 +18,7 @@ This is enforced by a simple rule: **`vi.fn()`, `vi.mock()`, `vi.stubGlobal()`, 
 
 **Location:** `packages/provider-adapters/src/__test-support__/TestHttpServer.ts`
 
-A lightweight `node:http` server that binds to port 0 (OS-assigned) on `127.0.0.1`. Used by all five adapter test files (Ollama, OpenAI, Gemini, LMStudio, Apple Intelligence).
+A lightweight `node:http` server that binds to port 0 (OS-assigned) on `127.0.0.1`. Used by the two adapter test files (Ollama, Apple Intelligence).
 
 ```typescript
 const server = new TestHttpServer();
@@ -47,7 +47,7 @@ Uses `@electric-sql/pglite` (in-process WASM Postgres) to provide a real Postgre
 
 ```typescript
 const pool = await createTestPool();    // Creates PGlite instance
-await runMigrations(pool);              // Runs all 8 migration SQL files
+await runMigrations(pool);              // Runs all 10 migration SQL files
 await truncateAll(pool);                // Truncates all tables between tests
 await closePool();                      // Cleans up
 ```

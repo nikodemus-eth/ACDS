@@ -1,5 +1,26 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { PoliciesController } from './PoliciesController.js';
+import { PgPolicyRepository } from '@acds/persistence-pg';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../../../../tests/__test-support__/pglitePool.js';
+
+// -- PGlite lifecycle --------------------------------------------------------
+
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+afterAll(async () => {
+  await closePool();
+});
+
+// -- Helpers -----------------------------------------------------------------
 
 function createReply() {
   return {
@@ -10,93 +31,80 @@ function createReply() {
   };
 }
 
+function createRepo(): PgPolicyRepository {
+  return new PgPolicyRepository(pool as any);
+}
+
 const now = new Date('2026-03-15T10:00:00Z');
 
-function makeGlobalPolicy(id = 'global-1') {
+const GLOBAL_ID   = '00000000-0000-0000-0000-000000000001';
+const APP_ID      = '00000000-0000-0000-0000-000000000002';
+const PROC_ID     = '00000000-0000-0000-0000-000000000003';
+const MISSING_ID  = '00000000-0000-0000-0000-00000000ffff';
+
+function makeGlobalPolicy(id = GLOBAL_ID) {
   return {
     id,
-    allowedVendors: ['openai'],
-    blockedVendors: [],
-    defaultPrivacy: 'cloud_allowed',
-    defaultCostSensitivity: 'medium',
-    structuredOutputRequiredForGrades: [],
-    traceabilityRequiredForGrades: [],
-    maxLatencyMsByLoadTier: {},
-    localPreferredTaskTypes: [],
-    cloudRequiredLoadTiers: [],
+    allowedVendors: ['openai'] as any[],
+    blockedVendors: [] as any[],
+    defaultPrivacy: 'cloud_allowed' as const,
+    defaultCostSensitivity: 'medium' as const,
+    structuredOutputRequiredForGrades: [] as any[],
+    traceabilityRequiredForGrades: [] as any[],
+    maxLatencyMsByLoadTier: {} as Record<string, any>,
+    localPreferredTaskTypes: [] as any[],
+    cloudRequiredLoadTiers: [] as any[],
     enabled: true,
     updatedAt: now,
   };
 }
 
-function makeAppPolicy(id = 'app-1') {
+function makeAppPolicy(id = APP_ID) {
   return {
     id,
     application: 'test_app',
-    allowedVendors: ['openai'],
-    blockedVendors: null,
-    privacyOverride: null,
-    costSensitivityOverride: null,
-    preferredModelProfileIds: null,
-    blockedModelProfileIds: null,
-    localPreferredTaskTypes: null,
-    structuredOutputRequiredForGrades: null,
+    allowedVendors: ['openai'] as any[] | null,
+    blockedVendors: null as any[] | null,
+    privacyOverride: null as any,
+    costSensitivityOverride: null as any,
+    preferredModelProfileIds: null as any[] | null,
+    blockedModelProfileIds: null as any[] | null,
+    localPreferredTaskTypes: null as any[] | null,
+    structuredOutputRequiredForGrades: null as any[] | null,
     enabled: true,
     updatedAt: now,
   };
 }
 
-function makeProcPolicy(id = 'proc-1') {
+function makeProcPolicy(id = PROC_ID) {
   return {
     id,
     application: 'test_app',
     process: 'review',
-    step: null,
-    defaultModelProfileId: null,
-    defaultTacticProfileId: null,
-    allowedModelProfileIds: null,
-    blockedModelProfileIds: null,
-    allowedTacticProfileIds: null,
-    privacyOverride: null,
-    costSensitivityOverride: null,
-    forceEscalationForGrades: null,
+    step: null as string | null,
+    defaultModelProfileId: null as string | null,
+    defaultTacticProfileId: null as string | null,
+    allowedModelProfileIds: null as any[] | null,
+    blockedModelProfileIds: null as any[] | null,
+    allowedTacticProfileIds: null as any[] | null,
+    privacyOverride: null as any,
+    costSensitivityOverride: null as any,
+    forceEscalationForGrades: null as any[] | null,
     enabled: true,
     updatedAt: now,
   };
 }
 
-class InMemoryPolicyRepo {
-  private global: any | null = null;
-  private apps = new Map<string, any>();
-  private procs = new Map<string, any>();
-
-  constructor(options: { global?: any; apps?: any[]; procs?: any[] } = {}) {
-    this.global = options.global ?? null;
-    for (const a of options.apps ?? []) this.apps.set(a.id, a);
-    for (const p of options.procs ?? []) this.procs.set(p.id, p);
-  }
-
-  async getGlobalPolicy() { return this.global; }
-  async listApplicationPolicies() { return [...this.apps.values()]; }
-  async listProcessPolicies() { return [...this.procs.values()]; }
-  async findApplicationPolicyById(id: string) { return this.apps.get(id) ?? null; }
-  async findProcessPolicyById(id: string) { return this.procs.get(id) ?? null; }
-  async saveGlobalPolicy(p: any) { this.global = p; }
-  async saveApplicationPolicy(p: any) { this.apps.set(p.id, p); }
-  async saveProcessPolicy(p: any) { this.procs.set(p.id, p); }
-  async deleteApplicationPolicy(id: string) { this.apps.delete(id); }
-  async deleteProcessPolicy(id: string) { this.procs.delete(id); }
-}
+// -- Tests -------------------------------------------------------------------
 
 describe('PoliciesController', () => {
   describe('list', () => {
     it('returns all levels when no filter', async () => {
-      const repo = new InMemoryPolicyRepo({
-        global: makeGlobalPolicy(),
-        apps: [makeAppPolicy()],
-        procs: [makeProcPolicy()],
-      });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy());
+      await repo.saveApplicationPolicy(makeAppPolicy());
+      await repo.saveProcessPolicy(makeProcPolicy());
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.list({ query: {} } as any, reply as any);
 
@@ -106,12 +114,11 @@ describe('PoliciesController', () => {
     });
 
     it('filters to global level only', async () => {
-      const repo = new InMemoryPolicyRepo({
-        global: makeGlobalPolicy(),
-        apps: [makeAppPolicy()],
-        procs: [makeProcPolicy()],
-      });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy());
+      await repo.saveApplicationPolicy(makeAppPolicy());
+      await repo.saveProcessPolicy(makeProcPolicy());
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.list({ query: { level: 'global' } } as any, reply as any);
 
@@ -121,12 +128,11 @@ describe('PoliciesController', () => {
     });
 
     it('filters to application level only', async () => {
-      const repo = new InMemoryPolicyRepo({
-        global: makeGlobalPolicy(),
-        apps: [makeAppPolicy()],
-        procs: [makeProcPolicy()],
-      });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy());
+      await repo.saveApplicationPolicy(makeAppPolicy());
+      await repo.saveProcessPolicy(makeProcPolicy());
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.list({ query: { level: 'application' } } as any, reply as any);
 
@@ -136,12 +142,11 @@ describe('PoliciesController', () => {
     });
 
     it('filters to process level only', async () => {
-      const repo = new InMemoryPolicyRepo({
-        global: makeGlobalPolicy(),
-        apps: [makeAppPolicy()],
-        procs: [makeProcPolicy()],
-      });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy());
+      await repo.saveApplicationPolicy(makeAppPolicy());
+      await repo.saveProcessPolicy(makeProcPolicy());
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.list({ query: { level: 'process' } } as any, reply as any);
 
@@ -153,42 +158,45 @@ describe('PoliciesController', () => {
 
   describe('getById', () => {
     it('returns global policy when id matches', async () => {
-      const repo = new InMemoryPolicyRepo({ global: makeGlobalPolicy('g1') });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy(GLOBAL_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.getById({ params: { id: 'g1' } } as any, reply as any);
+      await controller.getById({ params: { id: GLOBAL_ID } } as any, reply as any);
       expect((reply.body as any).level).toBe('global');
     });
 
     it('returns application policy when id matches', async () => {
-      const repo = new InMemoryPolicyRepo({ apps: [makeAppPolicy('a1')] });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveApplicationPolicy(makeAppPolicy(APP_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.getById({ params: { id: 'a1' } } as any, reply as any);
+      await controller.getById({ params: { id: APP_ID } } as any, reply as any);
       expect((reply.body as any).level).toBe('application');
     });
 
     it('returns process policy when id matches', async () => {
-      const repo = new InMemoryPolicyRepo({ procs: [makeProcPolicy('p1')] });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveProcessPolicy(makeProcPolicy(PROC_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.getById({ params: { id: 'p1' } } as any, reply as any);
+      await controller.getById({ params: { id: PROC_ID } } as any, reply as any);
       expect((reply.body as any).level).toBe('process');
     });
 
     it('returns 404 when not found', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.getById({ params: { id: 'missing' } } as any, reply as any);
+      await controller.getById({ params: { id: MISSING_ID } } as any, reply as any);
       expect(reply.statusCode).toBe(404);
     });
   });
 
   describe('create', () => {
     it('creates a global policy', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.create({
         body: { level: 'global', allowedVendors: ['openai'] },
@@ -198,8 +206,8 @@ describe('PoliciesController', () => {
     });
 
     it('creates an application policy', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.create({
         body: { level: 'application', application: 'myapp' },
@@ -210,8 +218,8 @@ describe('PoliciesController', () => {
     });
 
     it('creates a process policy', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.create({
         body: { level: 'process', application: 'app', process: 'proc' },
@@ -221,8 +229,8 @@ describe('PoliciesController', () => {
     });
 
     it('uses defaults for missing fields', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.create({
         body: { level: 'process' },
@@ -235,22 +243,24 @@ describe('PoliciesController', () => {
 
   describe('update', () => {
     it('updates a global policy', async () => {
-      const repo = new InMemoryPolicyRepo({ global: makeGlobalPolicy('g1') });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy(GLOBAL_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.update({
-        params: { id: 'g1' },
+        params: { id: GLOBAL_ID },
         body: { level: 'global', allowedVendors: ['anthropic'] },
       } as any, reply as any);
       expect(reply.statusCode).toBe(200);
     });
 
     it('updates an application policy', async () => {
-      const repo = new InMemoryPolicyRepo({ apps: [makeAppPolicy('a1')] });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveApplicationPolicy(makeAppPolicy(APP_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.update({
-        params: { id: 'a1' },
+        params: { id: APP_ID },
         body: { level: 'application', application: 'updated_app' },
       } as any, reply as any);
       expect(reply.statusCode).toBe(200);
@@ -258,11 +268,12 @@ describe('PoliciesController', () => {
     });
 
     it('updates a process policy', async () => {
-      const repo = new InMemoryPolicyRepo({ procs: [makeProcPolicy('p1')] });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveProcessPolicy(makeProcPolicy(PROC_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.update({
-        params: { id: 'p1' },
+        params: { id: PROC_ID },
         body: { level: 'process', process: 'updated_proc' },
       } as any, reply as any);
       expect(reply.statusCode).toBe(200);
@@ -270,11 +281,11 @@ describe('PoliciesController', () => {
     });
 
     it('returns 404 when policy not found', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
       await controller.update({
-        params: { id: 'missing' },
+        params: { id: MISSING_ID },
         body: { level: 'global' },
       } as any, reply as any);
       expect(reply.statusCode).toBe(404);
@@ -283,34 +294,37 @@ describe('PoliciesController', () => {
 
   describe('remove', () => {
     it('returns 404 when not found', async () => {
-      const repo = new InMemoryPolicyRepo();
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.remove({ params: { id: 'missing' } } as any, reply as any);
+      await controller.remove({ params: { id: MISSING_ID } } as any, reply as any);
       expect(reply.statusCode).toBe(404);
     });
 
     it('returns 405 for global policy', async () => {
-      const repo = new InMemoryPolicyRepo({ global: makeGlobalPolicy('g1') });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveGlobalPolicy(makeGlobalPolicy(GLOBAL_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.remove({ params: { id: 'g1' } } as any, reply as any);
+      await controller.remove({ params: { id: GLOBAL_ID } } as any, reply as any);
       expect(reply.statusCode).toBe(405);
     });
 
     it('deletes application policy with 204', async () => {
-      const repo = new InMemoryPolicyRepo({ apps: [makeAppPolicy('a1')] });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveApplicationPolicy(makeAppPolicy(APP_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.remove({ params: { id: 'a1' } } as any, reply as any);
+      await controller.remove({ params: { id: APP_ID } } as any, reply as any);
       expect(reply.statusCode).toBe(204);
     });
 
     it('deletes process policy with 204', async () => {
-      const repo = new InMemoryPolicyRepo({ procs: [makeProcPolicy('p1')] });
-      const controller = new PoliciesController(repo as any);
+      const repo = createRepo();
+      await repo.saveProcessPolicy(makeProcPolicy(PROC_ID));
+      const controller = new PoliciesController(repo);
       const reply = createReply();
-      await controller.remove({ params: { id: 'p1' } } as any, reply as any);
+      await controller.remove({ params: { id: PROC_ID } } as any, reply as any);
       expect(reply.statusCode).toBe(204);
     });
   });

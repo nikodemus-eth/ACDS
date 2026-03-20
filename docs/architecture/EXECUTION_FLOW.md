@@ -59,12 +59,12 @@ The `DispatchRunService` in `execution-orchestrator` takes the `RoutingDecision`
 
 The `ProviderExecutionProxy` in `provider-broker`:
 
-1. Resolves the correct adapter via `AdapterResolver` (matching the provider's vendor to the appropriate adapter: Ollama, LM Studio, Gemini, or OpenAI).
+1. Resolves the correct adapter via `AdapterResolver` (matching the provider's vendor to the appropriate adapter: Ollama or Apple Intelligence).
 2. Normalizes the request into the adapter's expected format.
 3. Executes the request through the adapter.
 4. Returns the raw response.
 
-Each adapter (`OllamaAdapter`, `LMStudioAdapter`, `GeminiAdapter`, `OpenAIAdapter`) handles vendor-specific protocol details, including authentication, request mapping via its `Mapper`, and response parsing.
+Each adapter (`OllamaAdapter`, `AppleIntelligenceAdapter`) handles vendor-specific protocol details, including request mapping via its `Mapper`, and response parsing.
 
 ## Step 4: Fallback Handling
 

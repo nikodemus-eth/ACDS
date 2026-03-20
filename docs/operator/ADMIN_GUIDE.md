@@ -40,9 +40,9 @@ The list view shows:
 
 Click the add button to open the provider form. Required fields:
 
-- **Name** -- Human-readable identifier such as `Local Ollama` or `Production OpenAI`
-- **Vendor** -- Ollama, LM Studio, Gemini, or OpenAI
-- **Auth Type** -- None for local providers, API key or token-based auth for cloud providers
+- **Name** -- Human-readable identifier such as `Local Ollama` or `Apple Intelligence`
+- **Vendor** -- Ollama or Apple Intelligence
+- **Auth Type** -- None (both vendors are local providers)
 - **Base URL** -- Provider endpoint
 - **Environment** -- Development, staging, or production label for operator clarity
 - **Secret** -- Only supplied during create; encrypted before storage

@@ -19,7 +19,7 @@ ACDS routes cognitive work to the best available provider based on task requirem
 3. **Maximum privacy**: For privacy-sensitive tasks (medical, financial, personal), on-device inference eliminates data exposure entirely
 4. **Availability**: Present on every modern Mac — no setup, no Docker, no model downloads
 
-This makes Apple Intelligence the ideal default for low-to-medium complexity tasks on macOS workstations, complementing Ollama/LMStudio for custom models and cloud providers for frontier capabilities.
+This makes Apple Intelligence the ideal default for low-to-medium complexity tasks on macOS workstations, complementing Ollama for custom open-source models.
 
 ## Bridge Architecture
 
@@ -35,7 +35,7 @@ The bridge is a lightweight Swift HTTP server that:
 - Translates ACDS adapter requests into Foundation Models API calls
 - Returns structured responses matching the ACDS `AdapterResponse` contract
 
-This is the same pattern used by Ollama (`localhost:11434`) and LMStudio (`localhost:1234`) — ACDS already knows how to talk to local services over HTTP.
+This is the same pattern used by Ollama (`localhost:11434`) — ACDS already knows how to talk to local services over HTTP.
 
 ## Security Model
 
@@ -72,8 +72,8 @@ Three seed profiles are provided:
 | Profile | Model | Task Types | Grade | Use Case |
 |---------|-------|-----------|-------|----------|
 | `apple_local_fast` | apple-fm-fast | classification, extraction, summarization | BASIC | Quick classification and extraction |
-| `apple_local_structured` | apple-fm-structured | extraction, decision_support, generation | STANDARD | Structured output tasks |
-| `apple_local_reasoning_lite` | apple-fm-reasoning | decision_support, summarization, generation | ENHANCED | Lightweight reasoning |
+| `apple_local_structured` | apple-fm-structured | extraction, decision_support, creative | STANDARD | Structured output tasks |
+| `apple_local_reasoning_lite` | apple-fm-reasoning | decision_support, summarization, creative | ENHANCED | Lightweight reasoning |
 
 All profiles are `localOnly: true, cloudAllowed: false` with zero cost.
 

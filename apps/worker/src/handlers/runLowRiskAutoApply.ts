@@ -3,8 +3,7 @@
  * in auto_apply mode and applies them via LowRiskAutoApplyService when
  * the family qualifies as low-risk.
  *
- * In a full implementation, the repository instances would be injected
- * via a DI container.
+ * All repositories are backed by PostgreSQL via the shared worker pool.
  */
 
 import type {
@@ -22,8 +21,10 @@ import {
   type FamilyRiskLevel,
 } from '@acds/adaptive-optimizer';
 import { rankCandidates } from '@acds/adaptive-optimizer';
-import { getSharedOptimizerStateRepository } from '../repositories/InMemoryOptimizerStateRepository.js';
-import { getAdaptationRecommendationRepository, getAdaptiveModeProvider as getSharedModeProvider } from './runAdaptationRecommendations.js';
+import type { Pool } from '@acds/persistence-pg';
+import { getSharedOptimizerStateRepository } from '../repositories/workerOptimizerStateRepository.js';
+import { getWorkerPool } from '../repositories/createWorkerPool.js';
+import { getAdaptiveModeProvider as getSharedModeProvider } from './runAdaptationRecommendations.js';
 
 // ── Abstract reader interfaces ─────────────────────────────────────────────
 
@@ -132,14 +133,30 @@ function getOptimizerStateRepository() {
   return getSharedOptimizerStateRepository();
 }
 
-class InMemoryPendingRecommendationReader implements PendingRecommendationReader {
+// ── PG-backed PendingRecommendationReader ──────────────────────────────────
+
+class PgPendingRecommendationReader implements PendingRecommendationReader {
+  constructor(private readonly pool: Pool) {}
+
   async listPendingForAutoApply(): Promise<AdaptationRecommendation[]> {
-    return getAdaptationRecommendationRepository().getPending();
+    const result = await this.pool.query(
+      `SELECT * FROM adaptation_approval_records
+       WHERE status = 'pending'
+       ORDER BY submitted_at DESC`,
+    );
+    return result.rows.map((r: Record<string, unknown>) => ({
+      id: r.recommendation_id as string,
+      familyKey: r.family_key as string,
+      recommendedRanking: [],
+      evidence: (r.reason as string) ?? '',
+      status: (r.status as AdaptationRecommendation['status']) ?? 'pending',
+      createdAt: r.submitted_at as string,
+    }));
   }
 }
 
 function getPendingRecommendationReader(): PendingRecommendationReader {
-  return new InMemoryPendingRecommendationReader();
+  return pendingReader;
 }
 
 function getAdaptiveModeProvider(): AdaptiveModeProvider {
@@ -147,41 +164,35 @@ function getAdaptiveModeProvider(): AdaptiveModeProvider {
 }
 
 /**
- * Default risk provider — classifies all families as low-risk.
- * In a database-backed setup, this would read from a risk classification table.
+ * StaticFamilyRiskProvider - Classifies all families as low-risk.
+ * This is a legitimate policy default for systems where risk
+ * classification has not been configured per-family.
  */
-class DefaultFamilyRiskProvider implements FamilyRiskProvider {
+class StaticFamilyRiskProvider implements FamilyRiskProvider {
   async getRiskLevel(_familyKey: string): Promise<FamilyRiskLevel> {
     return 'low';
   }
 }
 
 /**
- * Default posture provider — returns 'advisory' for all families.
- * In a database-backed setup, this would read the family's configured posture.
+ * StaticFamilyPostureProvider - Returns 'advisory' for all families.
+ * This is a legitimate policy default for systems where posture
+ * has not been configured per-family.
  */
-class DefaultFamilyPostureProvider implements FamilyPostureProvider {
+class StaticFamilyPostureProvider implements FamilyPostureProvider {
   async getPosture(_familyKey: string): Promise<string> {
     return 'advisory';
   }
 }
 
 class PgRecentFailureCounter implements RecentFailureCounter {
+  constructor(private readonly pool: Pool) {}
+
   async countRecentFailures(familyKey: string): Promise<number> {
-    const { createPool } = await import('@acds/persistence-pg');
-    const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
-    const pool = createPool({
-      host: databaseUrl.hostname,
-      port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
-      database: databaseUrl.pathname.replace(/^\//, ''),
-      user: decodeURIComponent(databaseUrl.username),
-      password: decodeURIComponent(databaseUrl.password),
-      ssl: databaseUrl.searchParams.get('sslmode') === 'require',
-    });
-    const result = await pool.query(
+    const result = await this.pool.query(
       `SELECT COUNT(*) AS count FROM execution_records
        WHERE status = 'failed'
-         AND routing_request->>'application' = $1
+         AND application = $1
          AND created_at > NOW() - INTERVAL '1 hour'`,
       [familyKey.split(':')[0]],
     );
@@ -190,18 +201,10 @@ class PgRecentFailureCounter implements RecentFailureCounter {
 }
 
 class PgAutoApplyDecisionWriter implements AutoApplyDecisionWriter {
+  constructor(private readonly pool: Pool) {}
+
   async save(record: AutoApplyDecisionRecord): Promise<void> {
-    const { createPool } = await import('@acds/persistence-pg');
-    const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
-    const pool = createPool({
-      host: databaseUrl.hostname,
-      port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
-      database: databaseUrl.pathname.replace(/^\//, ''),
-      user: decodeURIComponent(databaseUrl.username),
-      password: decodeURIComponent(databaseUrl.password),
-      ssl: databaseUrl.searchParams.get('sslmode') === 'require',
-    });
-    await pool.query(
+    await this.pool.query(
       `INSERT INTO auto_apply_decision_records (id, family_key, previous_ranking, new_ranking, reason, mode, risk_basis, applied_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
@@ -240,10 +243,14 @@ class OptimizerStateAutoApplyApplier implements AutoApplyStateApplier {
   }
 }
 
-const riskProvider = new DefaultFamilyRiskProvider();
-const postureProvider = new DefaultFamilyPostureProvider();
-const failureCounter = new PgRecentFailureCounter();
-const decisionWriter = new PgAutoApplyDecisionWriter();
+// ── Singleton instances ───────────────────────────────────────────────────
+
+const pool = getWorkerPool();
+const pendingReader = new PgPendingRecommendationReader(pool);
+const riskProvider = new StaticFamilyRiskProvider();
+const postureProvider = new StaticFamilyPostureProvider();
+const failureCounter = new PgRecentFailureCounter(pool);
+const decisionWriter = new PgAutoApplyDecisionWriter(pool);
 const autoApplyStateApplier = new OptimizerStateAutoApplyApplier(getSharedOptimizerStateRepository());
 
 function getFamilyRiskProvider(): FamilyRiskProvider {

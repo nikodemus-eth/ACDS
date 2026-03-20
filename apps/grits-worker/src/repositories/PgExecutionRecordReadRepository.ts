@@ -1,60 +1,17 @@
 import type { ExecutionRecordReadRepository } from '@acds/grits';
 import type { ExecutionRecord } from '@acds/core-types';
-import { createPool } from '@acds/persistence-pg';
-
-// ---------------------------------------------------------------------------
-// InMemory implementation (used by tests)
-// ---------------------------------------------------------------------------
-
-export class InMemoryExecutionRecordReadRepository implements ExecutionRecordReadRepository {
-  private readonly records: ExecutionRecord[] = [];
-
-  addRecord(record: ExecutionRecord): void {
-    this.records.push(record);
-  }
-
-  async findById(id: string): Promise<ExecutionRecord | undefined> {
-    return this.records.find((r) => r.id === id);
-  }
-
-  async findByTimeRange(since: string, until: string, limit?: number): Promise<ExecutionRecord[]> {
-    const sinceDate = new Date(since);
-    const untilDate = new Date(until);
-    const matching = this.records.filter(
-      (r) => r.createdAt >= sinceDate && r.createdAt <= untilDate,
-    );
-    return limit ? matching.slice(0, limit) : matching;
-  }
-
-  async findByFamily(familyKey: string, limit?: number): Promise<ExecutionRecord[]> {
-    const matching = this.records.filter(
-      (r) => `${r.executionFamily.application}/${r.executionFamily.process}/${r.executionFamily.step}` === familyKey,
-    );
-    return limit ? matching.slice(0, limit) : matching;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Pg implementation (production)
-// ---------------------------------------------------------------------------
-
-function createWorkerPool() {
-  const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
-  return createPool({
-    host: databaseUrl.hostname,
-    port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
-    database: databaseUrl.pathname.replace(/^\//, ''),
-    user: decodeURIComponent(databaseUrl.username),
-    password: decodeURIComponent(databaseUrl.password),
-    ssl: databaseUrl.searchParams.get('sslmode') === 'require',
-  });
-}
-
-const pool = createWorkerPool();
+import type { Pool } from '@acds/persistence-pg';
+import { getGritsPool } from './createGritsPool.js';
 
 export class PgExecutionRecordReadRepository implements ExecutionRecordReadRepository {
+  private readonly pool: Pool;
+
+  constructor(pool?: Pool) {
+    this.pool = pool ?? getGritsPool();
+  }
+
   async findById(id: string): Promise<ExecutionRecord | undefined> {
-    const result = await pool.query(
+    const result = await this.pool.query(
       'SELECT * FROM execution_records WHERE id = $1',
       [id],
     );
@@ -62,7 +19,7 @@ export class PgExecutionRecordReadRepository implements ExecutionRecordReadRepos
   }
 
   async findByTimeRange(since: string, until: string, limit?: number): Promise<ExecutionRecord[]> {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `SELECT * FROM execution_records
        WHERE created_at >= $1 AND created_at <= $2
        ORDER BY created_at DESC
@@ -78,7 +35,7 @@ export class PgExecutionRecordReadRepository implements ExecutionRecordReadRepos
     const process = parts[1] ?? '';
     const step = parts[2] ?? '';
 
-    const result = await pool.query(
+    const result = await this.pool.query(
       `SELECT * FROM execution_records
        WHERE application = $1 AND process = $2 AND step = $3
        ORDER BY created_at DESC

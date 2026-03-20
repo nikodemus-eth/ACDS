@@ -23,7 +23,7 @@ Core provider registration. Every inference endpoint in the system.
 |--------|------|-------------|-------------|
 | id | UUID | PK | Unique provider identifier |
 | name | VARCHAR | NOT NULL | Human-readable name |
-| vendor | VARCHAR | NOT NULL | ProviderVendor enum: `ollama`, `lmstudio`, `gemini`, `openai`, `apple` |
+| vendor | VARCHAR | NOT NULL | ProviderVendor enum: `ollama`, `apple` |
 | auth_type | VARCHAR | NOT NULL | AuthType enum: `none`, `api_key`, `bearer_token`, `custom` |
 | base_url | VARCHAR | NOT NULL | API endpoint URL |
 | enabled | BOOLEAN | NOT NULL | Active status |
@@ -381,7 +381,7 @@ Three mutually exclusive source classes. The `sourceClass` field is the discrimi
 
 | Field | Type | Description |
 |-------|------|-------------|
-| id | string | e.g. `openai-api` |
+| id | string | e.g. `ollama-api` |
 | name | string | |
 | sourceClass | `'capability'` | Discriminant |
 | deterministic | `false` (literal) | Always non-deterministic |
@@ -392,7 +392,7 @@ Three mutually exclusive source classes. The `sourceClass` field is the discrimi
 
 | Field | Type | Description |
 |-------|------|-------------|
-| id | string | e.g. `openai-session` |
+| id | string | e.g. `ollama-session` |
 | name | string | |
 | sourceClass | `'session'` | Discriminant |
 | explicitInvocationRequired | `true` (literal) | Never default-routed |
@@ -469,7 +469,7 @@ Each method registered to a provider. This is the routing unit — ACDS routes t
 
 | Enum | Values | Used By |
 |------|--------|---------|
-| ProviderVendor | `ollama`, `lmstudio`, `gemini`, `openai`, `apple` | Provider, ModelProfile |
+| ProviderVendor | `ollama`, `apple` | Provider, ModelProfile |
 | AuthType | `none`, `api_key`, `bearer_token`, `custom` | Provider |
 | TaskType | `creative`, `analytical`, `extraction`, `classification`, `summarization`, `generation`, `reasoning`, `coding`, `decision_support`, `transformation`, `critique`, `planning`, `retrieval_synthesis` | ModelProfile, TacticProfile, Policies |
 | LoadTier | `single_shot`, `batch`, `streaming`, `high_throughput` | ModelProfile, TacticProfile, Policies |

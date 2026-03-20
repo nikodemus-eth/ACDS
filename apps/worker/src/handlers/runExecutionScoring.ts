@@ -2,14 +2,14 @@
  * runExecutionScoring - Fetches recent unscored executions and scores
  * each via the ExecutionEvaluationBridge.
  *
- * In a full implementation, the repository instances would be injected
- * via a DI container. For the MVP, they are constructed inline using
- * environment-driven configuration.
+ * All repositories are backed by PostgreSQL via the shared worker pool.
  */
 
 import type { ExecutionOutcome } from '@acds/execution-orchestrator';
 import { evaluateOutcome } from '@acds/execution-orchestrator';
 import type { ExecutionScore } from '@acds/evaluation';
+import type { Pool } from '@acds/persistence-pg';
+import { getWorkerPool } from '../repositories/createWorkerPool.js';
 
 // ── Abstract repository interface ─────────────────────────────────────────
 
@@ -67,36 +67,62 @@ export async function runExecutionScoring(): Promise<void> {
   }
 }
 
-/**
- * In-memory UnscoredExecutionRepository.
- *
- * Stores execution outcomes and scores in memory. Outcomes are submitted
- * via `submitOutcome` (called by the ExecutionOutcomePublisher bridge)
- * and consumed by `fetchUnscored`.
- */
-class InMemoryUnscoredExecutionRepository implements UnscoredExecutionRepository {
-  private readonly unscored: ExecutionOutcome[] = [];
-  private readonly scored = new Map<string, ExecutionScore>();
+// ── PG-backed UnscoredExecutionRepository ─────────────────────────────────
 
-  submitOutcome(outcome: ExecutionOutcome): void {
-    this.unscored.push(outcome);
-  }
+class PgUnscoredExecutionRepository implements UnscoredExecutionRepository {
+  constructor(private readonly pool: Pool) {}
 
   async fetchUnscored(limit: number): Promise<ExecutionOutcome[]> {
-    return this.unscored.splice(0, limit);
+    const result = await this.pool.query(
+      `SELECT
+         id,
+         application,
+         process,
+         step,
+         status,
+         COALESCE(latency_ms, 0) AS latency_ms,
+         normalized_output,
+         selected_model_profile_id,
+         input_tokens,
+         output_tokens,
+         cost_estimate,
+         created_at
+       FROM execution_records
+       WHERE scored_at IS NULL
+         AND status IN ('succeeded', 'failed')
+       ORDER BY created_at ASC
+       LIMIT $1`,
+      [limit],
+    );
+
+    return result.rows.map((r: Record<string, unknown>) => ({
+      executionId: r.id as string,
+      familyKey: `${r.application}:${r.process}:${r.step}`,
+      status: r.status === 'succeeded' ? ('success' as const) : ('failure' as const),
+      latencyMs: Number(r.latency_ms),
+      adapterResponseSummary: {
+        modelProfileId: r.selected_model_profile_id,
+        inputTokens: r.input_tokens,
+        outputTokens: r.output_tokens,
+        costEstimate: r.cost_estimate != null ? Number(r.cost_estimate) : undefined,
+        normalizedOutput: r.normalized_output,
+      },
+      timestamp: (r.created_at as Date).toISOString(),
+    }));
   }
 
-  async markScored(executionId: string, score: ExecutionScore): Promise<void> {
-    this.scored.set(executionId, score);
-  }
-
-  getScore(executionId: string): ExecutionScore | undefined {
-    return this.scored.get(executionId);
+  async markScored(executionId: string, _score: ExecutionScore): Promise<void> {
+    await this.pool.query(
+      `UPDATE execution_records SET scored_at = NOW() WHERE id = $1`,
+      [executionId],
+    );
   }
 }
 
-const unscoredRepo = new InMemoryUnscoredExecutionRepository();
+// ── Singleton instance ────────────────────────────────────────────────────
 
-export function getUnscoredExecutionRepository(): UnscoredExecutionRepository & { submitOutcome(outcome: ExecutionOutcome): void } {
+const unscoredRepo = new PgUnscoredExecutionRepository(getWorkerPool());
+
+export function getUnscoredExecutionRepository(): UnscoredExecutionRepository {
   return unscoredRepo;
 }

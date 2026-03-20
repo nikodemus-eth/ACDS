@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Ollama Local",
+    "vendor": "ollama",
+    "authType": "none",
+    "baseUrl": "http://localhost:11434",
+    "environment": "local"
+  },
+  {
+    "name": "Apple Intelligence (Local)",
+    "vendor": "apple",
+    "authType": "none",
+    "baseUrl": "http://localhost:11435",
+    "environment": "local"
+  }
+]

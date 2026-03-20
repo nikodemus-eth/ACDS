@@ -115,7 +115,7 @@ export class PgAdaptationEventRepository implements AdaptationEventReader, Adapt
       evidenceSummary: (row.reason as string) ?? '',
       mode: (row.mode as AdaptationEvent['mode']) ?? 'recommend_only',
       policyBoundsSnapshot: { explorationRate: 0, mode: 'recommend_only' as const, additionalConstraints: {} },
-      createdAt: (row.created_at as Date)?.toISOString?.() ?? (row.created_at as string),
+      createdAt: (row.applied_at as Date)?.toISOString?.() ?? (row.applied_at as string),
     };
   }
 }

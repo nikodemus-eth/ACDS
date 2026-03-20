@@ -12,38 +12,29 @@ This guide covers common operational issues and how to diagnose them.
 
 ### Diagnosis
 
-**Local providers (Ollama, LM Studio):**
+**Ollama:**
 
-1. Verify the provider process is running:
-   - Ollama: Check that `ollama serve` is active, or that the Ollama desktop app is running.
-   - LM Studio: Check that the local server is started from the LM Studio server tab.
-2. Verify the port is accessible:
-   - Ollama default: `http://localhost:11434`
-   - LM Studio default: `http://localhost:1234`
+1. Verify the provider process is running: check that `ollama serve` is active, or that the Ollama desktop app is running.
+2. Verify the port is accessible: `http://localhost:11434`
 3. Check that at least one model is loaded in the provider.
 4. If running in Docker, ensure the container can reach the host network (use `host.docker.internal` instead of `localhost`).
 
-**Cloud providers (Gemini, OpenAI):**
+**Apple Intelligence:**
 
-1. Verify the API key is valid and has not been revoked.
-2. Check for rate limiting or quota exhaustion on the provider's dashboard.
-3. Verify network connectivity to the provider's API endpoint.
-4. Check that the base URL is correct:
-   - Gemini: `https://generativelanguage.googleapis.com`
-   - OpenAI: `https://api.openai.com`
+1. Verify the Apple Intelligence bridge is running at `http://localhost:11435`.
+2. Verify you are running macOS 15.0 (Sequoia) or later -- Apple Intelligence requires macOS 15+.
+3. Check that Apple Intelligence is enabled in System Settings > Apple Intelligence & Siri.
+4. Verify the Mac has an Apple Silicon chip (M1 or later) or meets the minimum hardware requirements.
 
 ### Resolution
 
 - Re-register the provider with correct settings.
-- For API key issues, update the key via the provider form (the old key will be re-encrypted).
 - Trigger a manual connection test after making changes.
 
 ### Registration Validation Rules
 
 Provider registration is now stricter than simple URL parsing:
 
-- Cloud providers must use `https://`
-- Cloud providers cannot target loopback, link-local, or RFC1918/private-network hosts
 - Embedded credentials in provider URLs are rejected
 - Non-HTTP schemes such as `file://` and `ftp://` are rejected
 - Excessively long provider URLs are rejected
@@ -143,8 +134,7 @@ The routing engine could not find any model profiles that satisfy the effective 
 
 All providers in the fallback chain failed. The execution is marked `failed`. Check:
 - The health status of all providers.
-- Network connectivity to cloud providers.
-- Whether local provider processes are running.
+- Whether local provider processes are running (Ollama, Apple Intelligence bridge).
 - The specific error for each fallback attempt in the execution detail.
 
 ### "ACDS API DI container is incomplete"

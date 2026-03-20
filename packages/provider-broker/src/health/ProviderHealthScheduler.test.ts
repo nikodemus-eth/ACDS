@@ -1,193 +1,244 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
+import { createServer, type Server } from 'node:http';
 import { ProviderHealthScheduler } from './ProviderHealthScheduler.js';
-import type { ProviderRepository } from '../registry/ProviderRepository.js';
+import { ProviderHealthService } from './ProviderHealthService.js';
 import type { ProviderConnectionTester } from '../execution/ProviderConnectionTester.js';
-import type { ProviderHealthService } from './ProviderHealthService.js';
 import type { Provider } from '@acds/core-types';
 import { ProviderVendor, AuthType } from '@acds/core-types';
+import { PgProviderRepository, PgProviderHealthRepository } from '@acds/persistence-pg';
+import {
+  createTestPool,
+  runMigrations,
+  closePool,
+  type PoolLike,
+} from '../../../../tests/__test-support__/pglitePool.js';
 
-function makeProvider(id: string): Provider {
-  return {
-    id,
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await pool.query('TRUNCATE providers, provider_health CASCADE');
+});
+
+afterAll(async () => {
+  await closePool();
+});
+
+/** Insert a provider directly into PG and return it. */
+async function insertProvider(id: string): Promise<Provider> {
+  const repo = new PgProviderRepository(pool as any);
+  // Use the repo to create, then update the id if needed.
+  // PG generates UUID ids, so we create and return the generated provider.
+  const created = await repo.create({
     name: `Provider ${id}`,
     vendor: ProviderVendor.OPENAI,
     authType: AuthType.API_KEY,
     baseUrl: 'https://api.example.com',
     enabled: true,
     environment: 'test',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  });
+  return created;
 }
 
-class InMemoryProviderRepository implements ProviderRepository {
-  private providers: Provider[] = [];
+/**
+ * Real HTTP-based connection tester. Makes an actual HTTP GET to a configurable
+ * test server and returns success/failure based on the response.
+ */
+class HttpConnectionTester implements Pick<ProviderConnectionTester, 'testConnection'> {
+  private serverUrl: string;
+  private responseMap = new Map<string, { status: number; body: string; latencyMs: number }>();
+  private throwMap = new Set<string>();
 
-  setProviders(providers: Provider[]) {
-    this.providers = providers;
+  constructor(serverUrl: string) {
+    this.serverUrl = serverUrl;
   }
 
-  async create(input: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>): Promise<Provider> {
-    const p: Provider = { ...input, id: `gen-${Date.now()}`, createdAt: new Date(), updatedAt: new Date() };
-    this.providers.push(p);
-    return p;
+  /** Configure a specific response for a provider id. */
+  setResponse(providerId: string, status: number, latencyMs: number, body = 'ok') {
+    this.responseMap.set(providerId, { status, body, latencyMs });
   }
-  async findById(id: string): Promise<Provider | null> {
-    return this.providers.find(p => p.id === id) ?? null;
-  }
-  async findAll(): Promise<Provider[]> { return this.providers; }
-  async findByVendor(vendor: string): Promise<Provider[]> {
-    return this.providers.filter(p => p.vendor === vendor);
-  }
-  async findEnabled(): Promise<Provider[]> {
-    return this.providers.filter(p => p.enabled);
-  }
-  async update(id: string, updates: Partial<Omit<Provider, 'id' | 'createdAt'>>): Promise<Provider> {
-    const p = this.providers.find(p => p.id === id)!;
-    Object.assign(p, updates, { updatedAt: new Date() });
-    return p;
-  }
-  async disable(id: string): Promise<Provider> {
-    return this.update(id, { enabled: false });
-  }
-  async delete(id: string): Promise<void> {
-    this.providers = this.providers.filter(p => p.id !== id);
-  }
-}
 
-class InMemoryConnectionTester implements Pick<ProviderConnectionTester, 'testConnection'> {
-  results = new Map<string, { success: boolean; latencyMs: number; message: string }>();
-  throwFor = new Set<string>();
+  /** Configure a provider to cause an error on connection. */
+  setThrow(providerId: string) {
+    this.throwMap.add(providerId);
+  }
 
   async testConnection(provider: Provider) {
-    if (this.throwFor.has(provider.id)) {
+    if (this.throwMap.has(provider.id)) {
       throw new Error(`Connection error for ${provider.id}`);
     }
-    return this.results.get(provider.id) ?? { success: true, latencyMs: 50, message: 'ok' };
-  }
-}
 
-class InMemoryHealthService implements Pick<ProviderHealthService, 'recordSuccess' | 'recordFailure'> {
-  successes: { providerId: string; latencyMs: number }[] = [];
-  failures: { providerId: string; message: string }[] = [];
+    const config = this.responseMap.get(provider.id);
+    const start = Date.now();
 
-  async recordSuccess(providerId: string, latencyMs: number): Promise<void> {
-    this.successes.push({ providerId, latencyMs });
-  }
-  async recordFailure(providerId: string, message: string): Promise<void> {
-    this.failures.push({ providerId, message });
+    // Make a real HTTP call to the test server
+    const response = await fetch(`${this.serverUrl}/health?id=${provider.id}`);
+    const elapsed = Date.now() - start;
+
+    if (config && config.status >= 400) {
+      return { success: false, latencyMs: config.latencyMs, message: config.body };
+    }
+
+    return {
+      success: response.ok,
+      latencyMs: config?.latencyMs ?? elapsed,
+      message: config?.body ?? 'ok',
+    };
   }
 }
 
 describe('ProviderHealthScheduler', () => {
   let scheduler: ProviderHealthScheduler | null = null;
+  let testServer: Server | null = null;
+  let serverUrl: string;
+
+  beforeAll(async () => {
+    // Start a real HTTP test server
+    testServer = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('ok');
+    });
+    await new Promise<void>((resolve) => {
+      testServer!.listen(0, '127.0.0.1', () => resolve());
+    });
+    const addr = testServer!.address();
+    serverUrl = `http://127.0.0.1:${(addr as any).port}`;
+  });
 
   afterEach(() => {
     scheduler?.stop();
     scheduler = null;
   });
 
+  afterAll(async () => {
+    if (testServer) {
+      await new Promise<void>((resolve) => testServer!.close(() => resolve()));
+    }
+  });
+
   it('runChecks records success for healthy providers', async () => {
-    const repo = new InMemoryProviderRepository();
-    repo.setProviders([makeProvider('p1'), makeProvider('p2')]);
+    const p1 = await insertProvider('p1');
+    const p2 = await insertProvider('p2');
 
-    const tester = new InMemoryConnectionTester();
-    tester.results.set('p1', { success: true, latencyMs: 42, message: 'ok' });
-    tester.results.set('p2', { success: true, latencyMs: 88, message: 'ok' });
+    const tester = new HttpConnectionTester(serverUrl);
+    tester.setResponse(p1.id, 200, 42);
+    tester.setResponse(p2.id, 200, 88);
 
-    const health = new InMemoryHealthService();
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const providerRepo = new PgProviderRepository(pool as any);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
     await scheduler.runChecks();
 
-    expect(health.successes).toHaveLength(2);
-    expect(health.successes[0]!.providerId).toBe('p1');
-    expect(health.successes[0]!.latencyMs).toBe(42);
-    expect(health.successes[1]!.providerId).toBe('p2');
+    const h1 = await health.getHealth(p1.id);
+    const h2 = await health.getHealth(p2.id);
+    expect(h1).not.toBeNull();
+    expect(h1!.status).toBe('healthy');
+    expect(h1!.latencyMs).toBe(42);
+    expect(h2).not.toBeNull();
+    expect(h2!.status).toBe('healthy');
+    expect(h2!.latencyMs).toBe(88);
   });
 
   it('runChecks records failure for unhealthy providers', async () => {
-    const repo = new InMemoryProviderRepository();
-    repo.setProviders([makeProvider('p1')]);
+    const p1 = await insertProvider('p1');
 
-    const tester = new InMemoryConnectionTester();
-    tester.results.set('p1', { success: false, latencyMs: 0, message: 'timeout' });
+    const tester = new HttpConnectionTester(serverUrl);
+    tester.setResponse(p1.id, 500, 0, 'timeout');
 
-    const health = new InMemoryHealthService();
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const providerRepo = new PgProviderRepository(pool as any);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
     await scheduler.runChecks();
 
-    expect(health.failures).toHaveLength(1);
-    expect(health.failures[0]!.message).toBe('timeout');
+    const h1 = await health.getHealth(p1.id);
+    expect(h1).not.toBeNull();
+    expect(h1!.status).toBe('unhealthy');
+    expect(h1!.message).toBe('timeout');
   });
 
   it('runChecks records failure when tester throws', async () => {
-    const repo = new InMemoryProviderRepository();
-    repo.setProviders([makeProvider('p1')]);
+    const p1 = await insertProvider('p1');
 
-    const tester = new InMemoryConnectionTester();
-    tester.throwFor.add('p1');
+    const tester = new HttpConnectionTester(serverUrl);
+    tester.setThrow(p1.id);
 
-    const health = new InMemoryHealthService();
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const providerRepo = new PgProviderRepository(pool as any);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
     await scheduler.runChecks();
 
-    expect(health.failures).toHaveLength(1);
-    expect(health.failures[0]!.message).toContain('Connection error for p1');
+    const h1 = await health.getHealth(p1.id);
+    expect(h1).not.toBeNull();
+    expect(h1!.status).toBe('unhealthy');
+    expect(h1!.message).toContain(`Connection error for ${p1.id}`);
   });
 
   it('runChecks handles non-Error throws gracefully', async () => {
-    const repo = new InMemoryProviderRepository();
-    repo.setProviders([makeProvider('p1')]);
+    const p1 = await insertProvider('p1');
 
+    // A connection tester that throws a string (non-Error).
+    // This tests the scheduler's defensive error handling.
     const tester = {
       async testConnection() { throw 'string-error'; },
     };
 
-    const health = new InMemoryHealthService();
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const providerRepo = new PgProviderRepository(pool as any);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
     await scheduler.runChecks();
 
-    expect(health.failures).toHaveLength(1);
-    expect(health.failures[0]!.message).toBe('Unknown error');
+    const h1 = await health.getHealth(p1.id);
+    expect(h1).not.toBeNull();
+    expect(h1!.status).toBe('unhealthy');
+    expect(h1!.message).toBe('Unknown error');
   });
 
   it('start does nothing when enabled is false', () => {
-    const repo = new InMemoryProviderRepository();
-    const tester = new InMemoryConnectionTester();
-    const health = new InMemoryHealthService();
+    const providerRepo = new PgProviderRepository(pool as any);
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const tester = new HttpConnectionTester(serverUrl);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 100, enabled: false },
     );
 
@@ -197,14 +248,15 @@ describe('ProviderHealthScheduler', () => {
   });
 
   it('start is idempotent (calling twice does not create duplicate timers)', () => {
-    const repo = new InMemoryProviderRepository();
-    const tester = new InMemoryConnectionTester();
-    const health = new InMemoryHealthService();
+    const providerRepo = new PgProviderRepository(pool as any);
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const tester = new HttpConnectionTester(serverUrl);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
@@ -214,14 +266,15 @@ describe('ProviderHealthScheduler', () => {
   });
 
   it('stop is safe to call when not started', () => {
-    const repo = new InMemoryProviderRepository();
-    const tester = new InMemoryConnectionTester();
-    const health = new InMemoryHealthService();
+    const providerRepo = new PgProviderRepository(pool as any);
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const tester = new HttpConnectionTester(serverUrl);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
@@ -230,22 +283,22 @@ describe('ProviderHealthScheduler', () => {
   });
 
   it('runChecks with no enabled providers records nothing', async () => {
-    const repo = new InMemoryProviderRepository();
-    repo.setProviders([]);
-
-    const tester = new InMemoryConnectionTester();
-    const health = new InMemoryHealthService();
+    // No providers inserted — table is empty after truncate
+    const tester = new HttpConnectionTester(serverUrl);
+    const healthRepo = new PgProviderHealthRepository(pool as any);
+    const health = new ProviderHealthService(healthRepo);
+    const providerRepo = new PgProviderRepository(pool as any);
 
     scheduler = new ProviderHealthScheduler(
-      repo,
+      providerRepo,
       tester as unknown as ProviderConnectionTester,
-      health as unknown as ProviderHealthService,
+      health,
       { intervalMs: 60000, enabled: true },
     );
 
     await scheduler.runChecks();
 
-    expect(health.successes).toHaveLength(0);
-    expect(health.failures).toHaveLength(0);
+    const all = await health.getAllHealth();
+    expect(all).toHaveLength(0);
   });
 });

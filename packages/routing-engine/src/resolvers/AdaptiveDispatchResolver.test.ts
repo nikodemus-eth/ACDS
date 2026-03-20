@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { AdaptiveDispatchResolver } from './AdaptiveDispatchResolver.js';
 import type { AdaptiveDispatchResolverDeps } from './AdaptiveDispatchResolver.js';
+import { PgOptimizerStateRepository } from '@acds/persistence-pg';
 import {
   CognitiveGrade,
   DecisionPosture,
@@ -8,8 +9,29 @@ import {
   ProviderVendor,
   TaskType,
 } from '@acds/core-types';
+import {
+  createTestPool,
+  runMigrations,
+  closePool,
+  type PoolLike,
+} from '../../../../tests/__test-support__/pglitePool.js';
+
+let pool: PoolLike;
 
 const now = new Date('2026-03-15T10:00:00Z');
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await pool.query('TRUNCATE family_selection_states, candidate_performance_states CASCADE');
+});
+
+afterAll(async () => {
+  await closePool();
+});
 
 function makeRequest(overrides: Record<string, unknown> = {}) {
   return {
@@ -107,40 +129,22 @@ function makeDeps(overrides: Partial<AdaptiveDispatchResolverDeps> = {}): Adapti
   };
 }
 
-// In-memory optimizer state repository
-class InMemoryOptimizerStateRepo {
-  private familyStates = new Map<string, any>();
-  private candidateStates = new Map<string, any[]>();
-
-  setFamilyState(state: any) {
-    this.familyStates.set(state.familyKey, state);
-  }
-
-  setCandidateStates(familyKey: string, states: any[]) {
-    this.candidateStates.set(familyKey, states);
-  }
-
-  async getFamilyState(familyKey: string) {
-    return this.familyStates.get(familyKey);
-  }
-
-  async saveFamilyState(state: any) {
-    this.familyStates.set(state.familyKey, state);
-  }
-
-  async getCandidateStates(familyKey: string) {
-    return this.candidateStates.get(familyKey) ?? [];
-  }
-
-  async saveCandidateState(state: any) {
-    const key = state.familyKey;
-    const existing = this.candidateStates.get(key) ?? [];
-    existing.push(state);
-    this.candidateStates.set(key, existing);
-  }
-
-  async listFamilies() {
-    return Array.from(this.familyStates.keys());
+/** Helper: seed family + candidate state into PG for adaptive tests. */
+async function seedOptimizerState(
+  repo: PgOptimizerStateRepository,
+  familyKey: string,
+  familyState: Record<string, unknown>,
+  candidateStates: Record<string, unknown>[],
+) {
+  await repo.saveFamilyState({
+    familyKey,
+    ...familyState,
+  } as any);
+  for (const cs of candidateStates) {
+    await repo.saveCandidateState({
+      familyKey,
+      ...cs,
+    } as any);
   }
 }
 
@@ -207,7 +211,7 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('falls back to deterministic when optimizer repo has no family state', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const deps = makeDeps({
       adaptiveMode: 'fully_applied',
       optimizerStateRepository: repo,
@@ -234,23 +238,19 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('uses adaptive selection when optimizer state exists', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const familyKey = 'testapp:review:analyze';
 
-    repo.setFamilyState({
-      familyKey,
+    await seedOptimizerState(repo, familyKey, {
       currentCandidateId: 'prof-1:tac-1:prov-1',
       rollingScore: 0.8,
-      explorationRate: 0.0, // no exploration to get deterministic result
+      explorationRate: 0.0,
       plateauDetected: false,
       lastAdaptationAt: now.toISOString(),
       recentTrend: 'stable',
-    });
-
-    repo.setCandidateStates(familyKey, [
+    }, [
       {
         candidateId: 'prof-1:tac-1:prov-1',
-        familyKey,
         rollingScore: 0.8,
         runCount: 100,
         successRate: 0.95,
@@ -307,22 +307,18 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('decision rationaleSummary contains [adaptive] in adaptive mode', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const familyKey = 'testapp:review:analyze';
 
-    repo.setFamilyState({
-      familyKey,
+    await seedOptimizerState(repo, familyKey, {
       currentCandidateId: 'prof-1:tac-1:prov-1',
       rollingScore: 0.8,
       explorationRate: 0.0,
       plateauDetected: false,
       lastAdaptationAt: now.toISOString(),
       recentTrend: 'stable',
-    });
-
-    repo.setCandidateStates(familyKey, [{
+    }, [{
       candidateId: 'prof-1:tac-1:prov-1',
-      familyKey,
       rollingScore: 0.8,
       runCount: 50,
       successRate: 0.9,
@@ -342,18 +338,17 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('falls back to deterministic when portfolio is empty', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const familyKey = 'testapp:review:analyze';
 
-    repo.setFamilyState({
-      familyKey,
+    await seedOptimizerState(repo, familyKey, {
       currentCandidateId: 'nonexistent:tac:prov',
       rollingScore: 0.5,
       explorationRate: 0.0,
       plateauDetected: false,
       lastAdaptationAt: now.toISOString(),
       recentTrend: 'stable',
-    });
+    }, []);
 
     // No provider mapping for profiles means empty portfolio
     const deps = makeDeps({
@@ -377,22 +372,18 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('works with observe_only adaptive mode', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const familyKey = 'testapp:review:analyze';
 
-    repo.setFamilyState({
-      familyKey,
+    await seedOptimizerState(repo, familyKey, {
       currentCandidateId: 'prof-1:tac-1:prov-1',
       rollingScore: 0.7,
       explorationRate: 0.0,
       plateauDetected: false,
       lastAdaptationAt: now.toISOString(),
       recentTrend: 'stable',
-    });
-
-    repo.setCandidateStates(familyKey, [{
+    }, [{
       candidateId: 'prof-1:tac-1:prov-1',
-      familyKey,
       rollingScore: 0.7,
       runCount: 20,
       successRate: 0.85,
@@ -414,22 +405,18 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('works with recommend_only adaptive mode', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const familyKey = 'testapp:review:analyze';
 
-    repo.setFamilyState({
-      familyKey,
+    await seedOptimizerState(repo, familyKey, {
       currentCandidateId: 'prof-1:tac-1:prov-1',
       rollingScore: 0.7,
       explorationRate: 0.0,
       plateauDetected: false,
       lastAdaptationAt: now.toISOString(),
       recentTrend: 'stable',
-    });
-
-    repo.setCandidateStates(familyKey, [{
+    }, [{
       candidateId: 'prof-1:tac-1:prov-1',
-      familyKey,
       rollingScore: 0.7,
       runCount: 20,
       successRate: 0.85,
@@ -450,23 +437,19 @@ describe('AdaptiveDispatchResolver', () => {
 
   it('uses multiple profiles and tactics in adaptive mode', async () => {
     const resolver = new AdaptiveDispatchResolver();
-    const repo = new InMemoryOptimizerStateRepo();
+    const repo = new PgOptimizerStateRepository(pool as any);
     const familyKey = 'testapp:review:analyze';
 
-    repo.setFamilyState({
-      familyKey,
+    await seedOptimizerState(repo, familyKey, {
       currentCandidateId: 'prof-1:tac-1:prov-1',
       rollingScore: 0.6,
       explorationRate: 0.0,
       plateauDetected: false,
       lastAdaptationAt: now.toISOString(),
       recentTrend: 'stable',
-    });
-
-    repo.setCandidateStates(familyKey, [
+    }, [
       {
         candidateId: 'prof-1:tac-1:prov-1',
-        familyKey,
         rollingScore: 0.9,
         runCount: 50,
         successRate: 0.95,
@@ -475,7 +458,6 @@ describe('AdaptiveDispatchResolver', () => {
       },
       {
         candidateId: 'prof-2:tac-1:prov-2',
-        familyKey,
         rollingScore: 0.5,
         runCount: 20,
         successRate: 0.8,

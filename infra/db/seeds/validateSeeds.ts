@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Seed Data Wiring — Validates all JSON config and logs what would be inserted
 // ---------------------------------------------------------------------------
-// Run with: npx tsx infra/db/seeds/runSeeds.ts
+// Run with: npx tsx infra/db/seeds/validateSeeds.ts
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from 'node:fs';
@@ -13,6 +13,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ---------------------------------------------------------------------------
 // Types for seed data validation
 // ---------------------------------------------------------------------------
+
+interface ProviderSeed {
+  name: string;
+  vendor: string;
+  authType: string;
+  baseUrl: string;
+  environment: string;
+}
 
 interface GlobalPolicySeed {
   allowedVendors: string[];
@@ -55,7 +63,7 @@ interface TacticProfileSeed {
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-const VALID_VENDORS = ['ollama', 'lmstudio', 'gemini', 'openai'];
+const VALID_VENDORS = ['ollama', 'apple'];
 const VALID_LOAD_TIERS = ['single_shot', 'batch', 'streaming', 'high_throughput'];
 const VALID_COGNITIVE_GRADES = ['basic', 'standard', 'enhanced', 'frontier', 'specialized'];
 const VALID_TASK_TYPES = [
@@ -188,13 +196,38 @@ function loadJson<T>(relativePath: string): T {
 // Main
 // ---------------------------------------------------------------------------
 
-function runSeeds(): void {
+const VALID_AUTH_TYPES = ['none', 'api_key', 'bearer_token', 'custom'];
+
+function validateProvider(data: ProviderSeed): string[] {
+  const errors: string[] = [];
+  if (typeof data.name !== 'string' || data.name.trim().length === 0) errors.push('name must be non-empty');
+  if (!VALID_VENDORS.includes(data.vendor)) errors.push(`Unknown vendor: ${data.vendor}`);
+  if (!VALID_AUTH_TYPES.includes(data.authType)) errors.push(`Unknown authType: ${data.authType}`);
+  if (typeof data.baseUrl !== 'string' || data.baseUrl.trim().length === 0) errors.push('baseUrl must be non-empty');
+  if (typeof data.environment !== 'string' || data.environment.trim().length === 0) errors.push('environment must be non-empty');
+  return errors;
+}
+
+function validateSeeds(): void {
   let hasErrors = false;
 
   console.log('=== ACDS Seed Data Validation ===\n');
 
+  // --- Providers ---
+  console.log('[1/5] Validating providers...');
+  const providers = loadJson<ProviderSeed[]>('../../config/providers/defaultProviders.json');
+  for (const provider of providers) {
+    const errors = validateProvider(provider);
+    if (errors.length > 0) {
+      hasErrors = true;
+      console.error(`  ERRORS in provider "${provider.name}":`, errors);
+    } else {
+      console.log(`  OK — would UPSERT providers: ${provider.name} (${provider.vendor})`);
+    }
+  }
+
   // --- Global Policy ---
-  console.log('[1/4] Validating global policy...');
+  console.log('\n[2/5] Validating global policy...');
   const globalPolicy = loadJson<GlobalPolicySeed>('../../config/policies/globalPolicy.json');
   const globalErrors = validateGlobalPolicy(globalPolicy);
   if (globalErrors.length > 0) {
@@ -208,7 +241,7 @@ function runSeeds(): void {
   }
 
   // --- Application Policies ---
-  console.log('\n[2/4] Validating application policies...');
+  console.log('\n[3/5] Validating application policies...');
   const appPolicyFiles = ['thingsteadPolicy.json', 'processSwarmPolicy.json'];
   for (const file of appPolicyFiles) {
     const policy = loadJson<ApplicationPolicySeed>(`../../config/policies/${file}`);
@@ -223,7 +256,7 @@ function runSeeds(): void {
   }
 
   // --- Model Profiles ---
-  console.log('\n[3/4] Validating model profiles...');
+  console.log('\n[4/5] Validating model profiles...');
   const modelProfiles = loadJson<ModelProfileSeed[]>('../../config/profiles/modelProfiles.json');
   for (const profile of modelProfiles) {
     const errors = validateModelProfile(profile);
@@ -239,7 +272,7 @@ function runSeeds(): void {
   }
 
   // --- Tactic Profiles ---
-  console.log('\n[4/4] Validating tactic profiles...');
+  console.log('\n[5/5] Validating tactic profiles...');
   const tacticProfiles = loadJson<TacticProfileSeed[]>('../../config/profiles/tacticProfiles.json');
   for (const profile of tacticProfiles) {
     const errors = validateTacticProfile(profile);
@@ -254,6 +287,7 @@ function runSeeds(): void {
 
   // --- Summary ---
   console.log('\n=== Summary ===');
+  console.log(`Providers: ${providers.length}`);
   console.log(`Global policies: 1`);
   console.log(`Application policies: ${appPolicyFiles.length}`);
   console.log(`Model profiles: ${modelProfiles.length}`);
@@ -267,4 +301,4 @@ function runSeeds(): void {
   }
 }
 
-runSeeds();
+validateSeeds();

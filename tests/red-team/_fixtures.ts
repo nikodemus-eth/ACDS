@@ -1,9 +1,12 @@
 /**
- * ARGUS-9 Red Team Test Suite — Shared Fixtures
+ * ARGUS-9 Red Team Test Suite -- Shared Fixtures
  *
- * Factory functions and in-memory repository implementations for adversarial tests.
+ * Factory functions and PG-backed repository setup for adversarial tests.
  * All factories use Partial<T> override pattern: defaults are valid objects,
  * tests override specific fields to create adversarial conditions.
+ *
+ * Static* providers return configurable default values (legitimate test defaults).
+ * Collecting* emitters accumulate events for assertion.
  */
 
 import type {
@@ -22,19 +25,14 @@ import {
 import type {
   FamilySelectionState,
   CandidatePerformanceState,
-  OptimizerStateRepository,
   RankedCandidate,
   AdaptationEvent,
   AdaptationTrigger,
-  AdaptationLedgerWriter,
-  AdaptationEventFilters,
   AdaptationRecommendation,
   AdaptationApproval,
   AdaptationApprovalStatus,
-  AdaptationApprovalRepository,
   RankingSnapshot,
   AdaptationRollbackRecord,
-  RollbackRecordWriter,
   ApprovalAuditEvent,
   ApprovalAuditEmitter,
   RollbackAuditEvent,
@@ -57,7 +55,69 @@ import type {
   InstancePolicyOverrides,
 } from '@acds/policy-engine';
 
-// ─── Model Profile Factory ─────────────────────────────────
+import {
+  PgOptimizerStateRepository,
+  PgAdaptationEventRepository,
+  PgAdaptationApprovalRepository,
+  PgRollbackRecordWriter,
+  PgApprovalAuditEmitter,
+  PgRollbackAuditEmitter,
+} from '@acds/persistence-pg';
+
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../__test-support__/pglitePool.js';
+
+// ---- PGlite pool management ------------------------------------------------
+// Shared pool for all red-team tests. Each test file should call
+// setupRedTeamPool() in beforeAll and teardownRedTeamPool() in afterAll.
+
+let _pool: PoolLike | null = null;
+
+export async function getRedTeamPool(): Promise<PoolLike> {
+  if (!_pool) {
+    _pool = await createTestPool();
+    await runMigrations(_pool);
+  }
+  return _pool;
+}
+
+export async function truncateRedTeamTables(): Promise<void> {
+  if (_pool) {
+    await truncateAll(_pool);
+  }
+}
+
+export async function teardownRedTeamPool(): Promise<void> {
+  await closePool();
+  _pool = null;
+}
+
+// ---- PG repository factories -----------------------------------------------
+
+export function createPgOptimizerStateRepository(pool: PoolLike): PgOptimizerStateRepository {
+  return new PgOptimizerStateRepository(pool as any);
+}
+
+export function createPgAdaptationLedger(pool: PoolLike): PgAdaptationEventRepository {
+  return new PgAdaptationEventRepository(pool as any);
+}
+
+export function createPgApprovalRepository(pool: PoolLike): PgAdaptationApprovalRepository {
+  return new PgAdaptationApprovalRepository(pool as any);
+}
+
+export function createPgRollbackRecordWriter(pool: PoolLike): PgRollbackRecordWriter {
+  return new PgRollbackRecordWriter(pool as any);
+}
+
+export function createPgApprovalAuditEmitter(pool: PoolLike): PgApprovalAuditEmitter {
+  return new PgApprovalAuditEmitter(pool as any);
+}
+
+export function createPgRollbackAuditEmitter(pool: PoolLike): PgRollbackAuditEmitter {
+  return new PgRollbackAuditEmitter(pool as any);
+}
+
+// ---- Model Profile Factory -------------------------------------------------
 
 export function makeProfile(overrides: Partial<ModelProfile> = {}): ModelProfile {
   return {
@@ -82,7 +142,7 @@ export function makeProfile(overrides: Partial<ModelProfile> = {}): ModelProfile
   };
 }
 
-// ─── Tactic Profile Factory ────────────────────────────────
+// ---- Tactic Profile Factory ------------------------------------------------
 
 export function makeTactic(overrides: Partial<TacticProfile> = {}): TacticProfile {
   return {
@@ -105,7 +165,7 @@ export function makeTactic(overrides: Partial<TacticProfile> = {}): TacticProfil
   };
 }
 
-// ─── Routing Request Factory ───────────────────────────────
+// ---- Routing Request Factory -----------------------------------------------
 
 export function makeRequest(overrides: Partial<RoutingRequest> = {}): RoutingRequest {
   return {
@@ -128,7 +188,7 @@ export function makeRequest(overrides: Partial<RoutingRequest> = {}): RoutingReq
   };
 }
 
-// ─── Policy Factories ──────────────────────────────────────
+// ---- Policy Factories ------------------------------------------------------
 
 export function makeEffectivePolicy(overrides: Partial<EffectivePolicy> = {}): EffectivePolicy {
   return {
@@ -214,7 +274,7 @@ export function makeInstanceOverrides(overrides: Partial<InstancePolicyOverrides
   };
 }
 
-// ─── Adaptive State Factories ──────────────────────────────
+// ---- Adaptive State Factories ----------------------------------------------
 
 export function makeFamilyState(overrides: Partial<FamilySelectionState> = {}): FamilySelectionState {
   return {
@@ -337,118 +397,36 @@ export function makeExplorationConfig(overrides: Partial<ExplorationConfig> = {}
   };
 }
 
-// ─── In-Memory Repository: OptimizerStateRepository ────────
+// ---- Static Providers (legitimate test defaults) ---------------------------
 
-export class InMemoryOptimizerStateRepository implements OptimizerStateRepository {
-  public familyStates = new Map<string, FamilySelectionState>();
-  public candidateStates = new Map<string, CandidatePerformanceState[]>();
+export class StaticFamilyRiskProvider implements FamilyRiskProvider {
+  constructor(private defaultLevel: FamilyRiskLevel = 'low') {}
+  public overrides = new Map<string, FamilyRiskLevel>();
 
-  async getFamilyState(familyKey: string): Promise<FamilySelectionState | undefined> {
-    return this.familyStates.get(familyKey);
-  }
-
-  async saveFamilyState(state: FamilySelectionState): Promise<void> {
-    this.familyStates.set(state.familyKey, state);
-  }
-
-  async getCandidateStates(familyKey: string): Promise<CandidatePerformanceState[]> {
-    return this.candidateStates.get(familyKey) ?? [];
-  }
-
-  async saveCandidateState(state: CandidatePerformanceState): Promise<void> {
-    const existing = this.candidateStates.get(state.familyKey) ?? [];
-    const idx = existing.findIndex(c => c.candidateId === state.candidateId);
-    if (idx >= 0) {
-      existing[idx] = state;
-    } else {
-      existing.push(state);
-    }
-    this.candidateStates.set(state.familyKey, existing);
-  }
-
-  async listFamilies(): Promise<string[]> {
-    return [...this.familyStates.keys()];
+  async getRiskLevel(familyKey: string): Promise<FamilyRiskLevel> {
+    return this.overrides.get(familyKey) ?? this.defaultLevel;
   }
 }
 
-// ─── In-Memory Repository: AdaptationLedgerWriter ──────────
+export class StaticFamilyPostureProvider implements FamilyPostureProvider {
+  constructor(private defaultPosture: string = DecisionPosture.ADVISORY) {}
+  public overrides = new Map<string, string>();
 
-export class InMemoryAdaptationLedger implements AdaptationLedgerWriter {
-  public events: AdaptationEvent[] = [];
-
-  async writeEvent(event: AdaptationEvent): Promise<void> {
-    this.events.push(event);
-  }
-
-  async listEvents(familyKey: string, filters?: AdaptationEventFilters): Promise<AdaptationEvent[]> {
-    let results = this.events.filter(e => e.familyKey === familyKey);
-    if (filters?.trigger) {
-      results = results.filter(e => e.trigger === filters.trigger);
-    }
-    if (filters?.since) {
-      results = results.filter(e => e.createdAt >= filters.since!);
-    }
-    if (filters?.until) {
-      results = results.filter(e => e.createdAt <= filters.until!);
-    }
-    if (filters?.limit) {
-      results = results.slice(0, filters.limit);
-    }
-    return results;
-  }
-
-  async getEvent(id: string): Promise<AdaptationEvent | undefined> {
-    return this.events.find(e => e.id === id);
+  async getPosture(familyKey: string): Promise<string> {
+    return this.overrides.get(familyKey) ?? this.defaultPosture;
   }
 }
 
-// ─── In-Memory Repository: AdaptationApprovalRepository ────
+export class StaticRecentFailureCounter implements RecentFailureCounter {
+  constructor(private defaultCount: number = 0) {}
+  public overrides = new Map<string, number>();
 
-export class InMemoryApprovalRepository implements AdaptationApprovalRepository {
-  public approvals: AdaptationApproval[] = [];
-
-  async save(approval: AdaptationApproval): Promise<void> {
-    this.approvals.push(approval);
-  }
-
-  async findById(id: string): Promise<AdaptationApproval | undefined> {
-    return this.approvals.find(a => a.id === id);
-  }
-
-  async findPending(): Promise<AdaptationApproval[]> {
-    return this.approvals.filter(a => a.status === 'pending');
-  }
-
-  async findByFamily(familyKey: string): Promise<AdaptationApproval[]> {
-    return this.approvals.filter(a => a.familyKey === familyKey);
-  }
-
-  async updateStatus(
-    id: string,
-    status: AdaptationApprovalStatus,
-    fields?: { decidedAt?: string; decidedBy?: string; reason?: string },
-  ): Promise<void> {
-    const approval = this.approvals.find(a => a.id === id);
-    if (approval) {
-      approval.status = status;
-      if (fields?.decidedAt) approval.decidedAt = fields.decidedAt;
-      if (fields?.decidedBy) approval.decidedBy = fields.decidedBy;
-      if (fields?.reason) approval.reason = fields.reason;
-    }
+  async countRecentFailures(familyKey: string): Promise<number> {
+    return this.overrides.get(familyKey) ?? this.defaultCount;
   }
 }
 
-// ─── In-Memory Repository: RollbackRecordWriter ────────────
-
-export class InMemoryRollbackRecordWriter implements RollbackRecordWriter {
-  public records: AdaptationRollbackRecord[] = [];
-
-  async save(record: AdaptationRollbackRecord): Promise<void> {
-    this.records.push(record);
-  }
-}
-
-// ─── Collecting Audit Emitters ─────────────────────────────
+// ---- Collecting Audit Emitters (for test assertions) -----------------------
 
 export class CollectingApprovalAuditEmitter implements ApprovalAuditEmitter {
   public events: ApprovalAuditEvent[] = [];
@@ -463,35 +441,6 @@ export class CollectingRollbackAuditEmitter implements RollbackAuditEmitter {
 
   emit(event: RollbackAuditEvent): void {
     this.events.push(event);
-  }
-}
-
-// ─── Mock Providers for LowRiskAutoApplyService ────────────
-
-export class MockFamilyRiskProvider implements FamilyRiskProvider {
-  constructor(private defaultLevel: FamilyRiskLevel = 'low') {}
-  public overrides = new Map<string, FamilyRiskLevel>();
-
-  async getRiskLevel(familyKey: string): Promise<FamilyRiskLevel> {
-    return this.overrides.get(familyKey) ?? this.defaultLevel;
-  }
-}
-
-export class MockFamilyPostureProvider implements FamilyPostureProvider {
-  constructor(private defaultPosture: string = DecisionPosture.ADVISORY) {}
-  public overrides = new Map<string, string>();
-
-  async getPosture(familyKey: string): Promise<string> {
-    return this.overrides.get(familyKey) ?? this.defaultPosture;
-  }
-}
-
-export class MockRecentFailureCounter implements RecentFailureCounter {
-  constructor(private defaultCount: number = 0) {}
-  public overrides = new Map<string, number>();
-
-  async countRecentFailures(familyKey: string): Promise<number> {
-    return this.overrides.get(familyKey) ?? this.defaultCount;
   }
 }
 

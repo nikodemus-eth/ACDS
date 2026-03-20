@@ -8,7 +8,6 @@ import type { OptimizerStateRepository } from '@acds/adaptive-optimizer';
 import type { AdaptationApprovalRepository } from '@acds/adaptive-optimizer';
 import type { ProviderRepository } from '@acds/provider-broker';
 import {
-  createPool,
   PgOptimizerStateRepository,
   PgAdaptationApprovalRepository,
   PgProviderRepository,
@@ -16,20 +15,9 @@ import {
 } from '@acds/persistence-pg';
 import type { PgPolicyRepository as PolicyRepo } from '@acds/persistence-pg';
 import type { AdaptationLedgerWriter, AdaptationEvent, AdaptationEventFilters } from '@acds/adaptive-optimizer';
+import { getGritsPool } from './createGritsPool.js';
 
-function createWorkerPool() {
-  const databaseUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://localhost:5432/acds');
-  return createPool({
-    host: databaseUrl.hostname,
-    port: databaseUrl.port ? Number(databaseUrl.port) : 5432,
-    database: databaseUrl.pathname.replace(/^\//, ''),
-    user: decodeURIComponent(databaseUrl.username),
-    password: decodeURIComponent(databaseUrl.password),
-    ssl: databaseUrl.searchParams.get('sslmode') === 'require',
-  });
-}
-
-const pool = createWorkerPool();
+const pool = getGritsPool();
 
 /**
  * Pg-backed adaptation ledger that writes to auto_apply_decision_records.

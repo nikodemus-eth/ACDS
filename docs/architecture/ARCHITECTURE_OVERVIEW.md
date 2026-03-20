@@ -17,7 +17,7 @@ Layer 5   packages/policy-engine Policy models and resolution
 Layer 4   packages/provider-broker
                                  Provider registry, execution proxy, health
 Layer 3   packages/provider-adapters
-                                 Provider-specific adapters (Ollama, LM Studio, Gemini, OpenAI)
+                                 Provider-specific adapters (Ollama, Apple Intelligence)
 Layer 2   packages/audit-ledger  Audit event writing and normalization
 Layer 1   packages/security      Crypto, secrets, redaction
 Layer 0   packages/core-types    Canonical types, enums, contracts

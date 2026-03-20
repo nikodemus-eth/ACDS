@@ -2,13 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Admin Web (Mock API)",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@acds/admin-web", "run", "dev:mock"],
-      "port": 4173
-    },
-    {
-      "name": "Admin Web (Live API)",
+      "name": "Admin Web",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@acds/admin-web", "run", "dev"],
       "port": 4173

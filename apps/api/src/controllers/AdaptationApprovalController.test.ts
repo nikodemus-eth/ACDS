@@ -1,8 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { AdaptationApprovalController } from './AdaptationApprovalController.js';
 import type { AdaptationApprovalRepository } from '@acds/adaptive-optimizer';
 import type { ApprovalAuditEmitter } from '@acds/adaptive-optimizer';
 import { NotFoundError, ConflictError } from '@acds/core-types';
+import { PgAdaptationApprovalRepository, PgApprovalAuditEmitter } from '@acds/persistence-pg';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../../../../tests/__test-support__/pglitePool.js';
+
+// -- PGlite lifecycle --------------------------------------------------------
+
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+afterAll(async () => {
+  await closePool();
+});
+
+// -- Helpers -----------------------------------------------------------------
 
 function createReply() {
   return {
@@ -13,8 +34,16 @@ function createReply() {
   };
 }
 
-function makeApproval(id: string, status = 'pending' as string) {
-  return {
+function createRepo(): PgAdaptationApprovalRepository {
+  return new PgAdaptationApprovalRepository(pool as any);
+}
+
+function createEmitter(): PgApprovalAuditEmitter {
+  return new PgApprovalAuditEmitter(pool as any);
+}
+
+async function seedApproval(repo: PgAdaptationApprovalRepository, id: string, status = 'pending') {
+  const approval: any = {
     id,
     familyKey: 'app:proc:step',
     recommendationId: 'rec-1',
@@ -24,36 +53,18 @@ function makeApproval(id: string, status = 'pending' as string) {
     decidedAt: status !== 'pending' ? '2026-03-15T12:00:00.000Z' : undefined,
     decidedBy: status !== 'pending' ? 'admin' : undefined,
   };
+  await repo.save(approval);
+  return approval;
 }
 
-class InMemoryApprovalRepo implements AdaptationApprovalRepository {
-  private store = new Map<string, any>();
-
-  constructor(initial: any[] = []) {
-    for (const item of initial) {
-      this.store.set(item.id, item);
-    }
-  }
-
-  async findById(id: string) { return this.store.get(id) ?? null; }
-  async findPending() { return [...this.store.values()].filter((a) => a.status === 'pending'); }
-  async findByFamily(_familyKey: string) { return [...this.store.values()]; }
-  async save(approval: any) { this.store.set(approval.id, approval); }
-  async updateStatus(id: string, status: string, meta: any) {
-    const item = this.store.get(id);
-    if (item) Object.assign(item, { status, ...meta });
-  }
-}
-
-class InMemoryAuditEmitter implements ApprovalAuditEmitter {
-  events: any[] = [];
-  emit(event: any) { this.events.push(event); }
-}
+// -- Tests -------------------------------------------------------------------
 
 describe('AdaptationApprovalController', () => {
   it('list returns pending approvals', async () => {
-    const repo = new InMemoryApprovalRepo([makeApproval('ap-1'), makeApproval('ap-2')]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
+    await seedApproval(repo, 'ap-1');
+    await seedApproval(repo, 'ap-2');
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -64,8 +75,9 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('getById returns approval when found', async () => {
-    const repo = new InMemoryApprovalRepo([makeApproval('ap-1')]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
+    await seedApproval(repo, 'ap-1');
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -75,8 +87,8 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('getById returns 404 when not found', async () => {
-    const repo = new InMemoryApprovalRepo([]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -85,8 +97,9 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('approve returns approved record on success', async () => {
-    const repo = new InMemoryApprovalRepo([makeApproval('ap-1')]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
+    await seedApproval(repo, 'ap-1');
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -99,8 +112,9 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('reject returns rejected record on success', async () => {
-    const repo = new InMemoryApprovalRepo([makeApproval('ap-1')]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
+    await seedApproval(repo, 'ap-1');
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -113,15 +127,14 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('approve returns 404 when approval not found', async () => {
-    const repo = new InMemoryApprovalRepo([]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
     // The service throws a plain Error with "not found" message, not NotFoundError
     // But the controller catches NotFoundError. Since the service uses requirePending
     // which throws a plain Error, we need to handle it differently.
-    // Let's test with a repo that returns a non-pending approval instead.
     await expect(
       controller.approve(
         { params: { id: 'missing' }, body: { actor: 'admin' } } as any,
@@ -131,8 +144,8 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('reject rethrows unknown errors', async () => {
-    const repo = new InMemoryApprovalRepo([]);
-    const emitter = new InMemoryAuditEmitter();
+    const repo = createRepo();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     await expect(
@@ -144,6 +157,7 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('approve returns 404 when repo throws NotFoundError', async () => {
+    // Inline interface implementation that deliberately throws -- tests controller error handling
     const repo: AdaptationApprovalRepository = {
       async findById(_id: string) { throw new NotFoundError('Approval not found'); },
       async findPending() { return []; },
@@ -151,7 +165,7 @@ describe('AdaptationApprovalController', () => {
       async save() {},
       async updateStatus() {},
     };
-    const emitter = new InMemoryAuditEmitter();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -164,6 +178,7 @@ describe('AdaptationApprovalController', () => {
   });
 
   it('approve returns 409 when repo throws ConflictError', async () => {
+    // Inline interface implementation that deliberately throws -- tests controller error handling
     const repo: AdaptationApprovalRepository = {
       async findById(_id: string) { throw new ConflictError('Already decided'); },
       async findPending() { return []; },
@@ -171,7 +186,7 @@ describe('AdaptationApprovalController', () => {
       async save() {},
       async updateStatus() {},
     };
-    const emitter = new InMemoryAuditEmitter();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -191,7 +206,7 @@ describe('AdaptationApprovalController', () => {
       async save() {},
       async updateStatus() {},
     };
-    const emitter = new InMemoryAuditEmitter();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();
@@ -211,7 +226,7 @@ describe('AdaptationApprovalController', () => {
       async save() {},
       async updateStatus() {},
     };
-    const emitter = new InMemoryAuditEmitter();
+    const emitter = createEmitter();
     const controller = new AdaptationApprovalController(repo, emitter);
 
     const reply = createReply();

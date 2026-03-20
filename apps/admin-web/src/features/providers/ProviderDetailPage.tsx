@@ -75,7 +75,7 @@ export function ProviderDetailPage() {
           </dl>
         </div>
 
-        <ProviderHealthPanel health={provider.health} />
+        {provider.health && <ProviderHealthPanel health={provider.health} />}
       </div>
     </div>
   );

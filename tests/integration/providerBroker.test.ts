@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
-// Integration Tests – Provider Broker
+// Integration Tests -- Provider Broker
+// PGlite-backed: no InMemory/Mock/Stub classes.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { Provider, ProviderSecret } from '@acds/core-types';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import type { Provider } from '@acds/core-types';
 import { ProviderVendor, AuthType } from '@acds/core-types';
 import {
   ProviderRegistryService,
@@ -11,85 +12,34 @@ import {
   AdapterResolver,
   ProviderConnectionTester,
 } from '@acds/provider-broker';
-import type { ProviderRepository } from '@acds/provider-broker';
 import type { ProviderAdapter, AdapterConfig, AdapterConnectionResult } from '@acds/provider-adapters';
+import {
+  PgProviderRepository,
+  PgSecretCipherStore,
+} from '@acds/persistence-pg';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../__test-support__/pglitePool.js';
+
+// -- PGlite lifecycle --------------------------------------------------------
+
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+afterAll(async () => {
+  await closePool();
+});
 
 // ---------------------------------------------------------------------------
-// In-memory repository mock
+// Static adapter for connection testing (not a mock -- returns fixed values)
 // ---------------------------------------------------------------------------
-class InMemoryProviderRepository implements ProviderRepository {
-  private providers: Provider[] = [];
-  private nextId = 1;
-
-  async create(input: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>): Promise<Provider> {
-    const provider: Provider = {
-      ...input,
-      id: `provider-${this.nextId++}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.providers.push(provider);
-    return provider;
-  }
-
-  async findById(id: string): Promise<Provider | null> {
-    return this.providers.find((p) => p.id === id) ?? null;
-  }
-
-  async findAll(): Promise<Provider[]> {
-    return [...this.providers];
-  }
-
-  async findByVendor(vendor: string): Promise<Provider[]> {
-    return this.providers.filter((p) => p.vendor === vendor);
-  }
-
-  async findEnabled(): Promise<Provider[]> {
-    return this.providers.filter((p) => p.enabled);
-  }
-
-  async update(id: string, updates: Partial<Omit<Provider, 'id' | 'createdAt'>>): Promise<Provider> {
-    const idx = this.providers.findIndex((p) => p.id === id);
-    if (idx === -1) throw new Error(`Provider not found: ${id}`);
-    this.providers[idx] = { ...this.providers[idx], ...updates, updatedAt: new Date() };
-    return this.providers[idx];
-  }
-
-  async disable(id: string): Promise<Provider> {
-    return this.update(id, { enabled: false });
-  }
-
-  async delete(id: string): Promise<void> {
-    this.providers = this.providers.filter((p) => p.id !== id);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Mock secret store
-// ---------------------------------------------------------------------------
-class InMemorySecretStore {
-  private secrets = new Map<string, ProviderSecret>();
-
-  store(providerId: string, secret: ProviderSecret): void {
-    this.secrets.set(providerId, secret);
-  }
-
-  retrieve(providerId: string): ProviderSecret | undefined {
-    return this.secrets.get(providerId);
-  }
-
-  retrieveByKeyId(keyId: string): ProviderSecret | undefined {
-    for (const s of this.secrets.values()) {
-      if (s.keyId === keyId) return s;
-    }
-    return undefined;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Mock adapter
-// ---------------------------------------------------------------------------
-function createMockAdapter(success: boolean): ProviderAdapter {
+function createStaticAdapter(success: boolean): ProviderAdapter {
   return {
     vendorName: 'ollama',
     validateConfig: (_config: AdapterConfig) => ({ valid: true, errors: [] }),
@@ -109,18 +59,12 @@ function createMockAdapter(success: boolean): ProviderAdapter {
 // Tests
 // ===========================================================================
 
-describe('Provider Broker – Provider Registration', () => {
-  let repo: InMemoryProviderRepository;
-  let validator: ProviderValidationService;
-  let service: ProviderRegistryService;
-
-  beforeEach(() => {
-    repo = new InMemoryProviderRepository();
-    validator = new ProviderValidationService();
-    service = new ProviderRegistryService(repo, validator);
-  });
-
+describe('Provider Broker -- Provider Registration', () => {
   it('creates a provider with valid data', async () => {
+    const repo = new PgProviderRepository(pool as any);
+    const validator = new ProviderValidationService();
+    const service = new ProviderRegistryService(repo, validator);
+
     const provider = await service.create({
       name: 'Local Ollama',
       vendor: ProviderVendor.OLLAMA,
@@ -138,6 +82,10 @@ describe('Provider Broker – Provider Registration', () => {
   });
 
   it('validates vendor and rejects invalid values', async () => {
+    const repo = new PgProviderRepository(pool as any);
+    const validator = new ProviderValidationService();
+    const service = new ProviderRegistryService(repo, validator);
+
     await expect(
       service.create({
         name: 'Bad Provider',
@@ -151,6 +99,10 @@ describe('Provider Broker – Provider Registration', () => {
   });
 
   it('validates auth type and rejects invalid values', async () => {
+    const repo = new PgProviderRepository(pool as any);
+    const validator = new ProviderValidationService();
+    const service = new ProviderRegistryService(repo, validator);
+
     await expect(
       service.create({
         name: 'Bad Auth Provider',
@@ -164,6 +116,10 @@ describe('Provider Broker – Provider Registration', () => {
   });
 
   it('validates base URL format', async () => {
+    const repo = new PgProviderRepository(pool as any);
+    const validator = new ProviderValidationService();
+    const service = new ProviderRegistryService(repo, validator);
+
     await expect(
       service.create({
         name: 'Bad URL Provider',
@@ -177,6 +133,10 @@ describe('Provider Broker – Provider Registration', () => {
   });
 
   it('lists enabled providers only', async () => {
+    const repo = new PgProviderRepository(pool as any);
+    const validator = new ProviderValidationService();
+    const service = new ProviderRegistryService(repo, validator);
+
     await service.create({
       name: 'Enabled',
       vendor: ProviderVendor.OLLAMA,
@@ -201,60 +161,51 @@ describe('Provider Broker – Provider Registration', () => {
   });
 });
 
-describe('Provider Broker – Secret Retrieval', () => {
-  let store: InMemorySecretStore;
+describe('Provider Broker -- Secret Store', () => {
+  it('stores and retrieves a secret by provider ID', async () => {
+    const store = new PgSecretCipherStore(pool as any);
 
-  beforeEach(() => {
-    store = new InMemorySecretStore();
-  });
-
-  it('stores and retrieves a secret by provider ID', () => {
-    const secret: ProviderSecret = {
-      id: 'secret-1',
-      providerId: 'provider-1',
-      ciphertextBlob: 'encrypted-blob-abc',
-      keyId: 'key-001',
+    const envelope = {
+      ciphertext: 'encrypted-blob-abc',
+      iv: 'test-iv',
+      tag: 'test-tag',
       algorithm: 'AES-256-GCM',
-      createdAt: new Date(),
-      rotatedAt: null,
-      expiresAt: null,
     };
-    store.store('provider-1', secret);
 
-    const retrieved = store.retrieve('provider-1');
+    await store.store('provider-1', envelope);
+    const retrieved = await store.retrieve('provider-1');
+
     expect(retrieved).toBeDefined();
-    expect(retrieved!.ciphertextBlob).toBe('encrypted-blob-abc');
-    expect(retrieved!.algorithm).toBe('AES-256-GCM');
+    expect(retrieved!.envelope.ciphertext).toBe('encrypted-blob-abc');
+    expect(retrieved!.envelope.algorithm).toBe('AES-256-GCM');
   });
 
-  it('retrieves a secret by key ID', () => {
-    const secret: ProviderSecret = {
-      id: 'secret-2',
-      providerId: 'provider-2',
-      ciphertextBlob: 'encrypted-blob-xyz',
-      keyId: 'key-002',
+  it('returns null for missing secrets', async () => {
+    const store = new PgSecretCipherStore(pool as any);
+    const result = await store.retrieve('nonexistent');
+    expect(result).toBeNull();
+  });
+
+  it('checks existence of secrets', async () => {
+    const store = new PgSecretCipherStore(pool as any);
+
+    expect(await store.exists('nonexistent')).toBe(false);
+
+    await store.store('provider-exists', {
+      ciphertext: 'test',
+      iv: 'iv',
+      tag: 'tag',
       algorithm: 'AES-256-GCM',
-      createdAt: new Date(),
-      rotatedAt: null,
-      expiresAt: null,
-    };
-    store.store('provider-2', secret);
+    });
 
-    const retrieved = store.retrieveByKeyId('key-002');
-    expect(retrieved).toBeDefined();
-    expect(retrieved!.providerId).toBe('provider-2');
-  });
-
-  it('returns undefined for missing secrets', () => {
-    expect(store.retrieve('nonexistent')).toBeUndefined();
-    expect(store.retrieveByKeyId('nonexistent-key')).toBeUndefined();
+    expect(await store.exists('provider-exists')).toBe(true);
   });
 });
 
-describe('Provider Broker – Connection Testing', () => {
+describe('Provider Broker -- Connection Testing', () => {
   it('returns success for a working adapter', async () => {
     const resolver = new AdapterResolver();
-    resolver.register('ollama', createMockAdapter(true));
+    resolver.register('ollama', createStaticAdapter(true));
     const tester = new ProviderConnectionTester(resolver);
 
     const provider: Provider = {
@@ -278,7 +229,7 @@ describe('Provider Broker – Connection Testing', () => {
 
   it('returns failure for a broken adapter', async () => {
     const resolver = new AdapterResolver();
-    resolver.register('ollama', createMockAdapter(false));
+    resolver.register('ollama', createStaticAdapter(false));
     const tester = new ProviderConnectionTester(resolver);
 
     const provider: Provider = {

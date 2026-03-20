@@ -28,7 +28,7 @@ Every package in the ACDS monorepo has a defined responsibility and a set of for
 
 ## packages/provider-adapters
 
-**Owns:** Base adapter contract (`ProviderAdapter`), adapter types and errors, request/response normalization, and concrete adapters for each vendor: `OllamaAdapter`, `LMStudioAdapter`, `GeminiAdapter`, `OpenAIAdapter`. Each adapter includes its own config type and request/response mapper.
+**Owns:** Base adapter contract (`ProviderAdapter`), adapter types and errors, request/response normalization, and concrete adapters for each vendor: `OllamaAdapter`, `AppleIntelligenceAdapter`. Each adapter includes its own config type and request/response mapper.
 
 **Must NOT import:** `provider-broker`, `policy-engine`, `routing-engine`, `execution-orchestrator`, `sdk`, or any app package.
 

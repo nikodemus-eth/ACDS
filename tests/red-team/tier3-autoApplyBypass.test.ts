@@ -1,8 +1,9 @@
 /**
- * ARGUS-9 Tier 3 — Auto-Apply Bypass
+ * ARGUS-9 Tier 3 -- Auto-Apply Bypass
  *
  * Tests that LowRiskAutoApplyService and isAutoApplyPermitted
  * can be bypassed through trusted provider manipulation and config abuse.
+ * Uses Static* providers (legitimate test defaults, not mocks).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -15,16 +16,16 @@ import {
   makeFamilyState,
   makeRecommendation,
   makeRankedCandidate,
-  MockFamilyRiskProvider,
-  MockFamilyPostureProvider,
-  MockRecentFailureCounter,
+  StaticFamilyRiskProvider,
+  StaticFamilyPostureProvider,
+  StaticRecentFailureCounter,
   CollectingAutoApplyDecisionWriter,
 } from './_fixtures.js';
 
 function createService(config?: { rollingScoreThreshold?: number; maxRecentFailures?: number }) {
-  const risk = new MockFamilyRiskProvider('low');
-  const posture = new MockFamilyPostureProvider(DecisionPosture.ADVISORY);
-  const failures = new MockRecentFailureCounter(0);
+  const risk = new StaticFamilyRiskProvider('low');
+  const posture = new StaticFamilyPostureProvider(DecisionPosture.ADVISORY);
+  const failures = new StaticRecentFailureCounter(0);
   const writer = new CollectingAutoApplyDecisionWriter();
   const service = new LowRiskAutoApplyService(risk, posture, failures, writer, config);
   return { risk, posture, failures, writer, service };
@@ -32,11 +33,9 @@ function createService(config?: { rollingScoreThreshold?: number; maxRecentFailu
 
 describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
 
-  describe('isAutoApplyPermitted — risk classification', () => {
+  describe('isAutoApplyPermitted -- risk classification', () => {
 
     it('permits medium risk in fully_applied mode', () => {
-      // VULN: fully_applied allows medium risk — the docs say "low and medium"
-      // but this means medium-risk families get auto-applied without human review
       expect(isAutoApplyPermitted('fully_applied', 'medium')).toBe(true);
     });
 
@@ -57,10 +56,9 @@ describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
     });
   });
 
-  describe('LowRiskAutoApplyService — trusted provider manipulation', () => {
+  describe('LowRiskAutoApplyService -- trusted provider manipulation', () => {
 
-    it('trusts riskProvider blindly — mock returns low for any family', async () => {
-      // VULN: no independent verification of risk level
+    it('trusts riskProvider blindly -- returns low for any family', async () => {
       const { service } = createService();
       const fk = 'high-consequence:family:key';
       const result = await service.inspectAndApply(
@@ -73,11 +71,9 @@ describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
       expect(result).not.toBeNull();
     });
 
-    it('trusts postureProvider blindly — mock returns ADVISORY for FINAL family', async () => {
-      // VULN: no cross-check between posture provider and actual family configuration
+    it('trusts postureProvider blindly -- returns ADVISORY for FINAL family', async () => {
       const { posture, service } = createService();
       const fk = 'final-posture:family:key';
-      // Posture provider lies — says ADVISORY when it should be FINAL
       posture.overrides.set(fk, DecisionPosture.ADVISORY);
 
       const result = await service.inspectAndApply(
@@ -90,8 +86,7 @@ describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
       expect(result).not.toBeNull();
     });
 
-    it('trusts failureCounter blindly — mock returns 0 when failures exist', async () => {
-      // VULN: no independent verification of failure count
+    it('trusts failureCounter blindly -- returns 0 when failures exist', async () => {
       const { service } = createService();
       const result = await service.inspectAndApply(
         'fam',
@@ -104,16 +99,13 @@ describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
     });
   });
 
-  describe('LowRiskAutoApplyService — config abuse', () => {
+  describe('LowRiskAutoApplyService -- config abuse', () => {
 
     it('rejects rollingScoreThreshold: -1 during construction after hardening', () => {
-      // FIXED: Previously accepted negative threshold (any score qualified), now validates 0-1 range
       expect(() => createService({ rollingScoreThreshold: -1 })).toThrow();
     });
 
     it('creates AutoApplyDecisionRecord but does NOT mutate FamilySelectionState', async () => {
-      // VULN: gap between decision and application — record is written but
-      // no service actually changes the family's currentCandidateId
       const { writer, service } = createService();
       await service.inspectAndApply(
         'fam',
@@ -123,11 +115,9 @@ describe('ARGUS F7, G7: Auto-Apply Bypass', () => {
         'auto_apply_low_risk',
       );
       expect(writer.decisions).toHaveLength(1);
-      // But no FamilySelectionState was mutated — the service doesn't have access to the repo
     });
 
     it('rejects FINAL posture even with low risk and high score', async () => {
-      // Correct behavior: FINAL posture should never auto-apply
       const { posture, service } = createService();
       posture.overrides.set('fam', DecisionPosture.FINAL);
 

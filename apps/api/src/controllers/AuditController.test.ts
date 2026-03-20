@@ -1,5 +1,26 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { AuditController, type AuditEventReader } from './AuditController.js';
+import { PgAuditEventRepository } from '@acds/persistence-pg';
+import { createTestPool, runMigrations, truncateAll, closePool, type PoolLike } from '../../../../tests/__test-support__/pglitePool.js';
+
+// -- PGlite lifecycle --------------------------------------------------------
+
+let pool: PoolLike;
+
+beforeAll(async () => {
+  pool = await createTestPool();
+  await runMigrations(pool);
+});
+
+beforeEach(async () => {
+  await truncateAll(pool);
+});
+
+afterAll(async () => {
+  await closePool();
+});
+
+// -- Helpers -----------------------------------------------------------------
 
 function createReply() {
   return {
@@ -10,35 +31,29 @@ function createReply() {
   };
 }
 
-function makeAuditEvent(id: string) {
-  return {
-    id,
-    eventType: 'execution_completed' as any,
-    actor: 'system',
-    action: 'complete',
-    resourceType: 'execution',
-    resourceId: 'exec-1',
-    application: 'test_app',
-    details: { result: 'success' },
-    timestamp: new Date('2026-03-15T10:00:00Z'),
-  };
+function createReader(): PgAuditEventRepository {
+  return new PgAuditEventRepository(pool as any);
 }
 
-class InMemoryAuditReader implements AuditEventReader {
-  private events = [makeAuditEvent('audit-1'), makeAuditEvent('audit-2')];
+const AUDIT_ID_1 = '00000000-0000-0000-0000-000000000001';
+const AUDIT_ID_2 = '00000000-0000-0000-0000-000000000002';
+const AUDIT_ID_MISSING = '00000000-0000-0000-0000-00000000ffff';
 
-  async findById(id: string) {
-    return this.events.find((e) => e.id === id) ?? null;
-  }
-
-  async find(_filters: any) {
-    return this.events;
-  }
+async function seedAuditEvent(id: string) {
+  await pool.query(
+    `INSERT INTO audit_events (id, event_type, actor, action, resource_type, resource_id, application, details, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [id, 'execution_completed', 'system', 'complete', 'execution', 'exec-1', 'test_app', JSON.stringify({ result: 'success' }), new Date('2026-03-15T10:00:00Z')],
+  );
 }
+
+// -- Tests -------------------------------------------------------------------
 
 describe('AuditController', () => {
   it('list returns formatted audit events', async () => {
-    const controller = new AuditController(new InMemoryAuditReader());
+    await seedAuditEvent(AUDIT_ID_1);
+    await seedAuditEvent(AUDIT_ID_2);
+    const controller = new AuditController(createReader());
     const reply = createReply();
     await controller.list({ query: {} } as any, reply as any);
 
@@ -91,20 +106,21 @@ describe('AuditController', () => {
   });
 
   it('getById returns event when found', async () => {
-    const controller = new AuditController(new InMemoryAuditReader());
+    await seedAuditEvent(AUDIT_ID_1);
+    const controller = new AuditController(createReader());
     const reply = createReply();
-    await controller.getById({ params: { id: 'audit-1' } } as any, reply as any);
+    await controller.getById({ params: { id: AUDIT_ID_1 } } as any, reply as any);
 
     expect(reply.statusCode).toBe(200);
-    expect((reply.body as any).id).toBe('audit-1');
+    expect((reply.body as any).id).toBe(AUDIT_ID_1);
   });
 
   it('getById returns 404 when not found', async () => {
-    const controller = new AuditController(new InMemoryAuditReader());
+    const controller = new AuditController(createReader());
     const reply = createReply();
-    await controller.getById({ params: { id: 'missing' } } as any, reply as any);
+    await controller.getById({ params: { id: AUDIT_ID_MISSING } } as any, reply as any);
 
     expect(reply.statusCode).toBe(404);
-    expect((reply.body as any).message).toContain('missing');
+    expect((reply.body as any).message).toContain(AUDIT_ID_MISSING);
   });
 });
