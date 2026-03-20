@@ -218,7 +218,7 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
   adapterResolver.register('gemini', new GeminiAdapter());
   adapterResolver.register('apple', new AppleIntelligenceAdapter());
 
-  const providerExecutionProxy = new ProviderExecutionProxy(adapterResolver);
+  const providerExecutionProxy = new ProviderExecutionProxy(adapterResolver, 120_000);
   const providerHealthService = new ProviderHealthService(providerHealthRepository);
   const providerRegistryService = new ProviderRegistryService(
     providerRepository,
