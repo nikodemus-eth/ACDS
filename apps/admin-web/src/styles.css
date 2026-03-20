@@ -681,6 +681,227 @@ textarea {
   font-size: 0.88rem;
 }
 
+/* ── Artifact Registry ────────────────────────── */
+
+.artifact-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.4rem;
+}
+
+.artifact-stats__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.85rem 1.2rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 1rem;
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  min-width: 6rem;
+}
+
+.artifact-stats__value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--secondary);
+}
+
+.artifact-stats__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.artifact-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.2rem;
+}
+
+.artifact-filter__btn {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.artifact-filter__btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--text);
+}
+
+.artifact-filter__btn--active {
+  background: var(--secondary);
+  color: white;
+  border-color: var(--secondary);
+}
+
+.artifact-filter__btn--active:hover {
+  background: var(--secondary);
+  color: white;
+}
+
+.artifact-type-label {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.84rem;
+}
+
+.artifact-type-label__family {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
+.artifact-type-label__dot {
+  color: var(--muted);
+}
+
+.artifact-type-label__action {
+  color: var(--text);
+}
+
+.artifact-type-label__variant {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.artifact-capability {
+  font-size: 0.82rem;
+  padding: 0.15rem 0.4rem;
+  background: rgba(39, 76, 119, 0.08);
+  border-radius: 0.3rem;
+  color: var(--secondary);
+}
+
+/* Artifact detail page */
+
+.artifact-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.artifact-detail__section {
+  border: 1px solid var(--surface-border);
+  border-radius: 1.35rem;
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+  padding: 1.4rem 1.6rem;
+}
+
+.artifact-detail__section-title {
+  margin: 0 0 1rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--secondary);
+}
+
+.artifact-detail__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin: 0;
+}
+
+.artifact-detail__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.artifact-detail__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.artifact-detail__label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  flex-shrink: 0;
+  min-width: 10rem;
+}
+
+.artifact-detail__value {
+  font-weight: 500;
+  text-align: right;
+  margin: 0;
+}
+
+.artifact-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.artifact-tags__tag {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(39, 76, 119, 0.08);
+  color: var(--secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.artifact-tags--policy .artifact-tags__tag {
+  background: rgba(165, 73, 30, 0.1);
+  color: var(--primary);
+}
+
+/* Pipeline stages visualization */
+
+.artifact-pipeline-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.artifact-pipeline-stages__stage {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 0.75rem;
+  background: var(--surface-strong);
+  font-size: 0.84rem;
+}
+
+.artifact-pipeline-stages__number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.artifact-pipeline-stages__name {
+  font-weight: 500;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

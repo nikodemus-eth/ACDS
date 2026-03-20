@@ -14,6 +14,8 @@ import { ApprovalDetailPage } from '../features/adaptation/ApprovalDetailPage';
 import { RollbackQueuePage } from '../features/adaptation/RollbackQueuePage';
 import { RollbackDetailPage } from '../features/adaptation/RollbackDetailPage';
 import { AppleIntelligencePage } from '../features/apple-intelligence/AppleIntelligencePage';
+import { ArtifactsPage } from '../features/artifacts/ArtifactsPage';
+import { ArtifactDetailPage } from '../features/artifacts/ArtifactDetailPage';
 
 export function AppRouter() {
   return (
@@ -39,6 +41,8 @@ export function AppRouter() {
           <Route path="/adaptation/rollbacks" element={<RollbackQueuePage />} />
           <Route path="/adaptation/rollbacks/:familyKey" element={<RollbackDetailPage />} />
           <Route path="/adaptation/:familyKey" element={<FamilyPerformancePage />} />
+          <Route path="/artifacts" element={<ArtifactsPage />} />
+          <Route path="/artifacts/:artifactType" element={<ArtifactDetailPage />} />
           <Route path="/apple-intelligence" element={<AppleIntelligencePage />} />
         </Route>
       </Routes>

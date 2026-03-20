@@ -8,6 +8,7 @@ const navItems = [
   { to: '/adaptation', label: 'Adaptation' },
   { to: '/audit', label: 'Audit' },
   { to: '/executions', label: 'Executions' },
+  { to: '/artifacts', label: 'Artifacts' },
   { to: '/apple-intelligence', label: 'Apple Intelligence' },
 ] as const;
 
