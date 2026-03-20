@@ -28,6 +28,7 @@ import type { DispatchResolverDeps } from '@acds/routing-engine';
 import type { AppConfig } from '../config/index.js';
 import type { FastifyInstance } from 'fastify';
 import { ProfileCatalogService } from '../services/ProfileCatalogService.js';
+import { CapabilityTestService } from '../services/CapabilityTestService.js';
 
 type ModelProfileSeed = Omit<ModelProfile, 'id' | 'description' | 'enabled' | 'createdAt' | 'updatedAt'> & {
   name: string;
@@ -359,6 +360,11 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     triageRunService,
     routingAuditWriter,
     providerAuditWriter,
+    capabilityTestService: new CapabilityTestService({
+      registryService: providerRegistryService,
+      executionProxy: providerExecutionProxy,
+      resolveApiKey: (pid: string) => resolveProviderApiKey(providerRepository, pid),
+    }),
     resolve<T>(name: string): T {
       return this[name] as T;
     },

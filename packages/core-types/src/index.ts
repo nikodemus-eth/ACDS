@@ -28,6 +28,7 @@ export type { DispatchRunRequest } from './contracts/DispatchRunRequest.js';
 export type { DispatchRunResponse } from './contracts/DispatchRunResponse.js';
 export type { IntentEnvelope, ExecutionConstraints } from './contracts/IntentEnvelope.js';
 export type { TriageDecision, TriageError, TriageErrorCode, CandidateEvaluation } from './contracts/TriageDecision.js';
+export type { CapabilityManifestEntry, CapabilityTestRequest, CapabilityTestResponse, InputMode, OutputMode } from './contracts/CapabilityManifest.js';
 
 // Events
 export type { ExecutionRationale } from './events/ExecutionRationale.js';

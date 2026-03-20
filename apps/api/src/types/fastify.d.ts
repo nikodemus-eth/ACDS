@@ -6,6 +6,7 @@ import type { AdaptationRollbackService, AdaptationApprovalRepository, ApprovalA
 import type { PgPolicyRepository } from '@acds/persistence-pg';
 import type { RoutingAuditWriter, ProviderAuditWriter } from '@acds/audit-ledger';
 import type { ProfileCatalogService } from '../services/ProfileCatalogService.js';
+import type { CapabilityTestService } from '../services/CapabilityTestService.js';
 import type { AuditEventReader } from '../controllers/AuditController.js';
 import type { TriageRunService } from '../controllers/TriageController.js';
 import type {
@@ -36,6 +37,7 @@ interface DiContainer {
   triageRunService: TriageRunService;
   routingAuditWriter: RoutingAuditWriter;
   providerAuditWriter: ProviderAuditWriter;
+  capabilityTestService: CapabilityTestService;
   resolve<T>(name: string): T;
   [key: string]: unknown;
 }

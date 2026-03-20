@@ -53,6 +53,7 @@ function makeRecord(overrides: Partial<Omit<ExecutionRecord, 'id'>> = {}): Omit<
     normalizedOutput: null,
     errorMessage: null,
     fallbackAttempts: 0,
+    requestId: null,
     createdAt: new Date(),
     completedAt: null,
     ...overrides,

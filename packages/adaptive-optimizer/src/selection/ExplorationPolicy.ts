@@ -57,7 +57,19 @@ export function computeExplorationRate(
 ): number {
   const c: ExplorationConfig = { ...DEFAULT_CONFIG, ...config };
 
-  let rate = c.baseRate * CONSEQUENCE_MULTIPLIERS[c.consequenceLevel];
+  // When no config overrides are supplied at all, and the familyState carries
+  // a pre-computed explorationRate, use it directly. This keeps the stored rate
+  // authoritative for the common case (select → shouldExplore with no config).
+  // When ANY config partial is supplied, always use the config-based formula.
+  const hasConfigOverrides = Object.keys(config).length > 0;
+  let rate: number;
+  if (!hasConfigOverrides &&
+      typeof familyState.explorationRate === 'number' &&
+      Number.isFinite(familyState.explorationRate)) {
+    rate = familyState.explorationRate;
+  } else {
+    rate = c.baseRate * CONSEQUENCE_MULTIPLIERS[c.consequenceLevel];
+  }
 
   // If a plateau is detected, boost exploration to escape it
   if (familyState.plateauDetected) {

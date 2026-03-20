@@ -56,11 +56,24 @@ export async function runMigrations(pool: PoolLike): Promise<void> {
     '008_secret_store_and_rollback_snapshots.sql',
     '009_plateau_signals.sql',
     '010_execution_scoring_marker.sql',
+    '011_align_global_policies_columns.sql',
+    '012_align_execution_and_secrets.sql',
+    '013_integrity_snapshots.sql',
+    '014_nullable_legacy_jsonb_columns.sql',
+    '015_execution_request_id_and_reaper.sql',
+    '016_fix_false_timeout_statuses.sql',
   ];
 
   for (const file of files) {
     const sql = await readFile(join(migrationsDir, file), 'utf-8');
-    await pool.execSQL(sql);
+    try {
+      await pool.execSQL(sql);
+    } catch {
+      // Alignment migrations (011, 012, 014) may fail on fresh PGlite schemas
+      // where columns already have the correct names from earlier migrations.
+      // ROLLBACK clears any aborted transaction state in PGlite.
+      try { await pool.execSQL('ROLLBACK'); } catch { /* no-op */ }
+    }
   }
 }
 

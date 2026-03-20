@@ -142,9 +142,24 @@ Audit events are written to the `audit_events` table through a layered architect
 
 All audit writes are fire-and-forget with error logging — audit failures never block the dispatch path.
 
+## Capability Test Console
+
+The Capability Test Console is a full-stack testing surface that lets operators exercise every provider capability through the admin web UI.
+
+**Backend flow**: `CapabilityTestController` → `CapabilityTestService` → `ProviderCapabilityManifestBuilder` + `ProviderExecutionProxy`
+
+- `ProviderCapabilityManifestBuilder` maps vendor-specific capabilities to a unified `CapabilityManifestEntry[]`. Standard providers (Ollama, OpenAI, LM Studio, Gemini) expose a single `text.generate` capability. Apple Intelligence exposes 26 methods across 8 subsystems.
+- `CapabilityTestService.testCapability()` resolves the provider, builds an `AdapterRequest`, and executes through the same `ProviderExecutionProxy` used by the dispatch pipeline.
+- Routes: `GET /providers/:id/capabilities` (manifest) and `POST /providers/:id/capabilities/:capabilityId/test` (execution).
+
+**Frontend flow**: `CapabilityTestConsolePage` → `CapabilityTabs` (sidebar) → `InputRenderer` / `OutputRenderer` / `ExecutionMetadata` / `RawResponseViewer`
+
+- `InputRenderer` switches on `InputMode` to render appropriate input controls (text prompt, image description, TTS text, audio upload, JSON editor).
+- `OutputRenderer` switches on `OutputMode` to display results (formatted text, image preview, audio player, JSON tree, error panel).
+
 ## Infrastructure
 
-- `infra/db` -- Database migrations and seed data (PostgreSQL). Migrations 001–013 cover all tables. Migrations are append-only — never modify an applied migration; create a new ALTER migration instead.
+- `infra/db` -- Database migrations and seed data (PostgreSQL). Migrations 001–016 cover all tables. Migrations are append-only — never modify an applied migration; create a new ALTER migration instead.
 - `infra/docker` -- Container definitions for local and production deployments
 - `infra/config` -- Profile and policy configuration files
 - `infra/scripts` -- Operational scripts (backup, migration, health checks)

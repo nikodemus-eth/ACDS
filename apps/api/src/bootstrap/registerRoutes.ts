@@ -15,6 +15,7 @@ import { adaptationApprovalRoutes } from '../routes/adaptationApprovalRoutes.js'
 import { adaptationRollbackRoutes } from '../routes/adaptationRollbackRoutes.js';
 import { artifactsRoutes } from '../routes/artifactsRoutes.js';
 import { triageRoutes } from '../routes/triageRoutes.js';
+import { capabilityTestRoutes } from '../routes/capabilityTestRoutes.js';
 
 /**
  * Registers all route modules with appropriate URL prefixes.
@@ -22,6 +23,7 @@ import { triageRoutes } from '../routes/triageRoutes.js';
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes);
   await app.register(providersRoutes, { prefix: '/providers' });
+  await app.register(capabilityTestRoutes, { prefix: '/providers' });
   await app.register(profilesRoutes, { prefix: '/profiles' });
   await app.register(policiesRoutes, { prefix: '/policies' });
 

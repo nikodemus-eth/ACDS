@@ -48,6 +48,7 @@ beforeAll(async () => {
       normalized_output         TEXT,
       error_message             TEXT,
       fallback_attempts         INTEGER     DEFAULT 0,
+      request_id                VARCHAR,
       completed_at              TIMESTAMPTZ,
       created_at                TIMESTAMPTZ DEFAULT NOW()
     );
@@ -84,6 +85,7 @@ function makeRecord(overrides: Partial<Omit<ExecutionRecord, 'id'>> = {}): Omit<
     normalizedOutput: 'test output',
     errorMessage: null,
     fallbackAttempts: 0,
+    requestId: null,
     createdAt: new Date('2026-03-16T11:00:00Z'),
     completedAt: new Date('2026-03-16T12:00:00Z'),
     ...overrides,

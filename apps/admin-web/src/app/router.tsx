@@ -16,6 +16,7 @@ import { RollbackDetailPage } from '../features/adaptation/RollbackDetailPage';
 import { AppleIntelligencePage } from '../features/apple-intelligence/AppleIntelligencePage';
 import { ArtifactsPage } from '../features/artifacts/ArtifactsPage';
 import { ArtifactDetailPage } from '../features/artifacts/ArtifactDetailPage';
+import { CapabilityTestConsolePage } from '../features/providers/CapabilityTestConsolePage';
 
 export function AppRouter() {
   return (
@@ -30,6 +31,7 @@ export function AppRouter() {
           <Route path="/" element={<Navigate to="/providers" replace />} />
           <Route path="/providers" element={<ProvidersPage />} />
           <Route path="/providers/:id" element={<ProviderDetailPage />} />
+          <Route path="/providers/:id/test" element={<CapabilityTestConsolePage />} />
           <Route path="/profiles" element={<ProfilesPage />} />
           <Route path="/policies" element={<PoliciesPage />} />
           <Route path="/audit" element={<AuditPage />} />

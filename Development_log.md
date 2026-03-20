@@ -1380,3 +1380,78 @@ Six pure-function modules implementing the ITS pipeline:
 - `CandidateEvaluator.test.ts` (8 tests): eligibility with 7 rejection reasons, trust zone enforcement, context window checks
 - `TriageRanker.test.ts` (5 tests): cost ranking, tiebreaker, exclusion, determinism (20 iterations)
 - `TriagePipeline.test.ts` (9 tests): happy path, no-provider, invalid input, fallback chain, classification, policy evaluation, sensitivity enforcement, determinism (10 iterations)
+
+## 2026-03-19 — Execution Status Fixes, Auto-Reaper, Run ID Linking
+
+### Execution Status Tracking Fixes
+
+- Fixed false "failed" statuses caused by premature 30-second timeout in `ExecutionStatusTracker`
+- Root cause: timeout timer fired before providers returned responses, marking executions as failed even when they eventually succeeded
+- Fix: increased default timeout, added cancellation on completion, added `request_id` column for Process Swarm run linking
+- Migration 015: `request_id TEXT` column on `execution_records`, index for fast lookup
+- Migration 016: fixes false timeout statuses by resetting impacted records
+
+### Auto-Reaper
+
+- `reapStaleExecutions(thresholdMs)` method on `PgExecutionRecordRepository`
+- Marks stale `pending`/`running` executions older than threshold as `auto_reaped`
+- Prevents ghost executions from accumulating in the system
+
+### Admin Web Empty Pages Fix
+
+- Root cause: `vite preview` (used by launchd service) had no proxy config
+- `server.proxy` only applies to dev mode; `preview.proxy` was missing
+- Added proxy to `preview` section in `vite.config.ts`
+- Created `.env.production.local` for production build env vars
+- Fixed build script to use `tsconfig.typecheck.json` with correct `rootDir`
+
+## 2026-03-20 — ExplorationPolicy Fix, 100% Coverage, Capability Test Console
+
+### ExplorationPolicy Bug Fix (Flaky Test Root Cause)
+
+- `computeExplorationRate()` always recalculated from `baseRate * consequenceMultiplier`, ignoring `familyState.explorationRate`
+- When `AdaptiveSelectionService` called `shouldExplore(familyState)` with no config, the stored exploration rate was unused
+- Fix: when no config overrides are provided, use `familyState.explorationRate` as baseline; when config is provided, use config-based calculation
+- This makes `explorationRate: 0` deterministically prevent exploration, and `explorationRate: 1.0` reliably force it
+
+### Stale Build Artifact Cleanup
+
+- Found 257 stale `.js`/`.d.ts` compiled files in `packages/*/src/` directories
+- These caused vitest to load outdated compiled JS instead of current `.ts` sources
+- Manifested as "not a function" errors for methods that clearly exist in `.ts` files
+- Cleaned all stale artifacts; also removed stale `pglitePool.js` from test support
+
+### Migration Runner Fix (PGlite ROLLBACK)
+
+- Alignment migrations (011, 012, 014) fail on fresh PGlite schemas where columns already have correct names
+- Failed `BEGIN` transactions left PGlite in "aborted transaction" state, blocking all subsequent migrations
+- Fix: added `ROLLBACK` after catch in `runMigrations` to clear aborted transaction state
+
+### ACDS Capability Test Console
+
+Full-stack feature for testing every provider capability through the admin web interface.
+
+**Backend:**
+- `CapabilityManifest` types: `InputMode` (text_prompt, image_prompt, tts_prompt, audio_input, long_text, structured_options), `OutputMode` (text, image, audio, json, error), `CapabilityManifestEntry`, `CapabilityTestRequest`, `CapabilityTestResponse`
+- `ProviderCapabilityManifestBuilder`: maps vendor-specific capabilities to unified manifest entries
+  - Standard providers (Ollama, OpenAI, LM Studio, Gemini): single `text.generate` capability
+  - Apple Intelligence: 26 methods across 8 subsystems (foundation_models, image_creator, tts, speech, sound, vision, translation, writing_tools)
+- `CapabilityTestService`: orchestrates capability testing via `ProviderExecutionProxy`
+- `CapabilityTestController`: Fastify controller with `GET /:id/capabilities` and `POST /:id/capabilities/:capabilityId/test`
+- Routes registered under `/providers` prefix with auth middleware
+
+**Frontend:**
+- `CapabilityTestConsolePage`: two-column layout with capability sidebar and input/output panels
+- `CapabilityTabs`: tab navigation grouped by category (text, speech, image, sound, translation)
+- `InputRenderer`: mode-specific input forms (textarea, file upload, JSON editor)
+- `OutputRenderer`: mode-specific output display (text, image preview, audio player, JSON viewer, error panel)
+- `ExecutionMetadata`: timestamp, duration, provider, capability, success/failure badge
+- `RawResponseViewer`: collapsible JSON viewer for raw API responses
+- Route: `/providers/:id/test`, accessible via "Test Capabilities" button on provider detail page
+
+### Test Coverage
+
+- Expanded test suite from ~2308 to 2935+ tests across 289 test files
+- Added comprehensive tests for: routing-engine (8 new files), provider-adapters (6 new files), adaptive-optimizer, execution-orchestrator, policy-engine, security, evaluation, api controllers/presenters
+- All tests use real PGlite databases — zero mocks
+- All 8 red-team tests pass (ARGUS-9 adversarial test suite)

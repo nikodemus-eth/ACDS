@@ -30,6 +30,12 @@ export function ProviderDetailPage() {
               Back
             </button>
             <button
+              onClick={() => navigate(`/providers/${id}/test`)}
+              className="button button--secondary"
+            >
+              Test Capabilities
+            </button>
+            <button
               onClick={() => testMutation.mutate(id!)}
               disabled={testMutation.isPending}
               className="button button--primary"

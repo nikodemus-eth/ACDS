@@ -99,6 +99,24 @@ describe('ExecutionStatusTracker', () => {
     expect(tracker.getStatus('nonexistent')).toBeUndefined();
   });
 
+  it('hydrateFromRecords populates the tracker with external records', () => {
+    const tracker = new ExecutionStatusTracker();
+    tracker.hydrateFromRecords([
+      { id: 'hydrated-1', status: 'running' },
+      { id: 'hydrated-2', status: 'succeeded' },
+    ]);
+
+    expect(tracker.getStatus('hydrated-1')?.status).toBe('running');
+    expect(tracker.getStatus('hydrated-2')?.status).toBe('succeeded');
+    expect(tracker.getStatus('hydrated-1')?.routingDecisionId).toBe('');
+  });
+
+  it('hydrateFromRecords with empty array does not add entries', () => {
+    const tracker = new ExecutionStatusTracker();
+    tracker.hydrateFromRecords([]);
+    expect(tracker.getStatus('any')).toBeUndefined();
+  });
+
   it('updatedAt changes after status transition', async () => {
     const tracker = new ExecutionStatusTracker();
     const id = await tracker.create(makeDecision() as any, makeRequest() as any);
