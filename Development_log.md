@@ -1331,3 +1331,52 @@ Integrated Process Swarm Gen2 with ACDS so that swarm runs create execution reco
 - Both `/executions` and `/audit` API endpoints return Process Swarm data
 - ACDS admin UI Executions page shows `process_swarm` application with `Oregon AI Governance Intelligence Brief` process
 - Audit Log page shows `routing.resolved`, `execution.started`, `execution.completed`/`execution.failed` events
+
+## 2026-03-20 — Inference Triage System (ITS) Implementation
+
+Implemented the Inference Triage System — a deterministic, policy-bound routing engine that maps task characteristics to minimum sufficient inference capability. ITS replaces manual model selection with constraint-based routing through sensitivity classes, trust zones, and quality tiers.
+
+### Core Types (`@acds/core-types`)
+
+- **IntentEnvelope**: Structured task metadata input — `taskClass`, `modality`, `sensitivity`, `qualityTier`, `executionConstraints`, `contextSizeEstimate`, `origin`
+- **TriageDecision**: Full output with classification, policy evaluation, candidate evaluations (with explicit rejection reasons), selected provider, fallback chain
+- **New enums**: `Modality` (5 values), `Sensitivity` (5 levels), `QualityTier` (4 tiers), `ContextSize` (3 sizes), `TrustZone` (3 zones)
+- **TriageError**: Typed error codes — `NO_ELIGIBLE_PROVIDER`, `POLICY_CONFLICT`, `INVALID_INTENT_ENVELOPE`
+- **AuditEventType**: Added `TRIAGE` value
+
+### Triage Engine (`@acds/routing-engine/triage/`)
+
+Six pure-function modules implementing the ITS pipeline:
+
+1. **IntentEnvelopeValidator** — Validates all required fields and enum values, checks mutually exclusive constraints
+2. **IntentTranslator** — Maps IntentEnvelope → RoutingRequest: `qualityTier→cognitiveGrade` (LOW→BASIC, MEDIUM→STANDARD, HIGH→ENHANCED, CRITICAL→FRONTIER), `sensitivity→privacy` (RESTRICTED/CONFIDENTIAL/REGULATED→local_only), `executionConstraints` override sensitivity
+3. **SensitivityPolicyResolver** — Maps sensitivity to allowed trust zones: PUBLIC/INTERNAL→[local,device,external], RESTRICTED→[local,device], CONFIDENTIAL/REGULATED→[local]
+4. **CandidateEvaluator** — Evaluates all model profiles against policy, request, sensitivity, and context size. Returns explicit rejection reasons: `disabled`, `policy_blocked`, `policy_allowlist_excluded`, `capability_mismatch`, `load_tier_unsupported`, `trust_zone_violation`, `context_size_exceeded`
+5. **TriageRanker** — Multi-factor ranking: (1) lowest cost, (2) smallest context window, (3) alphabetical ID tiebreaker. Implements "minimum sufficient intelligence"
+6. **TriagePipeline** — Orchestrates the full 8-step pipeline: validate → sensitivity → translate → policy → evaluate → enrich → rank → emit
+
+### API Endpoints
+
+- `POST /triage` — Pure routing decision, returns `TriageDecision` without execution
+- `POST /triage/run` — Routes through ITS then executes via existing provider proxy, returns `{ triageDecision, executionResult }`
+- `TriageController` with `TriageRunService` interface wired through DI container
+- Auth middleware applied to all triage routes
+
+### Process Swarm Integration
+
+- Added ITS data classes to `acds_client.py`: `IntentEnvelope`, `ExecutionConstraints`, `TriageRunRequest`, `TriageRunResponse`
+- `ACDSClient.triage()` method calls `POST /triage/run`
+- `ACDSInferenceProvider.infer()` now routes through ITS first, falls back to legacy `/dispatch/run` on 404 (graceful migration)
+- New ITS parameters (`sensitivity`, `modality`, `quality_tier`) with backward-compatible defaults
+- `COGNITIVE_TO_QUALITY` mapping: BASIC→low, STANDARD→medium, ENHANCED→high, FRONTIER→critical
+- Existing adapter calls (`cr_clustering`, `cr_extraction`, etc.) work unchanged — new params use defaults
+
+### Tests
+
+42 unit tests across 6 test files, all passing:
+- `IntentEnvelopeValidator.test.ts` (8 tests): valid/invalid envelopes, missing fields, bad enum values, mutually exclusive constraints
+- `SensitivityPolicyResolver.test.ts` (5 tests): all 5 sensitivity levels → trust zones
+- `IntentTranslator.test.ts` (7 tests): quality→grade mapping, sensitivity→privacy mapping, constraint overrides
+- `CandidateEvaluator.test.ts` (8 tests): eligibility with 7 rejection reasons, trust zone enforcement, context window checks
+- `TriageRanker.test.ts` (5 tests): cost ranking, tiebreaker, exclusion, determinism (20 iterations)
+- `TriagePipeline.test.ts` (9 tests): happy path, no-provider, invalid input, fallback chain, classification, policy evaluation, sensitivity enforcement, determinism (10 iterations)

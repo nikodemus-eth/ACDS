@@ -13,7 +13,9 @@ import {
   ProviderHealthService,
 } from '@acds/provider-broker';
 import { OpenAIAdapter, OllamaAdapter, LMStudioAdapter, GeminiAdapter, AppleIntelligenceAdapter, type AdapterRequest, type AdapterResponse } from '@acds/provider-adapters';
-import { DispatchResolver, type DispatchResult } from '@acds/routing-engine';
+import { DispatchResolver, type DispatchResult, IntentTranslator } from '@acds/routing-engine';
+import type { TriagePipelineDeps } from '@acds/routing-engine';
+import type { IntentEnvelope, TriageDecision } from '@acds/core-types';
 import { DispatchRunService, ExecutionRecordService } from '@acds/execution-orchestrator';
 import { PersistingExecutionStatusTracker } from './PersistingExecutionStatusTracker.js';
 import { PersistingFallbackDecisionTracker } from './PersistingFallbackDecisionTracker.js';
@@ -292,6 +294,50 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     },
   }, fallbackTracker);
 
+  const intentTranslator = new IntentTranslator();
+
+  const triageRunService = {
+    async buildTriageDeps(envelope: IntentEnvelope): Promise<TriagePipelineDeps> {
+      const routingRequest = intentTranslator.translate(envelope);
+      const deps = await buildResolverDeps(
+        routingRequest,
+        providerRepository,
+        policyRepository,
+        modelProfiles,
+        tacticProfiles,
+      );
+      return deps;
+    },
+
+    async executeFromDecision(decision: TriageDecision, inputPayload: unknown) {
+      if (!decision.selectedProvider) {
+        throw new Error('No provider selected in triage decision');
+      }
+      const { providerId, modelProfileId } = decision.selectedProvider;
+      const modelId = modelProfileById.get(modelProfileId)?.modelId;
+
+      if (!modelId) throw new Error(`Model profile not found: ${modelProfileId}`);
+
+      const provider = await providerRepository.findById(providerId);
+      if (!provider) throw new Error(`Provider not found: ${providerId}`);
+
+      const apiKey = await resolveProviderApiKey(providerRepository, providerId);
+      const response = await providerExecutionProxy.execute(provider, {
+        prompt: typeof inputPayload === 'string' ? inputPayload : JSON.stringify(inputPayload),
+        model: modelId,
+        responseFormat: 'text',
+      }, apiKey);
+
+      return {
+        status: 'succeeded',
+        normalizedOutput: response.content,
+        selectedProviderId: providerId,
+        selectedModelProfileId: modelProfileId,
+        latencyMs: response.latencyMs,
+      };
+    },
+  };
+
   const container: FastifyInstance['diContainer'] = {
     providerHealthService,
     registryService: providerRegistryService,
@@ -309,6 +355,7 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     adaptationApprovalRepository: approvalRepository as AdaptationApprovalRepository,
     approvalAuditEmitter: new PgApprovalAuditEmitter(pool),
     adaptationRollbackService: rollbackService,
+    triageRunService,
     routingAuditWriter,
     providerAuditWriter,
     resolve<T>(name: string): T {

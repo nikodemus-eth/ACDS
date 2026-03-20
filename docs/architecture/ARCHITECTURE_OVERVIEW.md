@@ -38,7 +38,23 @@ Additional worker applications:
 
 ## External Integrations
 
-- **Process Swarm Gen2** (`/ACDS - Process Swarm Integration/process-swarm-gen2/`) — Workflow execution engine that dispatches inference requests through ACDS via `POST /dispatch/run`. The `SwarmRunner` creates ACDS execution records at run start, and individual tool adapters route LLM calls through `ACDSInferenceProvider.infer()` which maps to `RoutingRequest` contracts. Fallback: adapters call Ollama/Apple Intelligence directly if ACDS is unavailable. Environment config: `INFERENCE_PROVIDER=acds`, `ACDS_BASE_URL`, `ACDS_AUTH_TOKEN`.
+- **Process Swarm Gen2** (`/ACDS - Process Swarm Integration/process-swarm-gen2/`) — Workflow execution engine that dispatches inference requests through ACDS. Per-step inference routes through the Inference Triage System (ITS) via `POST /triage/run`, with graceful fallback to legacy `POST /dispatch/run` if ITS is unavailable. The `SwarmRunner` creates ACDS execution records at run start, and individual tool adapters route LLM calls through `ACDSInferenceProvider.infer()` which builds `IntentEnvelope` contracts. Environment config: `INFERENCE_PROVIDER=acds`, `ACDS_BASE_URL`, `ACDS_AUTH_TOKEN`.
+
+## Inference Triage System (ITS)
+
+The ITS is a deterministic, policy-bound routing engine within `@acds/routing-engine/triage/`. It accepts an `IntentEnvelope` (task metadata describing what needs to be done) and produces a `TriageDecision` (which provider/model should handle it and why).
+
+**Pipeline:** Validate → Sensitivity → Translate → Policy → Evaluate → Rank → Select → Emit
+
+**Key concepts:**
+- **Sensitivity classes** (public → internal → restricted → confidential → regulated) map to allowed **trust zones** (local, device, external)
+- **Minimum sufficient intelligence**: always select the cheapest, lowest-latency provider that satisfies all constraints
+- **Full candidate evaluation**: every model profile is evaluated with explicit rejection reasons (capability_mismatch, trust_zone_violation, policy_blocked, etc.)
+- **Deterministic**: identical input always produces identical output
+
+**Endpoints:** `POST /triage` (pure decision), `POST /triage/run` (decision + execution)
+
+See `docs/architecture/inference-triage-system.md` for the full specification.
 
 ## Dependency Direction
 

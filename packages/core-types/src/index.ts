@@ -6,6 +6,11 @@ export { CognitiveGrade } from './enums/CognitiveGrade.js';
 export { ProviderVendor } from './enums/ProviderVendor.js';
 export { AuthType } from './enums/AuthType.js';
 export { AuditEventType } from './enums/AuditEventType.js';
+export { Modality } from './enums/Modality.js';
+export { Sensitivity } from './enums/Sensitivity.js';
+export { QualityTier } from './enums/QualityTier.js';
+export { ContextSize } from './enums/ContextSize.js';
+export { TrustZone } from './enums/TrustZone.js';
 
 // Entities
 export type { Provider } from './entities/Provider.js';
@@ -21,6 +26,8 @@ export type { RoutingRequest, RoutingConstraints, InstanceContext } from './cont
 export type { RoutingDecision, FallbackEntry } from './contracts/RoutingDecision.js';
 export type { DispatchRunRequest } from './contracts/DispatchRunRequest.js';
 export type { DispatchRunResponse } from './contracts/DispatchRunResponse.js';
+export type { IntentEnvelope, ExecutionConstraints } from './contracts/IntentEnvelope.js';
+export type { TriageDecision, TriageError, TriageErrorCode, CandidateEvaluation } from './contracts/TriageDecision.js';
 
 // Events
 export type { ExecutionRationale } from './events/ExecutionRationale.js';

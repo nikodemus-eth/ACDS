@@ -4,5 +4,6 @@ export enum AuditEventType {
   EXECUTION = 'execution',
   SECURITY = 'security',
   POLICY = 'policy',
+  TRIAGE = 'triage',
   SYSTEM = 'system',
 }

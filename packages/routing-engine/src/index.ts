@@ -31,3 +31,15 @@ export type { AdaptiveDispatchResolverDeps, AdaptiveDispatchResult } from './res
 // Confidence Escalation
 export { ConfidenceEscalationResolver } from './selection/ConfidenceEscalationResolver.js';
 export type { ConfidenceEscalationConfig } from './selection/ConfidenceEscalationResolver.js';
+
+// Triage (ITS)
+export { IntentEnvelopeValidator } from './triage/IntentEnvelopeValidator.js';
+export type { IntentValidationResult } from './triage/IntentEnvelopeValidator.js';
+export { IntentTranslator } from './triage/IntentTranslator.js';
+export { SensitivityPolicyResolver } from './triage/SensitivityPolicyResolver.js';
+export type { SensitivityPolicyResult } from './triage/SensitivityPolicyResolver.js';
+export { CandidateEvaluator } from './triage/CandidateEvaluator.js';
+export { TriageRanker } from './triage/TriageRanker.js';
+export type { RankedCandidate } from './triage/TriageRanker.js';
+export { TriagePipeline } from './triage/TriagePipeline.js';
+export type { TriagePipelineDeps, TriageResult } from './triage/TriagePipeline.js';
