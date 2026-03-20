@@ -23,6 +23,7 @@ interface ExecutionListQuery {
 export class ExecutionsController {
   constructor(
     private readonly recordService: ExecutionRecordService,
+    private readonly reapFn?: (thresholdMs?: number) => Promise<import('@acds/core-types').ExecutionRecord[]>,
   ) {}
 
   // ── GET / ────────────────────────────────────────────────────────────
@@ -72,5 +73,21 @@ export class ExecutionsController {
       return;
     }
     reply.send(ExecutionRecordPresenter.toDetailView(record));
+  }
+
+  // ── POST /reap-stale ──────────────────────────────────────────────────
+  async reapStale(
+    _request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> {
+    if (!this.reapFn) {
+      reply.status(501).send({ error: 'Reaper not configured', statusCode: 501 });
+      return;
+    }
+    const reaped = await this.reapFn();
+    reply.send({
+      reaped: reaped.length,
+      executionIds: reaped.map((r) => r.id),
+    });
   }
 }

@@ -14,7 +14,7 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
       'selected_tactic_profile_id', 'selected_provider_id',
       'status', 'input_tokens', 'output_tokens', 'latency_ms',
       'cost_estimate', 'normalized_output', 'error_message',
-      'fallback_attempts', 'completed_at',
+      'fallback_attempts', 'request_id', 'completed_at',
     ];
     const values = [
       ...(hasId ? [record.id] : []),
@@ -35,6 +35,7 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
       record.normalizedOutput,
       record.errorMessage,
       record.fallbackAttempts,
+      record.requestId,
       record.completedAt,
     ];
     const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
@@ -160,6 +161,10 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
       setClauses.push(`fallback_attempts = $${paramIdx++}`);
       values.push(updates.fallbackAttempts);
     }
+    if (updates.requestId !== undefined) {
+      setClauses.push(`request_id = $${paramIdx++}`);
+      values.push(updates.requestId);
+    }
     if (updates.completedAt !== undefined) {
       setClauses.push(`completed_at = $${paramIdx++}`);
       values.push(updates.completedAt);
@@ -184,6 +189,21 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
     return this.mapRow(result.rows[0]);
   }
 
+  async reapStaleExecutions(thresholdMs: number = 3_600_000): Promise<ExecutionRecord[]> {
+    const cutoff = new Date(Date.now() - thresholdMs);
+    const result = await this.pool.query(
+      `UPDATE execution_records
+       SET status = 'auto_reaped',
+           error_message = 'Stale execution reaped: exceeded ' || $1 || 'ms threshold',
+           completed_at = NOW()
+       WHERE status IN ('pending', 'running')
+         AND created_at < $2
+       RETURNING *`,
+      [thresholdMs, cutoff],
+    );
+    return result.rows.map((r) => this.mapRow(r));
+  }
+
   private mapRow(row: Record<string, unknown>): ExecutionRecord {
     return {
       id: row.id as string,
@@ -206,6 +226,7 @@ export class PgExecutionRecordRepository implements ExecutionRecordRepository {
       normalizedOutput: row.normalized_output as string | null,
       errorMessage: row.error_message as string | null,
       fallbackAttempts: row.fallback_attempts as number,
+      requestId: (row.request_id as string) ?? null,
       createdAt: new Date(row.created_at as string),
       completedAt: row.completed_at ? new Date(row.completed_at as string) : null,
     };

@@ -18,8 +18,13 @@ export async function executionsRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): Promise<void> {
+  const repo = app.diContainer!.executionRecordRepository;
+  const reapFn = repo && 'reapStaleExecutions' in repo
+    ? (thresholdMs?: number) => (repo as any).reapStaleExecutions(thresholdMs)
+    : undefined;
   const controller = new ExecutionsController(
     app.diContainer!.executionRecordService,
+    reapFn,
   );
 
   // Apply auth to all routes in this plugin scope
@@ -32,4 +37,7 @@ export async function executionsRoutes(
 
   /** Get a single execution record by ID. */
   app.get('/:id', (req, reply) => controller.getById(req as any, reply));
+
+  /** Reap stale executions stuck in pending/running > 1 hour. */
+  app.post('/reap-stale', (req, reply) => controller.reapStale(req, reply));
 }

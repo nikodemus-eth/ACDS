@@ -15,6 +15,7 @@ export interface ExecutionRecordRepository {
   findRecent(limit?: number): Promise<ExecutionRecord[]>;
   findFiltered(filters: ExecutionRecordFilters): Promise<ExecutionRecord[]>;
   update(id: string, updates: Partial<ExecutionRecord>): Promise<ExecutionRecord>;
+  reapStaleExecutions?(thresholdMs?: number): Promise<ExecutionRecord[]>;
 }
 
 export class ExecutionRecordService {

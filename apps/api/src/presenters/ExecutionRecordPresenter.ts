@@ -23,6 +23,7 @@ export interface ExecutionRecordView {
   normalizedOutput: string | null;
   errorMessage: string | null;
   fallbackAttempts: number;
+  requestId: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -68,6 +69,7 @@ export class ExecutionRecordPresenter {
       normalizedOutput: record.normalizedOutput,
       errorMessage: record.errorMessage,
       fallbackAttempts: record.fallbackAttempts,
+      requestId: record.requestId,
       createdAt: record.createdAt.toISOString(),
       completedAt: record.completedAt?.toISOString() ?? null,
     };

@@ -1,7 +1,7 @@
 import 'fastify';
 import type { ProviderHealthService, ProviderRegistryService, ProviderConnectionTester } from '@acds/provider-broker';
 import type { SecretRotationService } from '@acds/security';
-import type { DispatchRunService, ExecutionRecordService } from '@acds/execution-orchestrator';
+import type { DispatchRunService, ExecutionRecordService, ExecutionRecordRepository } from '@acds/execution-orchestrator';
 import type { AdaptationRollbackService, AdaptationApprovalRepository, ApprovalAuditEmitter } from '@acds/adaptive-optimizer';
 import type { PgPolicyRepository } from '@acds/persistence-pg';
 import type { RoutingAuditWriter, ProviderAuditWriter } from '@acds/audit-ledger';
@@ -24,6 +24,7 @@ interface DiContainer {
   secretRotationService: SecretRotationService;
   dispatchRunService: DispatchRunService;
   executionRecordService: ExecutionRecordService;
+  executionRecordRepository: ExecutionRecordRepository;
   auditEventReader: AuditEventReader;
   familyPerformanceReader: FamilyPerformanceReader;
   candidateRankingReader: CandidateRankingReader;

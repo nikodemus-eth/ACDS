@@ -6,7 +6,8 @@ export type ExecutionStatus =
   | 'succeeded'
   | 'failed'
   | 'fallback_succeeded'
-  | 'fallback_failed';
+  | 'fallback_failed'
+  | 'auto_reaped';
 
 export interface ExecutionRecord {
   id: string;
@@ -23,6 +24,7 @@ export interface ExecutionRecord {
   normalizedOutput: string | null;
   errorMessage: string | null;
   fallbackAttempts: number;
+  requestId: string | null;
   createdAt: Date;
   completedAt: Date | null;
 }

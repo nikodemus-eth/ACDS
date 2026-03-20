@@ -37,7 +37,7 @@ export class ExecutionStatusTracker {
     }
   }
 
-  async create(decision: RoutingDecision, _request: RoutingRequest): Promise<string> {
+  async create(decision: RoutingDecision, _request: RoutingRequest, _requestId?: string): Promise<string> {
     const id = randomUUID();
     this.executions.set(id, {
       id,

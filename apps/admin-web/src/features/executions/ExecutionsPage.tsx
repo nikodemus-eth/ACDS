@@ -8,6 +8,8 @@ import { useExecutions } from '../../hooks/useExecutions';
 import { formatDate, formatDuration, truncate } from '../../lib/formatters';
 import type { ExecutionFilters } from './executionsApi';
 
+const PROCESS_SWARM_BASE = 'http://127.0.0.1:18795/console';
+
 const inputStyle: React.CSSProperties = {
   padding: '6px 10px',
   border: '1px solid #d1d5db',
@@ -15,7 +17,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: '13px',
 };
 
-const columns: ColumnDef<ExecutionRecord>[] = [
+const columns: ColumnDef<ExecutionRecord & { requestId?: string | null }>[] = [
   { key: 'id', header: 'ID', render: (r) => truncate(r.id, 12) },
   {
     key: 'status',
@@ -33,6 +35,25 @@ const columns: ColumnDef<ExecutionRecord>[] = [
     key: 'process',
     header: 'Process',
     render: (r) => r.executionFamily.process,
+  },
+  {
+    key: 'requestId',
+    header: 'Run ID',
+    render: (r) => {
+      const rid = (r as any).requestId as string | null | undefined;
+      if (!rid) return '—';
+      return (
+        <a
+          href={`${PROCESS_SWARM_BASE}#run/${rid}`}
+          onClick={(e) => e.stopPropagation()}
+          style={{ color: '#2563eb', textDecoration: 'none', fontSize: '13px' }}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {truncate(rid, 16)}
+        </a>
+      );
+    },
   },
   { key: 'latencyMs', header: 'Latency', sortable: true, render: (r) => formatDuration(r.latencyMs) },
   {
@@ -80,6 +101,7 @@ export function ExecutionsPage() {
           <option value="failed">Failed</option>
           <option value="fallback_succeeded">Fallback Succeeded</option>
           <option value="fallback_failed">Fallback Failed</option>
+          <option value="auto_reaped">Auto-Reaped</option>
         </select>
 
         <input

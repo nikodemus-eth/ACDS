@@ -40,7 +40,7 @@ export class DispatchRunService {
   async run(request: DispatchRunRequest): Promise<DispatchRunResponse> {
     const { decision, rationale } = await this.deps.resolveRoute(request.routingRequest);
 
-    const executionId = await this.statusTracker.create(decision, request.routingRequest);
+    const executionId = await this.statusTracker.create(decision, request.routingRequest, request.requestId);
     await this.statusTracker.markRunning(executionId);
 
     const primaryModelId = await this.deps.resolveModelId(decision.selectedModelProfileId);

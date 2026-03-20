@@ -10,6 +10,7 @@ const colorMap: Record<string, { bg: string; text: string }> = {
   unhealthy: { bg: '#fecaca', text: '#991b1b' },
   failed: { bg: '#fecaca', text: '#991b1b' },
   fallback_failed: { bg: '#fecaca', text: '#991b1b' },
+  auto_reaped: { bg: '#fae8ff', text: '#86198f' },
   unknown: { bg: '#f3f4f6', text: '#374151' },
 };
 
@@ -25,6 +26,7 @@ const statusIcons: Record<string, string> = {
   unhealthy: '✕',
   failed: '✕',
   fallback_failed: '✕',
+  auto_reaped: '⊘',
   unknown: '?',
 };
 

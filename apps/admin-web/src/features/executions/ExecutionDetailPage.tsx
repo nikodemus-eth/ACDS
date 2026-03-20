@@ -5,6 +5,8 @@ import { DataTable, type ColumnDef } from '../../components/common/DataTable';
 import { useExecution } from '../../hooks/useExecutions';
 import { formatDate, formatDuration, truncate } from '../../lib/formatters';
 
+const PROCESS_SWARM_BASE = 'http://127.0.0.1:18795/console';
+
 interface FallbackRow {
   attempt: number;
   providerId: string;
@@ -30,24 +32,49 @@ export function ExecutionDetailPage() {
   if (isLoading) return <p>Loading...</p>;
   if (error || !data) return <p>Execution not found.</p>;
 
+  const requestId = (data as any).requestId as string | null | undefined;
+
   return (
     <div>
       <PageHeader
         title={`Execution ${truncate(data.id, 16)}`}
         actions={
-          <button
-            onClick={() => navigate('/executions')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#f3f4f6',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            Back
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {requestId && (
+              <a
+                href={`${PROCESS_SWARM_BASE}#run/${requestId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                View Run in Process Swarm
+              </a>
+            )}
+            <button
+              onClick={() => navigate('/executions')}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#f3f4f6',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Back
+            </button>
+          </div>
         }
       />
 
@@ -63,6 +90,21 @@ export function ExecutionDetailPage() {
             <dd className="dl-grid__value">{data.executionFamily.process}</dd>
             <dt className="dl-grid__term">Step</dt>
             <dd className="dl-grid__value">{data.executionFamily.step}</dd>
+            {requestId && (
+              <>
+                <dt className="dl-grid__term">Run ID</dt>
+                <dd className="dl-grid__value">
+                  <a
+                    href={`${PROCESS_SWARM_BASE}#run/${requestId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#2563eb', textDecoration: 'none' }}
+                  >
+                    {requestId}
+                  </a>
+                </dd>
+              </>
+            )}
             <dt className="dl-grid__term">Latency</dt>
             <dd className="dl-grid__value">{formatDuration(data.latencyMs)}</dd>
             <dt className="dl-grid__term">Fallback Attempts</dt>

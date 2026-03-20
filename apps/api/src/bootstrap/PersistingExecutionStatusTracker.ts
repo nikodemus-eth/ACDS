@@ -1,8 +1,11 @@
-import type { RoutingDecision, RoutingRequest } from '@acds/core-types';
+import type { RoutingDecision, RoutingRequest, ExecutionRecord } from '@acds/core-types';
 import type { AdapterResponse } from '@acds/provider-adapters';
 import type { ExecutionRecordRepository } from '@acds/execution-orchestrator';
 import { ExecutionStatusTracker } from '@acds/execution-orchestrator';
 import type { ExecutionAuditWriter } from '@acds/audit-ledger';
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 200;
 
 /**
  * Wraps the in-memory ExecutionStatusTracker with database persistence
@@ -11,6 +14,9 @@ import type { ExecutionAuditWriter } from '@acds/audit-ledger';
  * On `create()`, writes an initial execution record and emits execution.started.
  * On status transitions, updates the persisted record and emits the
  * corresponding audit event (execution.completed or execution.failed).
+ *
+ * Status updates use retry-with-backoff to prevent silent data loss
+ * that leaves execution records stuck in "running" state.
  */
 export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
   private readonly requests = new Map<string, { decision: RoutingDecision; request: RoutingRequest }>();
@@ -22,8 +28,8 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
     super();
   }
 
-  override async create(decision: RoutingDecision, request: RoutingRequest): Promise<string> {
-    const id = await super.create(decision, request);
+  override async create(decision: RoutingDecision, request: RoutingRequest, requestId?: string): Promise<string> {
+    const id = await super.create(decision, request, requestId);
     this.requests.set(id, { decision, request });
 
     try {
@@ -48,6 +54,7 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
         normalizedOutput: null,
         errorMessage: null,
         fallbackAttempts: 0,
+        requestId: requestId ?? null,
         createdAt: new Date(),
         completedAt: null,
       });
@@ -70,12 +77,12 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
 
   override async markRunning(id: string): Promise<void> {
     await super.markRunning(id);
-    await this.safeUpdate(id, { status: 'running' });
+    await this.retryUpdate(id, { status: 'running' });
   }
 
   override async markSucceeded(id: string, response: AdapterResponse): Promise<void> {
     await super.markSucceeded(id, response);
-    await this.safeUpdate(id, {
+    await this.retryUpdate(id, {
       status: 'succeeded',
       normalizedOutput: response.content,
       latencyMs: response.latencyMs,
@@ -96,7 +103,7 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
 
   override async markFailed(id: string, errorMessage: string): Promise<void> {
     await super.markFailed(id, errorMessage);
-    await this.safeUpdate(id, {
+    await this.retryUpdate(id, {
       status: 'failed',
       errorMessage,
       completedAt: new Date(),
@@ -112,7 +119,7 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
 
   override async markFallbackSucceeded(id: string): Promise<void> {
     await super.markFallbackSucceeded(id);
-    await this.safeUpdate(id, {
+    await this.retryUpdate(id, {
       status: 'fallback_succeeded',
       completedAt: new Date(),
     });
@@ -127,7 +134,7 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
 
   override async markFallbackFailed(id: string): Promise<void> {
     await super.markFallbackFailed(id);
-    await this.safeUpdate(id, {
+    await this.retryUpdate(id, {
       status: 'fallback_failed',
       completedAt: new Date(),
     });
@@ -141,11 +148,26 @@ export class PersistingExecutionStatusTracker extends ExecutionStatusTracker {
     );
   }
 
-  private async safeUpdate(id: string, updates: Record<string, unknown>): Promise<void> {
-    try {
-      await this.repository.update(id, updates);
-    } catch (err) {
-      console.error(`[persisting-tracker] Failed to update execution ${id}:`, err);
+  private async retryUpdate(id: string, updates: Partial<ExecutionRecord>): Promise<void> {
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        await this.repository.update(id, updates);
+        return;
+      } catch (err) {
+        if (attempt === MAX_RETRIES - 1) {
+          console.error(
+            `[persisting-tracker] FAILED to update execution ${id} after ${MAX_RETRIES} attempts. ` +
+            `Status update to '${updates.status}' was lost. Record may be stuck.`,
+            err,
+          );
+          return;
+        }
+        const delay = RETRY_BASE_MS * Math.pow(2, attempt);
+        console.warn(
+          `[persisting-tracker] Retry ${attempt + 1}/${MAX_RETRIES} for execution ${id} in ${delay}ms`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
   }
 

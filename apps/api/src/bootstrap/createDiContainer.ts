@@ -347,6 +347,7 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
     secretRotationService,
     dispatchRunService,
     executionRecordService,
+    executionRecordRepository,
     auditEventReader: new PgAuditEventRepository(pool),
     familyPerformanceReader: new PgFamilyPerformanceRepository(pool),
     candidateRankingReader: new OptimizerCandidateReader(optimizerRepository),
