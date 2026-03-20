@@ -77,6 +77,29 @@ ACDS separates two concerns that are often conflated:
 
 This separation means routing logic can be tested and reasoned about without any provider being available, and execution logic can be tested independently of how routes are chosen.
 
+## Artifact Pipeline
+
+The sovereign-runtime package includes an artifact pipeline that provides a higher-level abstraction over the capability fabric. Where `CapabilityOrchestrator` routes by capability ID (e.g., `text.rewrite`), the artifact pipeline routes by artifact type (e.g., `ACDS.TextAssist.Rewrite.Short`) — a stable contract that encodes family, action, variant, provider disposition, and quality expectations.
+
+```
+Artifact Request (ACDS.TextAssist.Rewrite.Short)
+       |
+  1. Intake — resolve from ArtifactRegistry, normalize input
+  2. Policy Gate — disposition check, local-only enforcement
+  3. Planning — score providers, apply disposition, select winner
+  4. Execution — delegate to CapabilityOrchestrator.request()
+  5. Post-Processing — family-specific output normalization
+  6. Provenance — record route, timing, normalizations
+  7. Delivery — assemble canonical ArtifactEnvelope
+       |
+  ArtifactEnvelope (7-layer: Identity, Contract, Input Summary,
+                    Payload, Provenance, Policy, Limitations)
+```
+
+Six artifact families are registered: TextAssist, TextModel, Image, Expression, Vision, and Action. Each family has its own normalizer handling input validation, output mapping, and quality dimensions. Provider disposition rules (apple-only, apple-preferred, apple-optional) control which providers may fulfill each artifact type.
+
+The pipeline never throws — every request produces a valid envelope (succeeded, failed, or blocked) for auditability. See `docs/architecture/artifact-pipeline-portfolio.md` for the full specification.
+
 ## Infrastructure
 
 - `infra/db` -- Database migrations and seed data (PostgreSQL)

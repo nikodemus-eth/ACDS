@@ -9,7 +9,9 @@ export type ErrorReasonCode =
   | 'POLICY_BLOCKED'
   | 'INVALID_REGISTRATION'
   | 'INVALID_EXECUTION_PLAN'
-  | 'VALIDATION_FAILED';
+  | 'VALIDATION_FAILED'
+  | 'ARTIFACT_BLOCKED'
+  | 'ARTIFACT_REGISTRY_ERROR';
 
 /**
  * Base runtime error with a typed reason code.
@@ -68,5 +70,17 @@ export class InvalidExecutionPlanError extends ACDSRuntimeError {
 export class ValidationFailedError extends ACDSRuntimeError {
   constructor(reason: string, details?: Record<string, unknown>) {
     super('VALIDATION_FAILED', reason, details);
+  }
+}
+
+export class ArtifactBlockedError extends ACDSRuntimeError {
+  constructor(reason: string, details?: Record<string, unknown>) {
+    super('ARTIFACT_BLOCKED', reason, details);
+  }
+}
+
+export class ArtifactRegistryError extends ACDSRuntimeError {
+  constructor(reason: string, details?: Record<string, unknown>) {
+    super('ARTIFACT_REGISTRY_ERROR', reason, details);
   }
 }

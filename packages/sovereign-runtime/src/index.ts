@@ -72,6 +72,9 @@ export type { DriftSignal, DriftSignalType } from './grits/drift-signals.js';
 export { GRITSHookRunner } from './grits/grits-hooks.js';
 export type { GRITSHookConfig } from './grits/grits-hooks.js';
 
+// Artifact Pipeline
+export * from './artifact/index.js';
+
 // Fixtures
 export { FIXTURES_APPLE_PROVIDER, FIXTURES_OLLAMA_PROVIDER, FIXTURES_OPENAI_CAPABILITY, FIXTURES_OPENAI_SESSION } from './fixtures/provider-fixtures.js';
 export { TASK_FIXTURES } from './fixtures/task-fixtures.js';

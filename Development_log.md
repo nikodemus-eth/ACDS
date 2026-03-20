@@ -1139,3 +1139,57 @@ Removing mocks exposed real bugs that mocks had hidden:
 - Updated `ADMIN_GUIDE.md`, `EXECUTION_FLOW.md`, `COMPONENT_BOUNDARIES.md`, `POLICY_CONFIGURATION.md`, `TROUBLESHOOTING.md`, `data-dictionary.md` — removed all OpenAI/Gemini/LMStudio vendor references
 
 **Total test count:** 199 files, 2026 tests, all passing.
+
+## 2026-03-19 — Apple Intelligence Artifact Pipeline Portfolio
+
+Implemented the artifact-first architecture as specified in `docs/architecture/artifact-pipeline-portfolio.md`. The artifact pipeline sits alongside (not replacing) the existing CapabilityOrchestrator dispatch path.
+
+### Foundation (packages/sovereign-runtime/src/artifact/)
+
+- **Canonical Artifact Envelope** — 7-layer structure (Identity, Contract, Input Summary, Payload, Provenance, Policy, Limitations) with Zod runtime validation. Factory helpers for blocked/failed envelopes ensure every request produces inspectable output.
+- **Artifact Registry** — type-safe registry with `ACDS.<Family>.<Action>.<Variant>` naming convention, Zod-validated entries, family indexing. 20 artifact types across 6 families.
+- **Provider Disposition Matrix** — apple-only (no substitute), apple-preferred (Apple boosted +0.2), apple-optional (interchangeable). Filters and re-sorts scored provider candidates.
+- **Quality Model** — 5-tier assessment (none → production) with per-family quality dimensions and configurable thresholds.
+
+### 7-Stage Pipeline
+
+| Stage | File | Purpose |
+|-------|------|---------|
+| 1. Intake | intake-stage.ts | Registry lookup, input normalization via family normalizer |
+| 2. Policy Gate | policy-gate-stage.ts | Disposition eligibility, local-only enforcement |
+| 3. Planning | planning-stage.ts | Provider scoring, disposition filtering, fallback preparation |
+| 4. Execution | execution-stage.ts | Delegates to CapabilityOrchestrator.request() |
+| 5. Post-Processing | post-processing-stage.ts | Family-specific output normalization |
+| 6. Provenance | provenance-stage.ts | Route, method, timing, normalization recording |
+| 7. Delivery | delivery-stage.ts | Final envelope assembly |
+
+Pipeline runner (`ArtifactPipeline`) orchestrates all 7 stages sequentially, never throws — always produces a valid envelope (succeeded, failed, or blocked).
+
+### 6 Artifact Families (20 artifact types)
+
+| Family | Tier | Artifacts | Disposition |
+|--------|------|-----------|-------------|
+| TextAssist | 1 | Rewrite.Short, Summarize.Short, Proofread, ToneShift | apple-preferred |
+| TextModel | 1 | Classify, Extract, Rank, Answer.Bounded | apple-optional |
+| Image | 1 | Generate.Stylized, Generate.Preview, Generate.Concept | apple-preferred |
+| Expression | 2 | Generate.Inline, Generate.Reaction | apple-only / apple-preferred |
+| Vision | 2 | Describe, Extract.Text, Classify, Contextualize | apple-preferred / apple-optional |
+| Action | 3 | Execute.Shortcut, Execute.Intent, Plan | apple-only / apple-preferred |
+
+Action family defaults to `dry_run: true` and `requires_confirmation: true` for safety.
+
+### Test Coverage
+
+- **20 new test files** covering all artifact source files
+- **Unit tests**: envelope schema validation, registry operations, disposition matrix, quality model, all 7 pipeline stages, all 6 family normalizers, pipeline runner end-to-end, default registry factory
+- **Red Team tests** (`tier2-artifactPipelineAbuse.test.ts`): artifact type injection, oversized input, disposition bypass, envelope forgery, type confusion, quality score bounds, registry integrity, XSS in input fields, ID uniqueness, safety defaults
+- Fixed pre-existing bug: disposition-matrix.test.ts `makeScore()` used wrong ProviderScore field names
+
+### Architecture Decisions
+
+- `CAPABILITY_IDS` stays frozen — artifact types map to existing capability IDs
+- Disposition lives in `ArtifactRegistryEntry`, not `CapabilityBinding`
+- `ArtifactPipeline` composes (not extends) `CapabilityOrchestrator`
+- Failed/blocked artifacts produce valid envelopes for auditability
+
+**Total test count:** 219 files, 2222 tests, all passing.
