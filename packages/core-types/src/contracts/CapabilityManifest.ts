@@ -9,6 +9,7 @@ export type InputMode =
   | 'tts_prompt'
   | 'audio_input'
   | 'long_text'
+  | 'translation_input'
   | 'structured_options';
 
 export type OutputMode = 'text' | 'image' | 'audio' | 'json' | 'error';

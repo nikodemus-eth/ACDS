@@ -22,4 +22,16 @@ export async function capabilityTestRoutes(
   app.post('/:id/capabilities/:capabilityId/test', (req, reply) =>
     controller.testCapability(req as any, reply),
   );
+
+  // Translation languages — proxies to the Apple Intelligence bridge
+  app.get('/translation/languages', async (_req, reply) => {
+    try {
+      const bridgeUrl = process.env['APPLE_BRIDGE_URL'] ?? 'http://127.0.0.1:11435';
+      const response = await fetch(`${bridgeUrl}/translation/languages`);
+      const data = await response.json();
+      reply.send(data);
+    } catch {
+      reply.status(503).send({ error: 'Apple Intelligence bridge unavailable' });
+    }
+  });
 }

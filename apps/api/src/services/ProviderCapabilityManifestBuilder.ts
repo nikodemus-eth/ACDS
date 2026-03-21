@@ -31,7 +31,7 @@ const SUBSYSTEM_TO_INPUT_MODE: Record<string, InputMode> = {
   tts: 'tts_prompt',
   vision: 'image_upload',
   image_creator: 'image_prompt',
-  translation: 'text_prompt',
+  translation: 'translation_input',
   sound: 'audio_input',
 };
 

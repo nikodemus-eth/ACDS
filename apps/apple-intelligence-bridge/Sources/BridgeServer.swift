@@ -88,6 +88,8 @@ final class BridgeHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
                 return mutable.readBytes(length: mutable.readableBytes).map { Data($0) }
             }
             (status, responseBody) = ExecuteEndpoint.handle(body: bodyData)
+        case (.GET, "/translation/languages"):
+            (status, responseBody) = TranslationLanguagesEndpoint.handle()
         default:
             status = .notFound
             responseBody = #"{"error":"Not Found"}"#.data(using: .utf8)!

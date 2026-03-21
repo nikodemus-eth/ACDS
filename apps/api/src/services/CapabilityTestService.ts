@@ -110,6 +110,10 @@ export class CapabilityTestService {
         ? 'json'
         : 'text',
       method,
+      targetLanguage: typeof input.targetLanguage === 'string' ? input.targetLanguage : undefined,
+      sourceLanguage: typeof input.sourceLanguage === 'string' ? input.sourceLanguage : undefined,
+      voice: typeof input.voice === 'string' ? input.voice : undefined,
+      rate: typeof input.rate === 'number' ? input.rate : undefined,
     };
   }
 

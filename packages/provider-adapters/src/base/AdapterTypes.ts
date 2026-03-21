@@ -9,6 +9,14 @@ export interface AdapterRequest {
   responseFormat?: 'text' | 'json';
   /** Subsystem method for multi-capability providers (e.g. 'image_creator.generate' for Apple Intelligence). */
   method?: string;
+  /** Target language code for translation (e.g. 'es', 'fr'). */
+  targetLanguage?: string;
+  /** Source language code hint for translation/speech. */
+  sourceLanguage?: string;
+  /** Voice identifier for TTS. */
+  voice?: string;
+  /** Speech rate for TTS (0.0–1.0). */
+  rate?: number;
 }
 
 export interface AdapterResponse {

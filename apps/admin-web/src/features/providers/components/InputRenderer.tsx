@@ -1,5 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { InputMode } from '@acds/core-types';
+
+interface TranslationLanguage {
+  code: string;
+  name: string;
+  installed: boolean;
+}
 
 interface InputRendererProps {
   inputMode: InputMode;
@@ -14,10 +20,30 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
   const [fileDataUri, setFileDataUri] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [targetLanguage, setTargetLanguage] = useState('es');
+  const [sourceLanguage, setSourceLanguage] = useState('');
+  const [installedLanguages, setInstalledLanguages] = useState<TranslationLanguage[]>([]);
+  const [languagesLoading, setLanguagesLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch installed translation languages when translation mode is active
+  useEffect(() => {
+    if (inputMode !== 'translation_input') return;
+    setLanguagesLoading(true);
+    fetch('/api/providers/translation/languages')
+      .then((r) => r.json())
+      .then((langs: TranslationLanguage[]) => {
+        setInstalledLanguages(langs);
+        // Default target to first installed non-English language
+        const firstInstalled = langs.find((l) => l.installed && l.code !== 'en');
+        if (firstInstalled) setTargetLanguage(firstInstalled.code);
+      })
+      .catch(() => setInstalledLanguages([]))
+      .finally(() => setLanguagesLoading(false));
+  }, [inputMode]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -88,6 +114,8 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
       input.prompt = prompt;
       input.text = prompt;
     }
+    if (targetLanguage) input.targetLanguage = targetLanguage;
+    if (sourceLanguage) input.sourceLanguage = sourceLanguage;
 
     onExecute(input, settings);
   }
@@ -232,6 +260,75 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
             )}
           </div>
         );
+      case 'translation_input': {
+        const installed = installedLanguages.filter((l) => l.installed);
+        const notInstalled = installedLanguages.filter((l) => !l.installed);
+        const isMac = navigator.platform?.toLowerCase().includes('mac');
+        const helpUrl = isMac
+          ? 'https://support.apple.com/guide/mac-help/translate-languages-mchl01bc1d51/mac'
+          : 'https://support.apple.com/guide/iphone/translate-text-voice-and-conversations-iphd74b8baa3/ios';
+        return (
+          <div className="input-renderer__translation">
+            <div className="input-renderer__translation-row">
+              <div className="input-renderer__translation-field">
+                <label className="input-renderer__label">From</label>
+                <select
+                  className="input-renderer__select"
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                >
+                  <option value="">Auto-detect</option>
+                  {installed.map((l) => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+              <span className="input-renderer__arrow">→</span>
+              <div className="input-renderer__translation-field">
+                <label className="input-renderer__label">To</label>
+                <select
+                  className="input-renderer__select"
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                >
+                  {installed.length > 0 ? (
+                    installed.map((l) => (
+                      <option key={l.code} value={l.code}>{l.name}</option>
+                    ))
+                  ) : (
+                    <option value="es">Spanish (default)</option>
+                  )}
+                </select>
+              </div>
+            </div>
+            <textarea
+              className="input-renderer__textarea"
+              placeholder="Enter text to translate..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={4}
+            />
+            {languagesLoading && (
+              <p className="input-renderer__hint">Loading installed languages...</p>
+            )}
+            {notInstalled.length > 0 && (
+              <details className="input-renderer__lang-details">
+                <summary className="input-renderer__hint">
+                  {installed.length} installed, {notInstalled.length} available to download
+                </summary>
+                <p className="input-renderer__hint">
+                  Not installed: {notInstalled.map((l) => l.name).join(', ')}
+                </p>
+              </details>
+            )}
+            <p className="input-renderer__hint">
+              <a href={helpUrl} target="_blank" rel="noopener noreferrer">
+                How to download language packs
+              </a>
+            </p>
+          </div>
+        );
+      }
       case 'structured_options':
         return (
           <textarea

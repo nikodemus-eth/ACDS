@@ -9,6 +9,10 @@ export interface AppleBridgeRequest {
   responseFormat?: 'text' | 'json';
   /** Subsystem method to invoke (e.g. 'image_creator.generate', 'tts.speak'). Defaults to 'foundation_models.generate'. */
   method?: string;
+  targetLanguage?: string;
+  sourceLanguage?: string;
+  voice?: string;
+  rate?: number;
 }
 
 export interface AppleBridgeResponse {
@@ -30,6 +34,10 @@ export function toAppleBridgeRequest(request: AdapterRequest): AppleBridgeReques
     temperature: request.temperature,
     responseFormat: request.responseFormat,
     method: request.method,
+    targetLanguage: request.targetLanguage,
+    sourceLanguage: request.sourceLanguage,
+    voice: request.voice,
+    rate: request.rate,
   };
 }
 
