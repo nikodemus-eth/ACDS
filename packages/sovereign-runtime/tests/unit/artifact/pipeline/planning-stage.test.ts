@@ -156,4 +156,51 @@ describe('PlanningStage', () => {
     await stage.execute(ctx);
     expect(ctx.timings['planning']).toBeGreaterThanOrEqual(0);
   });
+
+  it('sets error when capabilityId is missing', async () => {
+    const stage = new PlanningStage(makeCapabilityRegistry());
+    const ctx = makeCtx({ capabilityId: undefined });
+    await stage.execute(ctx);
+    expect(ctx.error).toBeDefined();
+    expect(ctx.error!.code).toBe('ARTIFACT_BLOCKED');
+  });
+
+  it('preserves pre-existing error instead of overwriting', async () => {
+    const stage = new PlanningStage(makeCapabilityRegistry());
+    const existingError = { stage: 'intake', message: 'intake failed', code: 'ARTIFACT_REGISTRY_ERROR' };
+    const ctx = makeCtx({ registryEntry: undefined, error: existingError });
+    await stage.execute(ctx);
+    expect(ctx.error).toBe(existingError);
+  });
+
+  it('sets error stage to planning on no bindings', async () => {
+    const capReg = makeCapabilityRegistry(); // no bindings
+    const stage = new PlanningStage(capReg);
+    const ctx = makeCtx();
+    await stage.execute(ctx);
+    expect(ctx.error!.stage).toBe('planning');
+  });
+
+  it('handles constraints for latency and cost', async () => {
+    const capReg = makeCapabilityRegistry([
+      makeBinding('text.rewrite', 'apple-intelligence-runtime'),
+    ]);
+    const stage = new PlanningStage(capReg);
+    const ctx = makeCtx({
+      options: {
+        requestedBy: 'test',
+        constraints: { maxLatencyMs: 500, maxCostUSD: 0.01 },
+      },
+    });
+    await stage.execute(ctx);
+    // With FREE_COST and LOCAL_LATENCY, the apple provider should still pass
+    expect(ctx.selectedProvider).toBeDefined();
+  });
+
+  it('records timing even on error paths', async () => {
+    const stage = new PlanningStage(makeCapabilityRegistry());
+    const ctx = makeCtx({ registryEntry: undefined });
+    await stage.execute(ctx);
+    expect(ctx.timings['planning']).toBeGreaterThanOrEqual(0);
+  });
 });

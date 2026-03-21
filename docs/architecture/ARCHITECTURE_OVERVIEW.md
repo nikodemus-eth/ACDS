@@ -148,14 +148,15 @@ The Capability Test Console is a full-stack testing surface that lets operators 
 
 **Backend flow**: `CapabilityTestController` → `CapabilityTestService` → `ProviderCapabilityManifestBuilder` + `ProviderExecutionProxy`
 
-- `ProviderCapabilityManifestBuilder` maps vendor-specific capabilities to a unified `CapabilityManifestEntry[]`. Standard providers (Ollama, OpenAI, LM Studio, Gemini) expose a single `text.generate` capability. Apple Intelligence exposes 26 methods across 8 subsystems.
-- `CapabilityTestService.testCapability()` resolves the provider, builds an `AdapterRequest`, and executes through the same `ProviderExecutionProxy` used by the dispatch pipeline.
-- Routes: `GET /providers/:id/capabilities` (manifest) and `POST /providers/:id/capabilities/:capabilityId/test` (execution).
+- `ProviderCapabilityManifestBuilder` maps vendor-specific capabilities to a unified `CapabilityManifestEntry[]`. Standard providers (Ollama, OpenAI, LM Studio, Gemini) expose a single `text.generate` capability. Apple Intelligence exposes methods across 7 subsystems (foundation_models, writing_tools, speech, tts, vision, translation, sound). The `image_creator` subsystem is disabled due to Apple's `backgroundCreationForbidden` restriction.
+- `CapabilityTestService.testCapability()` resolves the provider, builds an `AdapterRequest` (with `targetLanguage`, `sourceLanguage`, `voice`, `rate` fields for subsystem-specific parameters), and executes through the same `ProviderExecutionProxy` used by the dispatch pipeline.
+- Routes: `GET /providers/:id/capabilities` (manifest), `POST /providers/:id/capabilities/:capabilityId/test` (execution), `GET /providers/translation/languages` (installed language packs).
 
 **Frontend flow**: `CapabilityTestConsolePage` → `CapabilityTabs` (sidebar) → `InputRenderer` / `OutputRenderer` / `ExecutionMetadata` / `RawResponseViewer`
 
-- `InputRenderer` switches on `InputMode` to render appropriate input controls (text prompt, image description, TTS text, audio upload, JSON editor).
-- `OutputRenderer` switches on `OutputMode` to display results (formatted text, image preview, audio player, JSON tree, error panel).
+- `InputRenderer` switches on `InputMode` to render appropriate input controls (text prompt, TTS text, audio upload with Record/Upload, translation with From/To language dropdowns, JSON editor).
+- `OutputRenderer` switches on `OutputMode` to display results (formatted text, audio player, JSON tree, error panel).
+- Translation input fetches installed language packs from the Apple Intelligence bridge via `GET /providers/translation/languages` and populates From/To dropdowns with auto-detect support.
 
 ## Infrastructure
 

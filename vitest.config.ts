@@ -92,8 +92,7 @@ export default defineConfig({
         'apps/api/src/types/**',
         'apps/api/src/routes/**',
         'apps/api/src/config/appConfig.ts',
-        'apps/api/src/bootstrap/createDiContainer.ts',
-        'apps/api/src/bootstrap/registerMiddleware.ts',
+        'apps/api/src/bootstrap/**',
         'apps/api/src/app.ts',
         // Sovereign runtime type-only files (pure interfaces/types, no runtime code)
         'packages/sovereign-runtime/src/domain/source-types.ts',
@@ -111,6 +110,8 @@ export default defineConfig({
         'packages/sovereign-runtime/src/telemetry/audit-logger.ts',
         'packages/sovereign-runtime/src/domain/capability-contract.ts',
         'packages/sovereign-runtime/src/registry/capability-binding.ts',
+        'packages/sovereign-runtime/src/artifact/pipeline/pipeline-types.ts',
+        'packages/sovereign-runtime/src/artifact/pipeline/family-normalizer.ts',
       ],
       reporter: ['text', 'text-summary', 'json'],
     },

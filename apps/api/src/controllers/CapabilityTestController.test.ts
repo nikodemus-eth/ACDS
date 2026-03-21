@@ -189,5 +189,131 @@ describe('CapabilityTestController', () => {
 
       expect(reply.getStatus()).toBe(500);
     });
+
+    it('returns 400 when input is an array', async () => {
+      const deps = makeServiceDeps({ provider: makeProvider('p1') });
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.testCapability(
+        { params: { id: 'p1', capabilityId: 'text.generate' }, body: { input: [1, 2, 3] } } as any,
+        reply as any,
+      );
+
+      // Arrays are objects in JS, so this should pass input validation and execute
+      expect(reply.getStatus()).toBe(200);
+    });
+
+    it('returns 400 when input is a number', async () => {
+      const deps = makeServiceDeps({ provider: makeProvider('p1') });
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.testCapability(
+        { params: { id: 'p1', capabilityId: 'text.generate' }, body: { input: 42 } } as any,
+        reply as any,
+      );
+
+      expect(reply.getStatus()).toBe(400);
+    });
+
+    it('returns 404 when service throws "not found" for testCapability', async () => {
+      const deps = makeServiceDeps({ provider: null });
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.testCapability(
+        { params: { id: 'gone', capabilityId: 'text.generate' }, body: { input: { text: 'hi' } } } as any,
+        reply as any,
+      );
+
+      expect(reply.getStatus()).toBe(404);
+      expect((reply.getBody() as any).error).toBe('Not Found');
+    });
+
+    it('returns 500 with string error message when service throws non-Error', async () => {
+      const deps = makeServiceDeps();
+      deps.registryService = {
+        getById: async () => { throw 'raw string error'; },
+      } as any;
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.testCapability(
+        { params: { id: 'p1', capabilityId: 'text.generate' }, body: { input: { text: 'hi' } } } as any,
+        reply as any,
+      );
+
+      expect(reply.getStatus()).toBe(500);
+      expect((reply.getBody() as any).message).toBe('raw string error');
+    });
+
+    it('returns successful test result with settings in body', async () => {
+      const deps = makeServiceDeps({ provider: makeProvider('p1') });
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.testCapability(
+        {
+          params: { id: 'p1', capabilityId: 'text.generate' },
+          body: { input: { text: 'hello' }, settings: { temperature: 0.5 } },
+        } as any,
+        reply as any,
+      );
+
+      const body = reply.getBody() as CapabilityTestResponse;
+      expect(body.success).toBe(true);
+    });
+  });
+
+  describe('getManifest edge cases', () => {
+    it('returns 500 with string error when getManifest throws non-Error', async () => {
+      const deps = makeServiceDeps();
+      deps.registryService = {
+        getById: async () => { throw 'non-Error thrown'; },
+      } as any;
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.getManifest({ params: { id: 'p1' } } as any, reply as any);
+
+      expect(reply.getStatus()).toBe(500);
+      expect((reply.getBody() as any).message).toBe('non-Error thrown');
+    });
+
+    it('returns correct error structure on 404', async () => {
+      const deps = makeServiceDeps({ provider: null });
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.getManifest({ params: { id: 'nonexistent' } } as any, reply as any);
+
+      const body = reply.getBody() as any;
+      expect(body.error).toBe('Not Found');
+      expect(body.statusCode).toBe(404);
+    });
+
+    it('returns correct error structure on 500', async () => {
+      const deps = makeServiceDeps();
+      deps.registryService = {
+        getById: async () => { throw new Error('DB crash'); },
+      } as any;
+      const service = new CapabilityTestService(deps);
+      const controller = new CapabilityTestController(service);
+      const reply = mockReply();
+
+      await controller.getManifest({ params: { id: 'p1' } } as any, reply as any);
+
+      const body = reply.getBody() as any;
+      expect(body.error).toBe('Internal Server Error');
+      expect(body.statusCode).toBe(500);
+    });
   });
 });

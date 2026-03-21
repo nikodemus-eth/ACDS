@@ -68,4 +68,79 @@ describe('assembleEnvelope', () => {
     expect(envelope.fallback!.attempted).toBe(true);
     expect(envelope.fallback!.fallback_provider).toBe('ollama-local');
   });
+
+  it('does not include fallback section when fallback was not used', () => {
+    const ctx = makeCompletedCtx();
+    ctx.fallbackUsed = false;
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.fallback).toBeUndefined();
+  });
+
+  it('uses defaults when registryEntry is missing', () => {
+    const ctx = makeCompletedCtx();
+    ctx.registryEntry = undefined;
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.artifact_version).toBe('0.0.0');
+    expect(envelope.limitations.quality_tier).toBe('consumer_demo_grade');
+    expect(envelope.limitations.known_constraints).toContain('unregistered artifact type');
+  });
+
+  it('uses defaults when optional context fields are missing', () => {
+    const ctx = makeCompletedCtx();
+    ctx.selectedProvider = undefined;
+    ctx.selectedProviderFamily = undefined;
+    ctx.outputModality = undefined;
+    ctx.outputFormat = undefined;
+    ctx.inputSummary = undefined;
+    ctx.canonicalPayload = undefined;
+    ctx.provenance = undefined;
+    ctx.policyDecision = undefined;
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.provider).toBe('unknown');
+    expect(envelope.provider_family).toBe('custom');
+    expect(envelope.output_modality).toBe('text');
+    expect(envelope.output_format).toBe('plain_text');
+    expect(envelope.input_summary.source_modality).toBe('unknown');
+    expect(envelope.provenance.provider_route).toBe('unknown');
+    expect(envelope.policy.provider_eligibility).toBe('blocked');
+    expect(envelope.policy.policy_trace).toEqual([]);
+  });
+
+  it('sums timing values for execution duration_ms', () => {
+    const ctx = makeCompletedCtx();
+    ctx.timings = { intake: 10, policy_gate: 5, planning: 15, execution: 100, post_processing: 3, provenance: 2 };
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.execution!.duration_ms).toBe(135);
+  });
+
+  it('uses rawOutput in payload when canonicalPayload is undefined', () => {
+    const ctx = makeCompletedCtx();
+    ctx.canonicalPayload = undefined;
+    ctx.rawOutput = { raw: 'data' };
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.payload.primary).toEqual({ raw: 'data' });
+  });
+
+  it('sets policy.local_only_requirement from policyDecision', () => {
+    const ctx = makeCompletedCtx();
+    ctx.policyDecision = { allowed: true, tier: 'allowed', trace: [], local_only: true };
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.policy.local_only_requirement).toBe(true);
+  });
+
+  it('uses requestedBy from options in provenance when provenance is missing', () => {
+    const ctx = makeCompletedCtx();
+    ctx.provenance = undefined;
+    ctx.options = { requestedBy: 'custom-user' };
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.provenance.requested_by).toBe('custom-user');
+  });
+
+  it('defaults requestedBy to system when options has no requestedBy', () => {
+    const ctx = makeCompletedCtx();
+    ctx.provenance = undefined;
+    ctx.options = {};
+    const envelope = assembleEnvelope(ctx);
+    expect(envelope.provenance.requested_by).toBe('system');
+  });
 });

@@ -203,5 +203,121 @@ describe('CapabilityTestService', () => {
       expect(result.success).toBe(true);
       expect(result.rawResponse.content).toBe('text');
     });
+
+    it('uses file field as prompt when input has file data URI', async () => {
+      const service = new CapabilityTestService(makeDeps());
+      const result = await service.testCapability('p1', 'text.generate', {
+        file: 'data:audio/wav;base64,AAAA',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('returns json responseFormat for extract capabilities', async () => {
+      // Use Apple provider which has many capabilities that might include extract
+      const service = new CapabilityTestService(makeDeps({
+        provider: makeProvider({ vendor: 'apple' as any }),
+      }));
+      const manifest = await service.getManifest('p1');
+      const extractCap = manifest.find(c => c.capabilityId.includes('extract'));
+      if (extractCap) {
+        const result = await service.testCapability('p1', extractCap.capabilityId, { text: 'test' });
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it('extracts rootCause from Error with .cause', async () => {
+      const deps = makeDeps();
+      deps.executionProxy = {
+        execute: async () => {
+          const inner = new Error('root cause message');
+          const outer = new Error('wrapper');
+          (outer as any).cause = inner;
+          throw outer;
+        },
+      } as any;
+      const service = new CapabilityTestService(deps);
+      const result = await service.testCapability('p1', 'text.generate', { text: 'hi' });
+
+      expect(result.success).toBe(false);
+      expect(result.error!.code).toBe('EXECUTION_FAILED');
+      expect(result.error!.message).toBe('root cause message');
+    });
+
+    it('uses wrapper message when cause is not an Error', async () => {
+      const deps = makeDeps();
+      deps.executionProxy = {
+        execute: async () => {
+          const outer = new Error('wrapper message');
+          (outer as any).cause = 'not an error';
+          throw outer;
+        },
+      } as any;
+      const service = new CapabilityTestService(deps);
+      const result = await service.testCapability('p1', 'text.generate', { text: 'hi' });
+
+      expect(result.success).toBe(false);
+      expect(result.error!.message).toBe('wrapper message');
+    });
+
+    it('sets apple method for apple-prefixed capability IDs', async () => {
+      const service = new CapabilityTestService(makeDeps({
+        provider: makeProvider({ vendor: 'apple' as any }),
+      }));
+      const manifest = await service.getManifest('p1');
+      if (manifest.length > 0) {
+        const appleCap = manifest[0];
+        const result = await service.testCapability('p1', appleCap.capabilityId, { text: 'test' });
+        expect(result.success).toBe(true);
+        expect(result.capabilityId).toBe(appleCap.capabilityId);
+      }
+    });
+
+    it('includes timestamp in error responses', async () => {
+      const service = new CapabilityTestService(makeDeps());
+      const result = await service.testCapability('p1', 'unknown.cap', { text: 'hi' });
+      expect(result.timestamp).toBeDefined();
+      expect(new Date(result.timestamp).getTime()).toBeGreaterThan(0);
+    });
+
+    it('measures durationMs for successful executions', async () => {
+      const service = new CapabilityTestService(makeDeps());
+      const result = await service.testCapability('p1', 'text.generate', { text: 'hi' });
+      expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('measures durationMs for failed executions', async () => {
+      const service = new CapabilityTestService(makeDeps({
+        executeError: new Error('timeout'),
+      }));
+      const result = await service.testCapability('p1', 'text.generate', { text: 'hi' });
+      expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('sets output type to error for error responses', async () => {
+      const service = new CapabilityTestService(makeDeps());
+      const result = await service.testCapability('p1', 'unknown.cap', {});
+      expect(result.output.type).toBe('error');
+    });
+
+    it('passes targetLanguage and sourceLanguage from input', async () => {
+      const service = new CapabilityTestService(makeDeps());
+      const result = await service.testCapability('p1', 'text.generate', {
+        text: 'hello',
+        targetLanguage: 'fr',
+        sourceLanguage: 'en',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('passes voice and rate from input', async () => {
+      const service = new CapabilityTestService(makeDeps());
+      const result = await service.testCapability('p1', 'text.generate', {
+        text: 'hello',
+        voice: 'Samantha',
+        rate: 1.5,
+      });
+      expect(result.success).toBe(true);
+    });
   });
 });

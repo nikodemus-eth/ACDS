@@ -1481,3 +1481,76 @@ PGlite enforces PostgreSQL's strict UUID column types — short string IDs like 
 - All documentation updated (Development_log.md, ARCHITECTURE_OVERVIEW.md, CAPABILITY_TEST_CONSOLE.md, TEST_ARCHITECTURE.md)
 - Committed to local: `87b5fa1`
 - PR created: https://github.com/nikodemus-eth/ACDS/pull/1
+
+## 2026-03-20 — Apple Intelligence Subsystem Implementations & Translation UI
+
+### Real Apple Framework Integrations
+
+Replaced Foundation Models fallbacks with real Apple framework implementations where possible. Each subsystem wrapper now tries the real API first and falls back to FM only when the framework has a hard limitation.
+
+**TranslationWrapper** — Real `Translation` framework (macOS 26):
+- Uses `TranslationSession(installedSource:target:)` for installed language packs
+- Falls back to Foundation Models with translation system prompt when packs aren't installed
+- `NLLanguageRecognizer` for automatic source language detection
+- `#available(macOS 26.0, *)` guard for the new direct-init API
+
+**TranslationLanguagesEndpoint** — `GET /translation/languages`:
+- Queries real `LanguageAvailability` and `TranslationSession` for installed vs supported languages
+- Probes each language with a test translation to determine installation status
+- Returns sorted list (installed first, then alphabetical)
+- 5 languages confirmed installed: Arabic, English, English (GB), Hindi, Spanish
+
+**AdapterRequest extended** — Added `targetLanguage`, `sourceLanguage`, `voice`, `rate` fields:
+- Threaded through `AppleBridgeRequest` and `AppleIntelligenceMapper`
+- `CapabilityTestService.buildAdapterRequest()` passes these from frontend input
+
+### Translation UI Redesign
+
+New `translation_input` InputMode with full language management:
+- **From/To language dropdowns** populated from installed language packs (system call each time)
+- "Auto-detect" option for source language using NLLanguageRecognizer
+- Shows installed/available count with expandable list of downloadable packs
+- Links to Apple Support guide for downloading language packs (OS-detected: macOS vs iOS)
+- Uses `apiClient` (with auth header) instead of raw `fetch` for the languages endpoint
+- API proxy: `GET /providers/translation/languages` → bridge `GET /translation/languages`
+
+### Audio Input UX Fixes
+
+- Removed confusing "optional" textareas from `audio_input` and `image_upload` modes
+- Execute button enables immediately on file select (checks `fileName` not just `fileDataUri`)
+- Added `fileLoading` state with "Reading file..." button text during FileReader processing
+- Hidden temperature slider for `audio_input` and `image_upload` (irrelevant for those modes)
+
+### CapabilityTestService Error Pass-Through
+
+- `ProviderExecutionError.cause` chain now extracted for root cause messages
+- Bridge errors (e.g., "No speech detected") surface in the UI instead of generic "Execution failed"
+
+### Shared ResultBox Utility
+
+- Extracted `ResultBox<T>` from `FoundationModelsWrapper` to shared `ResultBox.swift`
+- Thread-safe `NSLock`-based box for bridging async Apple framework APIs to sync NIO handlers
+- Used by all subsystem wrappers: Translation, TTS, Speech, Vision, Sound
+
+### ImagePlayground Removal
+
+Apple's `ImageCreator` API throws `backgroundCreationForbidden` from any process not visible and in the foreground. Tested: launchd agent, `.app` bundle via `open`, `NSApplication.shared.run()` with `.accessory` policy — all fail. No entitlement bypass exists in public Apple documentation.
+
+**Removed:**
+- `apps/image-playground-service/` — entire foreground service app (Package.swift, server, endpoint)
+- `ImageCreatorWrapper.swift` from bridge
+- `image_creator` case from `ExecuteEndpoint` switch
+- `image_creator` from `SUPPORTED_APPLE_SUBSYSTEMS` and all mapping dictionaries
+- `com.m4.image-playground-service` launchd agent
+
+**Retained:** `image_creator` methods in `APPLE_METHODS` show as `available: false` — tabs won't appear in the Capability Test Console. If Apple adds a background entitlement, re-enabling requires only adding `image_creator` back to `SUPPORTED_APPLE_SUBSYSTEMS`.
+
+### Service Topology (Current)
+
+| Service | Port | Status |
+|---------|------|--------|
+| Apple Intelligence Bridge | 11435 | Running (6 subsystems) |
+| ACDS API | 3100 | Running |
+| Admin Web | 4173 | Running |
+| PostgreSQL | 5432 | Running |
+| ImagePlayground Service | — | **Removed** |

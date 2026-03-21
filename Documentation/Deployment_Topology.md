@@ -13,8 +13,10 @@ All services run as macOS launchd user agents with `RunAtLoad: true` and `KeepAl
 | `com.m4.session-watcher` | Session Watcher | — | `python -m swarm.bridge.session_watcher` |
 | `com.m4.acds-api` | ACDS REST API | 3100 | `node dist/main.js` |
 | `com.m4.acds-admin-web` | Admin Web (Vite Preview) | 4173 | `vite preview` |
-| `com.m4.apple-intelligence-bridge` | Apple Intelligence Bridge | — | `.build/debug/AppleIntelligenceBridge` |
+| `com.m4.apple-intelligence-bridge` | Apple Intelligence Bridge | 11435 | `.build/debug/AppleIntelligenceBridge` |
 | `homebrew.mxcl.postgresql@16` | PostgreSQL 16 | 5432 | Homebrew-managed |
+
+**Note**: The `com.m4.image-playground-service` agent was removed — Apple's `ImageCreator` API requires a visible foreground app and cannot run from any background/agent context.
 
 ### Plist Locations
 
