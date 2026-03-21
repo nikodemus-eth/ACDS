@@ -15,6 +15,7 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
   const [fileDataUri, setFileDataUri] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [fileLoading, setFileLoading] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState('es');
   const [sourceLanguage, setSourceLanguage] = useState('');
   const [installedLanguages, setInstalledLanguages] = useState<TranslationLanguage[]>([]);
@@ -43,9 +44,16 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
+    setFileLoading(true);
+    setFileDataUri('');
     const reader = new FileReader();
     reader.onload = () => {
       setFileDataUri(reader.result as string);
+      setFileLoading(false);
+    };
+    reader.onerror = () => {
+      setFileLoading(false);
+      setFileName('');
     };
     reader.readAsDataURL(file);
   }
@@ -114,31 +122,33 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
     onExecute(input, settings);
   }
 
-  const hasInput = prompt.trim() || fileDataUri;
+  const hasInput = prompt.trim() || fileDataUri || fileName;
 
   return (
     <div className="input-renderer">
       {renderInput()}
-      <div className="input-renderer__settings">
-        <label className="input-renderer__label">
-          Temperature: {temperature}
-          <input
-            type="range"
-            min={0}
-            max={2}
-            step={0.1}
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-            className="input-renderer__slider"
-          />
-        </label>
-      </div>
+      {inputMode !== 'audio_input' && inputMode !== 'image_upload' && (
+        <div className="input-renderer__settings">
+          <label className="input-renderer__label">
+            Temperature: {temperature}
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.1}
+              value={temperature}
+              onChange={(e) => setTemperature(Number(e.target.value))}
+              className="input-renderer__slider"
+            />
+          </label>
+        </div>
+      )}
       <button
         onClick={handleSubmit}
-        disabled={isPending || !hasInput}
+        disabled={isPending || fileLoading || !hasInput}
         className="button button--primary"
       >
-        {isPending ? 'Executing...' : 'Execute'}
+        {fileLoading ? 'Reading file...' : isPending ? 'Executing...' : 'Execute'}
       </button>
     </div>
   );
@@ -247,7 +257,10 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
               </div>
             </div>
             {fileName && (
-              <span className="input-renderer__file-name">{fileName}</span>
+              <span className="input-renderer__file-name">
+                {fileName}
+                {fileLoading && <span className="input-renderer__hint"> — reading file...</span>}
+              </span>
             )}
             {fileDataUri && (
               <audio controls src={fileDataUri} className="input-renderer__audio-preview" />
