@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { InputMode } from '@acds/core-types';
 
 interface InputRendererProps {
@@ -10,12 +10,38 @@ interface InputRendererProps {
 export function InputRenderer({ inputMode, onExecute, isPending }: InputRendererProps) {
   const [prompt, setPrompt] = useState('');
   const [temperature, setTemperature] = useState(0.7);
+  const [fileName, setFileName] = useState('');
+  const [fileDataUri, setFileDataUri] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFileDataUri(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
 
   function handleSubmit() {
-    const input: Record<string, unknown> = { prompt };
+    const input: Record<string, unknown> = {};
     const settings: Record<string, unknown> = { temperature };
+
+    if (fileDataUri) {
+      input.file = fileDataUri;
+      input.fileName = fileName;
+    }
+    if (prompt.trim()) {
+      input.prompt = prompt;
+      input.text = prompt;
+    }
+
     onExecute(input, settings);
   }
+
+  const hasInput = prompt.trim() || fileDataUri;
 
   return (
     <div className="input-renderer">
@@ -36,7 +62,7 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
       </div>
       <button
         onClick={handleSubmit}
-        disabled={isPending || !prompt.trim()}
+        disabled={isPending || !hasInput}
         className="button button--primary"
       >
         {isPending ? 'Executing...' : 'Execute'}
@@ -76,6 +102,38 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
             rows={3}
           />
         );
+      case 'image_upload':
+        return (
+          <div className="input-renderer__file-group">
+            <label className="input-renderer__file-label">
+              Upload an image for analysis:
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="input-renderer__file-input"
+              />
+            </label>
+            {fileName && (
+              <span className="input-renderer__file-name">{fileName}</span>
+            )}
+            {fileDataUri && (
+              <img
+                src={fileDataUri}
+                alt="Preview"
+                className="input-renderer__image-preview"
+              />
+            )}
+            <textarea
+              className="input-renderer__textarea"
+              placeholder="Optional: additional instructions (e.g., 'extract all text', 'describe scene')..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={2}
+            />
+          </div>
+        );
       case 'tts_prompt':
         return (
           <textarea
@@ -89,13 +147,28 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
       case 'audio_input':
         return (
           <div className="input-renderer__file-group">
-            <p className="input-renderer__hint">Audio input capabilities require file upload</p>
+            <label className="input-renderer__file-label">
+              Upload an audio file:
+              <input
+                ref={fileRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleFileChange}
+                className="input-renderer__file-input"
+              />
+            </label>
+            {fileName && (
+              <span className="input-renderer__file-name">{fileName}</span>
+            )}
+            {fileDataUri && (
+              <audio controls src={fileDataUri} className="input-renderer__audio-preview" />
+            )}
             <textarea
               className="input-renderer__textarea"
-              placeholder="Or enter text to simulate audio input..."
+              placeholder="Optional: additional context or instructions..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={3}
+              rows={2}
             />
           </div>
         );

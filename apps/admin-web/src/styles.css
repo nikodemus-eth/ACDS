@@ -1081,6 +1081,38 @@ textarea {
   gap: 0.5rem;
 }
 
+.input-renderer__file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.input-renderer__file-input {
+  font-size: 0.84rem;
+}
+
+.input-renderer__file-name {
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.input-renderer__image-preview {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  object-fit: contain;
+}
+
+.input-renderer__audio-preview {
+  width: 100%;
+  max-width: 300px;
+}
+
 /* Output renderer */
 
 .output-renderer {

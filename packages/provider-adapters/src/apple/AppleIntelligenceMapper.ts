@@ -7,6 +7,8 @@ export interface AppleBridgeRequest {
   maxTokens?: number;
   temperature?: number;
   responseFormat?: 'text' | 'json';
+  /** Subsystem method to invoke (e.g. 'image_creator.generate', 'tts.speak'). Defaults to 'foundation_models.generate'. */
+  method?: string;
 }
 
 export interface AppleBridgeResponse {
@@ -27,6 +29,7 @@ export function toAppleBridgeRequest(request: AdapterRequest): AppleBridgeReques
     maxTokens: request.maxTokens,
     temperature: request.temperature,
     responseFormat: request.responseFormat,
+    method: request.method,
   };
 }
 

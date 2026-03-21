@@ -5,6 +5,7 @@
 export type InputMode =
   | 'text_prompt'
   | 'image_prompt'
+  | 'image_upload'
   | 'tts_prompt'
   | 'audio_input'
   | 'long_text'

@@ -7,6 +7,8 @@ export interface AdapterRequest {
   topP?: number;
   stopSequences?: string[];
   responseFormat?: 'text' | 'json';
+  /** Subsystem method for multi-capability providers (e.g. 'image_creator.generate' for Apple Intelligence). */
+  method?: string;
 }
 
 export interface AdapterResponse {

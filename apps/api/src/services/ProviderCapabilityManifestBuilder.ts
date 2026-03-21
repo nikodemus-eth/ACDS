@@ -23,7 +23,7 @@ const SUBSYSTEM_TO_INPUT_MODE: Record<string, InputMode> = {
   writing_tools: 'long_text',
   speech: 'audio_input',
   tts: 'tts_prompt',
-  vision: 'image_prompt',
+  vision: 'image_upload',
   image_creator: 'image_prompt',
   translation: 'text_prompt',
   sound: 'audio_input',

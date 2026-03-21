@@ -87,6 +87,13 @@ export class CapabilityTestService {
         ? input.prompt
         : JSON.stringify(input);
 
+    // Extract subsystem method for Apple Intelligence capabilities.
+    // e.g. 'apple.image_creator.generate' → 'image_creator.generate'
+    // Non-Apple capabilities (e.g. 'text.generate') have no method.
+    const method = capabilityId.startsWith('apple.')
+      ? capabilityId.slice('apple.'.length)
+      : undefined;
+
     return {
       prompt,
       systemPrompt: typeof input.systemPrompt === 'string' ? input.systemPrompt : undefined,
@@ -96,6 +103,7 @@ export class CapabilityTestService {
       responseFormat: capabilityId.includes('extract') || capabilityId.includes('classify')
         ? 'json'
         : 'text',
+      method,
     };
   }
 
