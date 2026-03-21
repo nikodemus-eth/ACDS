@@ -1,0 +1,3 @@
+module Atomics {
+    header "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/Atomics.build/include/Atomics-Swift.h"
+}

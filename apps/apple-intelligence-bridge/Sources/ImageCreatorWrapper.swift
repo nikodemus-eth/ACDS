@@ -1,6 +1,5 @@
 import Foundation
 import CoreGraphics
-import ImagePlayground
 import AppKit
 
 /// Wraps Apple's ImagePlayground framework for image generation.
@@ -37,57 +36,65 @@ enum ImageCreatorWrapper {
         }
     }
 
-    /// Attempt image generation using the real ImagePlayground ImageCreator API
+    /// Proxy image generation to the ImagePlaygroundService foreground app on port 11436.
     private static func generateWithImageCreator(prompt: String, style: String?) -> Result<Output, BridgeError> {
+        let serviceUrl = "http://127.0.0.1:11436/generate"
+
+        // Build request body
+        var body: [String: Any] = ["prompt": prompt]
+        if let s = style { body["style"] = s }
+
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
+            return .failure(.generationFailed("Could not serialize request"))
+        }
+
+        var request = URLRequest(url: URL(string: serviceUrl)!)
+        request.httpMethod = "POST"
+        request.httpBody = jsonData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 180 // Image generation can be slow
+
         let semaphore = DispatchSemaphore(value: 0)
         let box = ResultBox<Result<Output, BridgeError>>(.failure(.generationFailed("Timeout")))
 
-        let capturedPrompt = prompt
-        let capturedStyle = style
-
-        Task { @Sendable in
-            guard #available(macOS 15.4, *) else {
-                box.value = .failure(.generationFailed("ImageCreator requires macOS 15.4+"))
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                box.value = .failure(.generationFailed("ImagePlaygroundService unreachable: \(error.localizedDescription)"))
                 semaphore.signal()
                 return
             }
-            do {
-                let creator = try await ImageCreator()
 
-                // Resolve style from string or default to animation
-                let imageStyle: ImagePlaygroundStyle
-                let availableStyles = creator.availableStyles
-                if let requestedStyle = capturedStyle,
-                   let matched = availableStyles.first(where: { $0.id == requestedStyle }) {
-                    imageStyle = matched
+            guard let httpResponse = response as? HTTPURLResponse else {
+                box.value = .failure(.generationFailed("Invalid response from ImagePlaygroundService"))
+                semaphore.signal()
+                return
+            }
+
+            guard let data = data else {
+                box.value = .failure(.generationFailed("Empty response from ImagePlaygroundService"))
+                semaphore.signal()
+                return
+            }
+
+            if httpResponse.statusCode == 200 {
+                // Parse the response to get the data URI
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let content = json["content"] as? String {
+                    let durationMs = json["durationMs"] as? Int ?? 0
+                    box.value = .success(Output(content: content, durationMs: durationMs))
                 } else {
-                    imageStyle = availableStyles.first ?? .animation
+                    box.value = .failure(.generationFailed("Could not parse ImagePlaygroundService response"))
                 }
-
-                for try await image in creator.images(
-                    for: [.text(capturedPrompt)],
-                    style: imageStyle,
-                    limit: 1
-                ) {
-                    let cgImage = image.cgImage
-                    let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-                    guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                        box.value = .failure(.generationFailed("Could not encode PNG from generated image"))
-                        break
-                    }
-                    let base64 = pngData.base64EncodedString()
-                    let dataUri = "data:image/png;base64,\(base64)"
-                    box.value = .success(Output(content: dataUri, durationMs: 0))
-                    break
-                }
-            } catch {
-                box.value = .failure(.generationFailed(error.localizedDescription))
+            } else {
+                let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                    ?? "HTTP \(httpResponse.statusCode)"
+                box.value = .failure(.generationFailed(errorMsg))
             }
             semaphore.signal()
         }
+        task.resume()
 
-        let timeout = DispatchTime.now() + .seconds(120) // Image generation can be slow
-        _ = semaphore.wait(timeout: timeout)
+        _ = semaphore.wait(timeout: .now() + 180)
         return box.value
     }
 

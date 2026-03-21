@@ -1,0 +1,3 @@
+module NIOFileSystem {
+    header "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/NIOFileSystem.build/include/NIOFileSystem-Swift.h"
+}

@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/_NIOConcurrency.build/master.swiftdeps"
+  },
+  "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/checkouts/swift-nio/Sources/_NIOConcurrency/Empty.swift": {
+    "dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/_NIOConcurrency.build/Empty.d",
+    "object": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/_NIOConcurrency.build/Empty.swift.o",
+    "swiftmodule": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/_NIOConcurrency.build/Empty~partial.swiftmodule",
+    "swift-dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/_NIOConcurrency.build/Empty.swiftdeps",
+    "diagnostics": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/_NIOConcurrency.build/Empty.dia"
+  }
+}

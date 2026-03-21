@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/master.swiftdeps"
+  },
+  "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/Sources/ImageGenerationEndpoint.swift": {
+    "dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImageGenerationEndpoint.d",
+    "object": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImageGenerationEndpoint.swift.o",
+    "swiftmodule": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImageGenerationEndpoint~partial.swiftmodule",
+    "swift-dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImageGenerationEndpoint.swiftdeps",
+    "diagnostics": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImageGenerationEndpoint.dia"
+  },
+  "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/Sources/ImagePlaygroundServer.swift": {
+    "dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImagePlaygroundServer.d",
+    "object": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImagePlaygroundServer.swift.o",
+    "swiftmodule": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImagePlaygroundServer~partial.swiftmodule",
+    "swift-dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImagePlaygroundServer.swiftdeps",
+    "diagnostics": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/ImagePlaygroundServer.dia"
+  },
+  "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/Sources/main.swift": {
+    "dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/main.d",
+    "object": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/main.swift.o",
+    "swiftmodule": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/main.swiftdeps",
+    "diagnostics": "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/arm64-apple-macosx/debug/ImagePlaygroundService.build/main.dia"
+  }
+}

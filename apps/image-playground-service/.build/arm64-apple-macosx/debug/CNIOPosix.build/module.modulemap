@@ -1,0 +1,4 @@
+module CNIOPosix {
+    umbrella header "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/checkouts/swift-nio/Sources/CNIOPosix/include/CNIOPosix.h"
+    export *
+}
