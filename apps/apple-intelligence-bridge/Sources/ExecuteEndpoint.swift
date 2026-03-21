@@ -62,9 +62,6 @@ enum ExecuteEndpoint {
         case "speech":
             return handleSpeech(request: request, method: methodStr, start: start)
 
-        case "image_creator":
-            return handleImageCreator(request: request, start: start)
-
         case "translation":
             return handleTranslation(request: request, start: start)
 
@@ -146,23 +143,6 @@ enum ExecuteEndpoint {
                 model: "apple-speech", content: output.content, done: true,
                 inputTokens: nil, outputTokens: nil,
                 durationMs: durationMs, capabilities: ["speech-recognition"]
-            )
-            return (.ok, try! JSONEncoder().encode(response))
-        case .failure(let error):
-            return (.internalServerError, #"{"error":"\#(error.localizedDescription)"}"#.data(using: .utf8)!)
-        }
-    }
-
-    private static func handleImageCreator(request: Request, start: Date) -> (NIOHTTP1.HTTPResponseStatus, Data) {
-        let result = ImageCreatorWrapper.execute(prompt: request.prompt, style: nil)
-        let durationMs = Int(Date().timeIntervalSince(start) * 1000)
-
-        switch result {
-        case .success(let output):
-            let response = Response(
-                model: "apple-image-creator", content: output.content, done: true,
-                inputTokens: request.prompt.count / 4, outputTokens: nil,
-                durationMs: durationMs, capabilities: ["image-generation"]
             )
             return (.ok, try! JSONEncoder().encode(response))
         case .failure(let error):

@@ -10,7 +10,7 @@ import { APPLE_METHODS } from '@acds/sovereign-runtime';
 /** Subsystems the Apple Intelligence bridge currently implements. */
 const SUPPORTED_APPLE_SUBSYSTEMS = new Set([
   'foundation_models', 'writing_tools', 'speech', 'tts',
-  'vision', 'image_creator', 'translation', 'sound',
+  'vision', 'translation', 'sound',
 ]);
 
 const SUBSYSTEM_TO_CATEGORY: Record<string, string> = {
@@ -19,7 +19,6 @@ const SUBSYSTEM_TO_CATEGORY: Record<string, string> = {
   speech: 'speech',
   tts: 'speech',
   vision: 'image',
-  image_creator: 'image',
   translation: 'translation',
   sound: 'sound',
 };
@@ -30,7 +29,6 @@ const SUBSYSTEM_TO_INPUT_MODE: Record<string, InputMode> = {
   speech: 'audio_input',
   tts: 'tts_prompt',
   vision: 'image_upload',
-  image_creator: 'image_prompt',
   translation: 'translation_input',
   sound: 'audio_input',
 };
@@ -41,7 +39,6 @@ const SUBSYSTEM_TO_OUTPUT_MODE: Record<string, OutputMode> = {
   speech: 'text',
   tts: 'audio',
   vision: 'json',
-  image_creator: 'image',
   translation: 'text',
   sound: 'json',
 };
