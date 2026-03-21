@@ -71,7 +71,9 @@ export class CapabilityTestService {
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Extract the root cause message — ProviderExecutionError wraps the actual bridge error in .cause
+      const rootCause = err instanceof Error && err.cause instanceof Error ? err.cause : err;
+      const message = rootCause instanceof Error ? rootCause.message : String(rootCause);
       return this.errorResponse(providerId, capabilityId, Date.now() - startMs, {
         code: 'EXECUTION_FAILED',
         message,

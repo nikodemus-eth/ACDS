@@ -176,13 +176,6 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
                 className="input-renderer__image-preview"
               />
             )}
-            <textarea
-              className="input-renderer__textarea"
-              placeholder="Optional: additional instructions (e.g., 'extract all text', 'describe scene')..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={2}
-            />
           </div>
         );
       case 'tts_prompt':
@@ -237,13 +230,6 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
             {fileDataUri && (
               <audio controls src={fileDataUri} className="input-renderer__audio-preview" />
             )}
-            <textarea
-              className="input-renderer__textarea"
-              placeholder="Optional: additional context or instructions..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={2}
-            />
           </div>
         );
       case 'structured_options':

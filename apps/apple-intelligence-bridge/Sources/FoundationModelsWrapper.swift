@@ -4,19 +4,6 @@ import Foundation
 import FoundationModels
 #endif
 
-/// Thread-safe box for passing results between Task and synchronous caller.
-private final class ResultBox<T: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _value: T
-
-    init(_ value: T) { _value = value }
-
-    var value: T {
-        get { lock.lock(); defer { lock.unlock() }; return _value }
-        set { lock.lock(); defer { lock.unlock() }; _value = newValue }
-    }
-}
-
 /// Wraps Apple's Foundation Models framework for on-device inference.
 /// Uses @available checks to gracefully degrade on unsupported macOS versions.
 enum FoundationModelsWrapper {
