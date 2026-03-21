@@ -7,6 +7,9 @@ import type { CapabilityManifestEntry, InputMode, OutputMode } from '@acds/core-
 import type { Provider } from '@acds/core-types';
 import { APPLE_METHODS } from '@acds/sovereign-runtime';
 
+/** Subsystems the Apple Intelligence bridge currently implements. */
+const SUPPORTED_APPLE_SUBSYSTEMS = new Set(['foundation_models', 'writing_tools']);
+
 const SUBSYSTEM_TO_CATEGORY: Record<string, string> = {
   foundation_models: 'text',
   writing_tools: 'text',
@@ -78,7 +81,7 @@ export class ProviderCapabilityManifestBuilder {
       category: SUBSYSTEM_TO_CATEGORY[method.subsystem] ?? 'text',
       inputMode: SUBSYSTEM_TO_INPUT_MODE[method.subsystem] ?? 'text_prompt',
       outputMode: SUBSYSTEM_TO_OUTPUT_MODE[method.subsystem] ?? 'text',
-      available: provider.enabled,
+      available: provider.enabled && SUPPORTED_APPLE_SUBSYSTEMS.has(method.subsystem),
     }));
   }
 }

@@ -10,6 +10,9 @@ enum ExecuteEndpoint {
         let maxTokens: Int?
         let temperature: Double?
         let responseFormat: String?
+        /// Subsystem method to invoke (e.g. "image_creator.generate", "tts.speak").
+        /// When nil or starting with "foundation_models.", routes to FoundationModelsWrapper.
+        let method: String?
     }
 
     struct Response: Codable {
@@ -31,6 +34,16 @@ enum ExecuteEndpoint {
         guard let request = try? JSONDecoder().decode(Request.self, from: body) else {
             let error = #"{"error":"Invalid request format"}"#.data(using: .utf8)!
             return (.badRequest, error)
+        }
+
+        // Route based on method: nil or foundation_models.* → text generation,
+        // writing_tools.* → text generation with writing prompt, all others → 501
+        let methodStr = request.method ?? "foundation_models.generate"
+        let isTextCapable = methodStr.hasPrefix("foundation_models.") || methodStr.hasPrefix("writing_tools.")
+
+        if !isTextCapable {
+            let errorJson = #"{"error":"Subsystem not yet implemented: \#(methodStr)","method":"\#(methodStr)","hint":"Only foundation_models and writing_tools subsystems are currently supported by the bridge."}"#
+            return (.notImplemented, errorJson.data(using: .utf8)!)
         }
 
         let start = Date()
