@@ -253,6 +253,22 @@ Tracking lessons learned to prevent repeating pain points.
 
 4. **`vite preview` proxy configuration is separate from `vite dev` proxy.** The `server.proxy` config in `vite.config.ts` only applies to `vite dev`. For `vite preview` (used by launchd), proxy must be configured under the `preview.proxy` key. Both must be maintained when proxying `/api` to the ACDS API server.
 
+## 2026-03-20 — LFSI MVP Implementation
+
+1. **Reuse existing adapters, don't wrap them in wrappers.** The LFSI providers import `AppleIntelligenceAdapter` and `OllamaAdapter` directly, calling `adapter.execute(config, request)`. The first implementation tried creating intermediate bridge/client classes — unnecessary abstraction when the adapters already handle HTTP, timeout, and error mapping. The thinnest possible wrapper (just type mapping) is the right approach for an MVP that will be refactored.
+
+2. **Capability-to-method mapping is the critical bridge between LFSI's abstraction and Apple's subsystem dispatch.** LFSI uses canonical capability IDs like `text.summarize`. The Apple bridge dispatches based on the `method` field (`foundation_models.summarize`). This mapping lives in `capabilities.ts` and feeds into the `AdapterRequest.method` field. Getting this mapping wrong means requests go to the wrong subsystem. The mapping is the contract between the routing layer and the execution layer.
+
+3. **Large language models need warm-up time that breaks test assumptions.** The first test run against Ollama's `qwen3:8b` timed out at 60s because the model wasn't loaded into memory. After one warm-up call, subsequent inference took 7–27s. Live integration tests should either warm up the model in `beforeAll` or use generous timeouts (120s+). The 70B `llama3.3:latest` model was consistently too slow (60s+) for test-friendly turnaround — the 8B `qwen3:8b` is fast enough for all text tasks.
+
+4. **`AdapterConnectionResult.success` not `.connected`.** The existing adapter interface uses `success: boolean` in its connection result, not `connected`. Assuming the field name caused a silent `undefined` return from `isAvailable()` — the test showed `typeof available === 'undefined'` instead of `'boolean'`. Always check the actual interface definition, not what you expect it to be.
+
+5. **Policy-denied capabilities should throw at policy resolution, not at provider selection.** `resolvePolicy('lfsi.private_strict', 'research.web')` throws immediately with a specific reason code, before the router even looks at providers. This gives clear error messages and keeps the router loop clean — it only deals with providers, not policy violations.
+
+6. **The ledger must write on every code path, including errors.** The router wraps its entire logic in try/catch and writes a ledger event in the catch block. This guarantees that every request — success, validation failure, policy denial, unknown capability — produces exactly one ledger entry. The error path writes `resultStatus: 'denied'` for policy violations and `'failure'` for everything else.
+
+7. **Don't create new packages when a new directory suffices.** The LFSI MVP lives at `packages/routing-engine/src/lfsi/` — inside the existing routing-engine package, not as a new `@acds/lfsi` package. This avoids package.json churn, tsconfig changes, workspace dependency wiring, and build pipeline updates. For an MVP that will be refactored, the overhead of a new package is pure waste.
+
 5. **PGlite enforces strict UUID column types.** Short string IDs like `'exec-1'` that pass in mocked environments cause `invalid input syntax for type uuid` errors against real Postgres. All test fixtures must use valid UUID format strings (`'00000000-0000-0000-0000-000000000001'`). This is exactly why we ban mocks — they hide type enforcement bugs.
 
 6. **PGlite migration `BEGIN` failures cascade as "aborted transaction" state.** When a migration with `BEGIN` fails (e.g., `RENAME COLUMN` on a column that already has the correct name), PGlite leaves the connection in an aborted state. All subsequent SQL commands fail with "current transaction is aborted, commands ignored until end of transaction block." The fix is explicit `ROLLBACK` after each migration failure, not just swallowing the error.

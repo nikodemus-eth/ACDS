@@ -56,6 +56,22 @@ The ITS is a deterministic, policy-bound routing engine within `@acds/routing-en
 
 See `docs/architecture/inference-triage-system.md` for the full specification.
 
+## Local-First Sovereign Inference (LFSI)
+
+LFSI is a deterministic, policy-driven inference routing module within `@acds/routing-engine/lfsi/`. It implements the doctrine: **execute locally by default, escalate only by policy, depend only with an exit.**
+
+**Tier model:**
+- **Tier 0** (Apple Intelligence): on-device, lowest latency, highest privacy
+- **Tier 1** (Ollama): local, broader capability, fallback for Tier 0
+
+**Router algorithm:** reject unknown capability → reject provider overrides → resolve policy → filter by tier+capability → execute primary (Apple first) → validate → escalate if policy allows → write ledger event (always).
+
+**Policies:** `lfsi.local_balanced` (prefer Apple, Ollama fallback), `lfsi.apple_only` (no escalation), `lfsi.private_strict` (deny `research.web`).
+
+Both providers use the existing `AppleIntelligenceAdapter` and `OllamaAdapter` directly — no additional abstraction layers.
+
+See `docs/architecture/lfsi-specification.md` for the full specification.
+
 ## Dependency Direction
 
 Dependencies flow strictly downward. A package at layer N may import from any package at layer N-1 or below, but never from a package at the same layer or above. This rule is what makes each layer independently testable and replaceable.

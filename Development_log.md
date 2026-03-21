@@ -1554,3 +1554,70 @@ Apple's `ImageCreator` API throws `backgroundCreationForbidden` from any process
 | Admin Web | 4173 | Running |
 | PostgreSQL | 5432 | Running |
 | ImagePlayground Service | — | **Removed** |
+
+## 2026-03-20 — LFSI MVP: Local-First Sovereign Inference
+
+Implemented the Local-First Sovereign Inference doctrine as a new module inside `packages/routing-engine/src/lfsi/`. LFSI defines deterministic, policy-driven inference routing: execute locally by default, escalate only by policy, depend only with an exit.
+
+### Core Architecture
+
+**Tier model:**
+- **Tier 0 (Apple Intelligence)**: on-device, lowest latency, highest privacy, bounded capability
+- **Tier 1 (Ollama)**: local execution, broader capability, higher resource cost
+- No Tier 2 (external) in MVP — no image generation
+
+**Three policies:**
+- `lfsi.local_balanced` — prefer Tier 0, allow Tier 1 fallback
+- `lfsi.apple_only` — Tier 0 only, no escalation
+- `lfsi.private_strict` — Tier 0 preferred, Tier 1 allowed, deny `research.web`
+
+**Deterministic router (10-step algorithm):**
+1. Reject unknown capability → 2. Reject provider overrides → 3. Resolve policy → 4. Filter providers by tier+capability → 5. Check availability → 6. Execute primary → 7. Validate result → 8. Escalate if policy allows → 9. Return or fail deterministically → 10. Write ledger event (always)
+
+### Capability Registry
+
+| Capability | Apple Method | Ollama Model | Tiers |
+|-----------|-------------|-------------|-------|
+| text.summarize | foundation_models.summarize | qwen3:8b | 0, 1 |
+| text.rewrite | writing_tools.rewrite | qwen3:8b | 0, 1 |
+| text.extract.structured | foundation_models.generate (JSON) | qwen3:8b (JSON) | 0, 1 |
+| reasoning.deep | — | qwen3:8b | 1 only |
+| speech.tts | tts.speak | — | 0 only |
+| speech.stt | speech.transcribe_file | — | 0 only |
+| intent.classify | foundation_models.generate | — | 0 only |
+| reasoning.light | foundation_models.generate | — | 0 only |
+| code.assist.basic | — | qwen3:8b | 1 only |
+
+### Real Providers — Zero Mocks
+
+Both providers wrap existing ACDS adapters directly:
+- `AppleInferenceProvider` → `AppleIntelligenceAdapter` → bridge at localhost:11435
+- `OllamaInferenceProvider` → `OllamaAdapter` → Ollama API at localhost:11434
+
+No stubs, no monkeypatches, no simulated providers. Every test uses real inference.
+
+### 8 Reason Codes
+
+`UNKNOWN_CAPABILITY`, `CLIENT_PROVIDER_OVERRIDE_FORBIDDEN`, `APPLE_PROVIDER_UNAVAILABLE`, `APPLE_ONLY_VALIDATION_FAILURE`, `NO_PROVIDER_AVAILABLE`, `VALIDATION_FAILED_NO_ESCALATION`, `WEB_RESEARCH_NOT_ALLOWED_UNDER_PRIVATE_STRICT`, `CURRENT_WEB_FORBIDDEN_UNDER_PRIVATE_STRICT`
+
+### File Layout
+
+```
+packages/routing-engine/src/lfsi/
+  types.ts, capabilities.ts, errors.ts, policies.ts,
+  validator.ts, ledger.ts, router.ts, index.ts
+  providers/apple.ts, providers/ollama.ts
+  test/policy.test.ts, test/ledger.test.ts
+  test/apple.live.test.ts, test/ollama.live.test.ts, test/router.live.test.ts
+```
+
+### Tests
+
+- **11 pure logic tests**: policy resolution, ledger writes — no network needed
+- **18 live integration tests**: real Apple bridge (1.2–19s), real Ollama qwen3:8b (7–27s), full router pipeline
+- All 29 tests pass
+- `llama3.3:latest` (70B) deleted from Ollama — all tasks use `qwen3:8b` (8B)
+
+### Documentation
+
+- Filed `ACDS Apple Routing.md` as `docs/architecture/lfsi-specification.md`
