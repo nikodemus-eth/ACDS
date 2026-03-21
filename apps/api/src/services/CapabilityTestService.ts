@@ -81,11 +81,15 @@ export class CapabilityTestService {
   }
 
   private buildAdapterRequest(input: Record<string, unknown>, capabilityId: string): AdapterRequest {
-    const prompt = typeof input.text === 'string'
-      ? input.text
-      : typeof input.prompt === 'string'
-        ? input.prompt
-        : JSON.stringify(input);
+    // For file-based capabilities (audio, image upload), the file data URI takes priority.
+    // The bridge expects base64 data in the prompt field for speech/vision/sound subsystems.
+    const prompt = typeof input.file === 'string'
+      ? input.file
+      : typeof input.text === 'string'
+        ? input.text
+        : typeof input.prompt === 'string'
+          ? input.prompt
+          : JSON.stringify(input);
 
     // Extract subsystem method for Apple Intelligence capabilities.
     // e.g. 'apple.image_creator.generate' → 'image_creator.generate'

@@ -1113,6 +1113,65 @@ textarea {
   max-width: 300px;
 }
 
+.input-renderer__audio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-renderer__record-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.input-renderer__or-divider {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.input-renderer__file-label--inline {
+  display: inline-flex;
+  cursor: pointer;
+  font-size: 0.84rem;
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.input-renderer__file-label--inline .input-renderer__file-input {
+  display: none;
+}
+
+.button--record {
+  background: #c0392b;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.button--record:hover {
+  background: #a93226;
+}
+
+.button--stop-record {
+  background: #7f8c8d;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+  animation: pulse-record 1s ease-in-out infinite;
+}
+
+@keyframes pulse-record {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 /* Output renderer */
 
 .output-renderer {

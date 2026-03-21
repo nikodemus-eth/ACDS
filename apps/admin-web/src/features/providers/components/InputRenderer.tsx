@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { InputMode } from '@acds/core-types';
 
 interface InputRendererProps {
@@ -12,7 +12,12 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
   const [temperature, setTemperature] = useState(0.7);
   const [fileName, setFileName] = useState('');
   const [fileDataUri, setFileDataUri] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -24,6 +29,52 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
     };
     reader.readAsDataURL(file);
   }
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = () => {
+          setFileDataUri(reader.result as string);
+          setFileName('recording.webm');
+        };
+        reader.readAsDataURL(blob);
+        if (timerRef.current) clearInterval(timerRef.current);
+        setRecordingDuration(0);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250); // collect data every 250ms
+      setIsRecording(true);
+      setRecordingDuration(0);
+      timerRef.current = setInterval(() => setRecordingDuration((d) => d + 1), 1000);
+    } catch {
+      // Microphone permission denied or not available
+      setFileName('');
+      setFileDataUri('');
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   function handleSubmit() {
     const input: Record<string, unknown> = {};
@@ -147,16 +198,39 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
       case 'audio_input':
         return (
           <div className="input-renderer__file-group">
-            <label className="input-renderer__file-label">
-              Upload an audio file:
-              <input
-                ref={fileRef}
-                type="file"
-                accept="audio/*"
-                onChange={handleFileChange}
-                className="input-renderer__file-input"
-              />
-            </label>
+            <div className="input-renderer__audio-controls">
+              <div className="input-renderer__record-group">
+                {!isRecording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="button button--record"
+                    disabled={isPending}
+                  >
+                    Record
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="button button--stop-record"
+                  >
+                    Stop ({recordingDuration}s)
+                  </button>
+                )}
+                <span className="input-renderer__or-divider">or</span>
+                <label className="input-renderer__file-label input-renderer__file-label--inline">
+                  Upload file
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleFileChange}
+                    className="input-renderer__file-input"
+                  />
+                </label>
+              </div>
+            </div>
             {fileName && (
               <span className="input-renderer__file-name">{fileName}</span>
             )}
