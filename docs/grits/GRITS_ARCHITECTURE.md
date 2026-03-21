@@ -27,7 +27,7 @@ Provides the shared contract that all GRITS components depend on.
 
 | Type | Purpose |
 |------|---------|
-| `InvariantId` | Union of invariant identifiers (`INV-001` through `INV-008`) |
+| `InvariantId` | Union of invariant identifiers (`INV-001` through `INV-008`, `AI-001` through `AI-006`) |
 | `Severity` | `critical`, `high`, `medium`, `low`, `info` |
 | `Cadence` | `fast`, `daily`, `release` |
 | `DefectReport` | Single integrity violation with evidence |
@@ -77,16 +77,19 @@ Provides the runtime that executes integrity checks.
 | `BoundaryIntegrityChecker` | INV-001 | daily, release |
 | `PolicyIntegrityChecker` | INV-001 | daily, release |
 | `OperationalIntegrityChecker` | INV-008 | daily, release |
+| `AppleIntelligenceChecker` | AI-001 through AI-006 | fast, daily |
 
-**In-Memory Repositories** (`src/repositories/`):
+**PostgreSQL Repositories** (`src/repositories/`):
 
 | Repository | Implements |
 |------------|-----------|
-| `InMemoryIntegritySnapshotRepository` | `IntegritySnapshotRepository` |
-| `InMemoryExecutionRecordReadRepository` | `ExecutionRecordReadRepository` |
-| `InMemoryRoutingDecisionReadRepository` | `RoutingDecisionReadRepository` |
-| `InMemoryAuditEventReadRepository` | `AuditEventReadRepository` |
-| `InMemoryAdaptationRollbackReadRepository` | `AdaptationRollbackReadRepository` |
+| `PgIntegritySnapshotRepository` | `IntegritySnapshotRepository` |
+| `PgExecutionRecordReadRepository` | `ExecutionRecordReadRepository` |
+| `PgRoutingDecisionReadRepository` | `RoutingDecisionReadRepository` |
+| `PgAuditEventReadRepository` | `AuditEventReadRepository` |
+| `PgAdaptationRollbackReadRepository` | `AdaptationRollbackReadRepository` |
+
+All repositories are Pg-backed in production. Tests use PGlite (in-process WASM Postgres) for real SQL execution against the full schema (16 migrations).
 
 **Shared Repository Singletons** (`src/repositories/sharedRepositories.ts`):
 
@@ -104,9 +107,9 @@ Provides singleton accessors for cross-package repositories used by checkers (op
 
 | Handler | Checkers Used |
 |---------|--------------|
-| `runFastIntegrityCheck` | ExecutionIntegrityChecker, AdaptiveIntegrityChecker |
-| `runDailyIntegrityCheck` | All 7 checkers |
-| `runReleaseIntegrityCheck` | All 7 checkers + DriftAnalyzer |
+| `runFastIntegrityCheck` | ExecutionIntegrityChecker, AdaptiveIntegrityChecker, AppleIntelligenceChecker |
+| `runDailyIntegrityCheck` | All 8 checkers |
+| `runReleaseIntegrityCheck` | All 8 checkers (excluding AppleIntelligenceChecker) + DriftAnalyzer |
 
 ## 4. Read-Only Contract
 
@@ -134,6 +137,7 @@ AuditIntegrityChecker(auditRepo, execRepo, approvalRepo)
 BoundaryIntegrityChecker(execRepo, providerRepo)
 PolicyIntegrityChecker(policyRepo, providerRepo)
 OperationalIntegrityChecker(execRepo)
+AppleIntelligenceChecker(providerRepo, execRepo)
 ```
 
 This makes every checker independently testable. Substitute any repository with a test double. No hidden coupling exists through globals, singletons, or service locators inside checker logic.
@@ -157,7 +161,7 @@ This makes every checker independently testable. Substitute any repository with 
                                 |
                     +-----------v-----------+
                     |   Integrity Checkers   |
-                    |   (7 checker classes)   |
+                    |   (8 checker classes)   |
                     +-----------+-----------+
                                 |
                     +-----------v-----------+
@@ -175,4 +179,4 @@ This makes every checker independently testable. Substitute any repository with 
 
 ## 7. Summary
 
-GRITS is a verification-only subsystem. It reads platform state through narrow repository interfaces, evaluates 8 invariants across 7 checkers on 3 cadences, and produces structured snapshots and drift reports. It never repairs, never writes back to the dispatch system, and never imports operational logic. All dependencies are injected through constructors, making the entire system testable in isolation.
+GRITS is a verification-only subsystem. It reads platform state through narrow repository interfaces, evaluates 14 invariants (INV-001 through INV-008 plus AI-001 through AI-006) across 8 checkers on 3 cadences, and produces structured snapshots and drift reports. It never repairs, never writes back to the dispatch system, and never imports operational logic. All dependencies are injected through constructors, making the entire system testable in isolation. All 8 checkers are tested against real PGlite databases with 79 tests covering all invariant paths.

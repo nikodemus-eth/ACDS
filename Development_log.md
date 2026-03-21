@@ -1449,9 +1449,35 @@ Full-stack feature for testing every provider capability through the admin web i
 - `RawResponseViewer`: collapsible JSON viewer for raw API responses
 - Route: `/providers/:id/test`, accessible via "Test Capabilities" button on provider detail page
 
-### Test Coverage
+### Test Coverage Expansion & Fixes
 
-- Expanded test suite from ~2308 to 2935+ tests across 289 test files
-- Added comprehensive tests for: routing-engine (8 new files), provider-adapters (6 new files), adaptive-optimizer, execution-orchestrator, policy-engine, security, evaluation, api controllers/presenters
+- Expanded test suite from ~2308 to **3136 tests across 311 test files**
+- Added 100+ new test files across all packages: adaptive-optimizer (14), persistence-pg (8), policy-engine (3), provider-adapters (5), routing-engine (8), security (3), sovereign-runtime (18), execution-orchestrator (4), grits-worker (10), api controllers/presenters (8)
 - All tests use real PGlite databases — zero mocks
-- All 8 red-team tests pass (ARGUS-9 adversarial test suite)
+- All 25 red-team test files pass (320 adversarial tests)
+
+### UUID Enforcement Fixes (PGlite Strict Mode)
+
+PGlite enforces PostgreSQL's strict UUID column types — short string IDs like `'exec-1'`, `'prov-1'`, `'ae-1'` that worked in mocked environments cause `invalid input syntax for type uuid` errors against real Postgres.
+
+**4 grits-worker checker test files fixed:**
+- `BoundaryIntegrityChecker.test.ts`, `ExecutionIntegrityChecker.test.ts`, `OperationalIntegrityChecker.test.ts`, `AuditIntegrityChecker.test.ts`
+- All short IDs replaced with deterministic UUIDs (e.g., `'00000000-0000-0000-0000-000000000001'`)
+- UUID constants declared at module scope for readability and reuse
+
+### TriageController Test Fix (Linter Auto-Correction)
+
+- `TriageController.test.ts` was using `as any` casts for `ModelProfile` and `TacticProfile` in `makeTriageService()` deps
+- Linter auto-corrected to use properly typed `makeModelProfile()` and `makeTacticProfile()` factory functions matching real `TriagePipelineDeps` interface
+- Added `'returns 503 when no eligible provider'` test case with empty deps
+- Pipeline now produces valid results (200/400/503) instead of throwing 500 from type mismatches
+
+### Final Verification
+
+- **311 test files, 3136 tests — ALL passing**
+- **25 red-team files, 320 tests — ALL passing**
+- **Coverage: 95.83% statements, 92.03% branches, 97.6% functions, 95.83% lines**
+- Admin-web build verified successful
+- All documentation updated (Development_log.md, ARCHITECTURE_OVERVIEW.md, CAPABILITY_TEST_CONSOLE.md, TEST_ARCHITECTURE.md)
+- Committed to local: `87b5fa1`
+- PR created: https://github.com/nikodemus-eth/ACDS/pull/1

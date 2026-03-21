@@ -64,7 +64,7 @@ The `ProviderExecutionProxy` in `provider-broker`:
 3. Executes the request through the adapter.
 4. Returns the raw response.
 
-Each adapter (`OllamaAdapter`, `AppleIntelligenceAdapter`) handles vendor-specific protocol details, including request mapping via its `Mapper`, and response parsing.
+Each adapter (`OllamaAdapter`, `AppleIntelligenceAdapter`, `OpenAIAdapter`, `GeminiAdapter`, `LMStudioAdapter`) handles vendor-specific protocol details, including request mapping via its `Mapper`, and response parsing.
 
 ## Step 4: Fallback Handling
 
@@ -105,3 +105,50 @@ The `DispatchRunResponse` returned to the caller contains:
 - Timing information
 - The rationale summary
 - The provider that handled the request (which may differ from the primary if fallback occurred)
+
+## Alternative Entry Point: Inference Triage System (ITS)
+
+In addition to the standard dispatch flow, requests can enter through the **Inference Triage System** — a deterministic, policy-bound routing engine that maps task characteristics to minimum sufficient inference capability.
+
+```
+IntentEnvelope
+    |
+    v
+[1] Validate (schema compliance)
+    |
+    v
+[2] Sensitivity Policy (trust zone resolution)
+    |
+    v
+[3] Translate (IntentEnvelope → RoutingRequest)
+    |
+    v
+[4] Policy Evaluation (effective policy resolution)
+    |
+    v
+[5] Candidate Evaluation (all profiles, explicit rejections)
+    |
+    v
+[6] Ranking (minimum sufficient intelligence)
+    |
+    v
+[7] Selection + Fallback Chain
+    |
+    v
+TriageDecision
+    |
+    v (POST /triage/run only)
+[8] Execution via DispatchRunService (same as Step 2 above)
+```
+
+**Endpoints:**
+- `POST /triage` — Pure decision, no execution. Returns `TriageDecision` with classification, candidate evaluations, and selected provider.
+- `POST /triage/run` — Decision + execution. Returns `{ triageDecision, executionResult }`.
+
+Process Swarm uses `POST /triage/run` as the primary inference route, with automatic fallback to `POST /dispatch/run` if the triage endpoint returns 404.
+
+## Auto-Reaper for Stale Executions
+
+The `PgExecutionRecordRepository` provides a `reapStaleExecutions(thresholdMs)` method that marks stale `pending` or `running` execution records older than the threshold as `auto_reaped`. This prevents ghost executions from accumulating when providers fail to respond and the timeout mechanism doesn't fire (e.g., due to process restart).
+
+The auto-reaper runs on a configurable schedule via the worker's stale execution cleanup job.

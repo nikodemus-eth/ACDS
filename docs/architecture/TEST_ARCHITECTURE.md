@@ -18,7 +18,7 @@ This is enforced by a simple rule: **`vi.fn()`, `vi.mock()`, `vi.stubGlobal()`, 
 
 **Location:** `packages/provider-adapters/src/__test-support__/TestHttpServer.ts`
 
-A lightweight `node:http` server that binds to port 0 (OS-assigned) on `127.0.0.1`. Used by the two adapter test files (Ollama, Apple Intelligence).
+A lightweight `node:http` server that binds to port 0 (OS-assigned) on `127.0.0.1`. Used by all five adapter test files (Ollama, OpenAI, Gemini, LM Studio, Apple Intelligence).
 
 ```typescript
 const server = new TestHttpServer();
@@ -47,7 +47,7 @@ Uses `@electric-sql/pglite` (in-process WASM Postgres) to provide a real Postgre
 
 ```typescript
 const pool = await createTestPool();    // Creates PGlite instance
-await runMigrations(pool);              // Runs all 10 migration SQL files
+await runMigrations(pool);              // Runs all 16 migration SQL files
 await truncateAll(pool);                // Truncates all tables between tests
 await closePool();                      // Cleans up
 ```
@@ -56,18 +56,17 @@ The `PoolLike` interface wraps PGlite to be compatible with `pg.Pool`:
 - `query(text, params)` — parameterized queries
 - `execSQL(sql)` — multi-statement SQL (used for migration files with BEGIN/COMMIT blocks)
 
-**Used by:** All persistence tests (PgAdaptationEventRepository, PgAuditEmitters, PgRollbackRecordWriter, PgSecretCipherStore).
+**Migration runner resilience:** Alignment migrations (011, 012, 014) may fail on fresh PGlite schemas where columns already have the correct names from earlier migrations. The runner wraps each migration in try/catch with `ROLLBACK` to clear PGlite's aborted transaction state and continue applying subsequent migrations.
 
-### GRITS Tests — In-Memory Repositories
+**Used by:** All persistence tests (PgAdaptationEventRepository, PgAuditEmitters, PgRollbackRecordWriter, PgSecretCipherStore, PgExecutionRecordRepository, PgProviderRepository, PgOptimizerStateRepository, PgProviderHealthRepository, PgAdaptationApprovalRepository, PgAuditEventRepository) and all 7 GRITS checker test files.
 
-**Location:** `apps/grits-worker/src/__test-support__/`
+### GRITS Tests — PGlite-Backed Real Repositories
 
-Two in-memory implementations that store data in arrays with real filtering logic:
+All 7 GRITS checker test files now use real PGlite databases via the shared `pglitePool.ts` infrastructure, with `seedProvider()`, `seedExecution()`, and `seedAuditEvent()` helper functions that insert into real PostgreSQL tables.
 
-- `InMemoryProviderRepository` — implements all 8 methods of `ProviderRepository`
-- `InMemoryExecutionRecordReadRepository` — implements all 3 methods of `ExecutionRecordReadRepository` with real date range filtering
+**UUID enforcement:** PGlite enforces PostgreSQL's strict UUID column types. All test IDs use deterministic UUID constants (e.g., `'00000000-0000-0000-0000-000000000001'`) instead of short strings like `'prov-1'`. This catches real schema compliance issues that in-memory fakes would miss.
 
-These are real implementations, not mocks — they perform the same logical operations as their Pg counterparts, just against in-memory data.
+**Checkers tested:** AdaptiveIntegrityChecker, AppleIntelligenceChecker, AuditIntegrityChecker, BoundaryIntegrityChecker, ExecutionIntegrityChecker, OperationalIntegrityChecker, PolicyIntegrityChecker, SecurityIntegrityChecker.
 
 ### Console Capture
 
@@ -90,16 +89,25 @@ This is a real reassignment, not a mock — no `vi.spyOn` involved.
 
 ## Test Categories
 
-| Category | Count | Pattern |
-|----------|-------|---------|
-| Unit — pure functions | ~200+ | Direct function calls with constructed inputs |
-| Unit — with TestHttpServer | ~53 | Real HTTP against adapter implementations |
-| Unit — with PGlite | ~35 | Real SQL against in-process Postgres |
-| Unit — with InMemory repos | ~17 | Real filtering against in-memory data |
-| Integration — routing/dispatch | ~40 | Full pipeline with in-memory state |
-| Red team — security | ~110 | Adversarial inputs against hardened code |
-| Chaos — fault injection | ~19 | Failure path verification |
-| Scenario — end-to-end | ~10 | Business workflow validation |
+| Category | Files | Tests | Pattern |
+|----------|-------|-------|---------|
+| Unit — pure functions | ~180 | ~1800 | Direct function calls with constructed inputs |
+| Unit — with TestHttpServer | 5 | ~53 | Real HTTP against adapter implementations |
+| Unit — with PGlite | ~80 | ~800 | Real SQL against in-process Postgres |
+| Integration — routing/dispatch | ~10 | ~100 | Full pipeline with real state |
+| Red team — security | 25 | 320 | Adversarial inputs against hardened code |
+| Chaos — fault injection | 3 | ~19 | Failure path verification |
+| Scenario — end-to-end | 8 | ~44 | Business workflow validation |
+| **Total** | **311** | **3136** | |
+
+## Current Coverage (as of 2026-03-20)
+
+| Metric | Coverage |
+|--------|----------|
+| Statements | 95.83% (11,913 / 12,431) |
+| Branches | 92.03% (2,901 / 3,152) |
+| Functions | 97.60% (735 / 753) |
+| Lines | 95.83% (11,913 / 12,431) |
 
 ## Coverage Configuration
 
@@ -108,9 +116,11 @@ Coverage is scoped to files with runtime logic. Excluded from coverage:
 - Enum definitions
 - Entity type definitions
 - Config default objects
+- Route registration files (`apps/api/src/routes/**`)
+- DI container bootstrap (`createDiContainer.ts`, `registerMiddleware.ts`)
+- App bootstrap (`app.ts`, `main.ts`), config singleton (`appConfig.ts`)
 - SDK client code (separate test infrastructure needed)
 - React frontend (needs JSDOM/browser environment)
-- Worker/app entry points (`main.ts`)
 
 ## Running Tests
 
