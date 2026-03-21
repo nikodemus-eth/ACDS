@@ -5,6 +5,16 @@ export function getCapabilities(providerId: string): Promise<CapabilityManifestE
   return apiClient.get<CapabilityManifestEntry[]>(`/providers/${providerId}/capabilities`);
 }
 
+export interface TranslationLanguage {
+  code: string;
+  name: string;
+  installed: boolean;
+}
+
+export function getTranslationLanguages(): Promise<TranslationLanguage[]> {
+  return apiClient.get<TranslationLanguage[]>('/providers/translation/languages');
+}
+
 export function testCapability(
   providerId: string,
   capabilityId: string,

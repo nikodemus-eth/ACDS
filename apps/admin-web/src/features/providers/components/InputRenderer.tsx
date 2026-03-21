@@ -1,11 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { InputMode } from '@acds/core-types';
-
-interface TranslationLanguage {
-  code: string;
-  name: string;
-  installed: boolean;
-}
+import { getTranslationLanguages, type TranslationLanguage } from '../capabilityTestApi';
 
 interface InputRendererProps {
   inputMode: InputMode;
@@ -33,8 +28,7 @@ export function InputRenderer({ inputMode, onExecute, isPending }: InputRenderer
   useEffect(() => {
     if (inputMode !== 'translation_input') return;
     setLanguagesLoading(true);
-    fetch('/api/providers/translation/languages')
-      .then((r) => r.json())
+    getTranslationLanguages()
       .then((langs: TranslationLanguage[]) => {
         setInstalledLanguages(langs);
         // Default target to first installed non-English language
