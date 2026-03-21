@@ -1,0 +1,13 @@
+Subject: Cannot access dashboard after password reset
+
+Hi support team,
+
+I reset my password yesterday using the forgot password link. The reset went through fine and I got the confirmation email. But now when I try to log in with my new password, the dashboard shows a blank white screen. The browser console shows a 401 error on the /api/session endpoint.
+
+I've tried clearing my browser cache and using incognito mode but the issue persists. My account email is jsmith@acme.com and I'm using Chrome 124 on macOS.
+
+This is blocking my team's sprint review which is scheduled for tomorrow morning.
+
+Thanks,
+Jake Smith
+Senior Developer, Acme Corp

@@ -1,0 +1,11 @@
+Meeting Notes — March 15, 2026
+
+Attendees: Dr. Sarah Chen (Lead Architect), Marcus Rivera (DevOps), Aisha Patel (Security), Tom Nakamura (Product)
+
+Dr. Chen presented the Q2 roadmap for the inference platform. The team agreed to prioritize local-first routing by April 1st. Marcus confirmed that the Ollama deployment on the staging server at 192.168.1.50 is stable with 99.7% uptime over the past 30 days. Aisha raised concerns about API key rotation for the external provider fallback path and requested a review of the secret storage encryption before launch. Tom noted that the product team needs structured extraction working by March 25th for the customer demo.
+
+Action items:
+- Sarah: finalize tier routing policy document by March 18
+- Marcus: provision Apple Intelligence bridge on all M4 development machines
+- Aisha: audit secret rotation implementation
+- Tom: prepare demo dataset for structured extraction showcase

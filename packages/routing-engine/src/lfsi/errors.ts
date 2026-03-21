@@ -1,0 +1,25 @@
+// LFSI MVP — Error Types
+// Spec reference: Section 8 (Required Reason Codes)
+
+export const LFSI_REASON = {
+  UNKNOWN_CAPABILITY: 'UNKNOWN_CAPABILITY',
+  CLIENT_PROVIDER_OVERRIDE_FORBIDDEN: 'CLIENT_PROVIDER_OVERRIDE_FORBIDDEN',
+  APPLE_PROVIDER_UNAVAILABLE: 'APPLE_PROVIDER_UNAVAILABLE',
+  APPLE_ONLY_VALIDATION_FAILURE: 'APPLE_ONLY_VALIDATION_FAILURE',
+  NO_PROVIDER_AVAILABLE: 'NO_PROVIDER_AVAILABLE',
+  VALIDATION_FAILED_NO_ESCALATION: 'VALIDATION_FAILED_NO_ESCALATION',
+  WEB_RESEARCH_NOT_ALLOWED_UNDER_PRIVATE_STRICT: 'WEB_RESEARCH_NOT_ALLOWED_UNDER_PRIVATE_STRICT',
+  CURRENT_WEB_FORBIDDEN_UNDER_PRIVATE_STRICT: 'CURRENT_WEB_FORBIDDEN_UNDER_PRIVATE_STRICT',
+} as const;
+
+export type LfsiReasonCode = (typeof LFSI_REASON)[keyof typeof LFSI_REASON];
+
+export class LfsiError extends Error {
+  readonly reasonCode: LfsiReasonCode;
+
+  constructor(reasonCode: LfsiReasonCode, message: string) {
+    super(message);
+    this.name = 'LfsiError';
+    this.reasonCode = reasonCode;
+  }
+}
