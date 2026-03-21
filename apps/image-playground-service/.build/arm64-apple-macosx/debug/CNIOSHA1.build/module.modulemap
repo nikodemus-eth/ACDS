@@ -1,4 +1,0 @@
-module CNIOSHA1 {
-    umbrella header "/Users/m4/ACDS - Adaptive Cognitive DIspatch System/apps/image-playground-service/.build/checkouts/swift-nio/Sources/CNIOSHA1/include/CNIOSHA1.h"
-    export *
-}
