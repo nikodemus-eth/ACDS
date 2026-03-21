@@ -8,7 +8,10 @@ import type { Provider } from '@acds/core-types';
 import { APPLE_METHODS } from '@acds/sovereign-runtime';
 
 /** Subsystems the Apple Intelligence bridge currently implements. */
-const SUPPORTED_APPLE_SUBSYSTEMS = new Set(['foundation_models', 'writing_tools']);
+const SUPPORTED_APPLE_SUBSYSTEMS = new Set([
+  'foundation_models', 'writing_tools', 'speech', 'tts',
+  'vision', 'image_creator', 'translation', 'sound',
+]);
 
 const SUBSYSTEM_TO_CATEGORY: Record<string, string> = {
   foundation_models: 'text',
