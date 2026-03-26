@@ -1,0 +1,20 @@
+{
+  "name": "@acds/db-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate": "bash -lc 'for f in migrations/*.sql; do psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$f\"; done'",
+    "seed:validate": "tsx seeds/runSeeds.ts",
+    "seed:model-profiles": "tsx seeds/seedModelProfiles.ts",
+    "seed:tactic-profiles": "tsx seeds/seedTacticProfiles.ts",
+    "seed:policies": "tsx seeds/seedPolicies.ts",
+    "seed": "pnpm run seed:model-profiles && pnpm run seed:tactic-profiles && pnpm run seed:policies"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

@@ -9,14 +9,12 @@ export interface JobDefinition {
 }
 
 export function registerJobs(): JobDefinition[] {
-  const jobs: JobDefinition[] = [
+  if (process.env.GRITS_RELEASE_MODE === 'true') {
+    return [releaseIntegrityJob];
+  }
+
+  return [
     fastIntegrityJob,
     dailyIntegrityJob,
   ];
-
-  if (process.env.GRITS_RELEASE_MODE === 'true') {
-    jobs.push(releaseIntegrityJob);
-  }
-
-  return jobs;
 }

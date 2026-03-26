@@ -28,6 +28,87 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
 
+  acds-release-gate:
+    name: ACDS Release Gate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: acds
+          POSTGRES_USER: acds
+          POSTGRES_PASSWORD: acds
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U acds -d acds"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: acds
+    env:
+      DATABASE_URL: postgresql://acds:acds@127.0.0.1:5432/acds
+      ADMIN_SESSION_SECRET: ci-admin-secret
+      MASTER_KEY_PATH: /tmp/acds-master.key
+      PORT: 3100
+      MOCK_OLLAMA_PORT: 11434
+      GRITS_OUTPUT_PATH: /tmp/grits-release-snapshot.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: acds/pnpm-lock.yaml
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client curl
+      - run: pnpm install --frozen-lockfile
+      - run: openssl rand -hex 32 > "$MASTER_KEY_PATH"
+      - run: pnpm --filter @acds/db-tools run migrate
+      - run: pnpm --filter @acds/db-tools run seed:validate
+      - run: pnpm --filter @acds/db-tools run seed
+      - run: node infra/scripts/mock_ollama.mjs > /tmp/mock-ollama.log 2>&1 &
+      - run: pnpm build
+      - run: node apps/api/dist/main.js > /tmp/acds-api.log 2>&1 &
+      - run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${PORT}/health > /tmp/acds-health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/acds-api.log
+          exit 1
+      - run: |
+          curl -sf \
+            -H "x-admin-session: ${ADMIN_SESSION_SECRET}" \
+            -H "content-type: application/json" \
+            -d '{"name":"CI Ollama","vendor":"ollama","authType":"none","baseUrl":"http://127.0.0.1:11434","enabled":true,"environment":"ci"}' \
+            http://127.0.0.1:${PORT}/providers > /tmp/provider.json
+      - run: |
+          curl -sf \
+            -H "x-admin-session: ${ADMIN_SESSION_SECRET}" \
+            -H "content-type: application/json" \
+            -d '{"routingRequest":{"application":"process_swarm","process":"content_review","step":"initial_draft","taskType":"classification","loadTier":"single_shot","decisionPosture":"operational","cognitiveGrade":"standard","input":"Smoke dispatch","constraints":{"privacy":"local_only","maxLatencyMs":30000,"costSensitivity":"medium","structuredOutputRequired":false,"traceabilityRequired":true}},"inputPayload":"Smoke dispatch","inputFormat":"text"}' \
+            http://127.0.0.1:${PORT}/dispatch/run > /tmp/dispatch-run.json
+      - run: curl -sf -H "x-admin-session: ${ADMIN_SESSION_SECRET}" http://127.0.0.1:${PORT}/executions > /tmp/executions.json
+      - run: curl -sf -H "x-admin-session: ${ADMIN_SESSION_SECRET}" http://127.0.0.1:${PORT}/audit > /tmp/audit.json
+      - run: pnpm --filter @acds/grits-worker run grits:pg:release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: grits-release-artifacts
+          path: |
+            /tmp/grits-release-snapshot.json
+            /tmp/acds-api.log
+            /tmp/mock-ollama.log
+            /tmp/executions.json
+            /tmp/audit.json
+
   process-swarm:
     name: Process Swarm Smoke
     runs-on: ubuntu-latest

@@ -14,40 +14,26 @@ import { AuditIntegrityChecker } from '../checkers/AuditIntegrityChecker.js';
 import { BoundaryIntegrityChecker } from '../checkers/BoundaryIntegrityChecker.js';
 import { PolicyIntegrityChecker } from '../checkers/PolicyIntegrityChecker.js';
 import { OperationalIntegrityChecker } from '../checkers/OperationalIntegrityChecker.js';
-import { getExecutionRecordReadRepository } from '../repositories/InMemoryExecutionRecordReadRepository.js';
-import { getRoutingDecisionReadRepository } from '../repositories/InMemoryRoutingDecisionReadRepository.js';
-import { getAuditEventReadRepository } from '../repositories/InMemoryAuditEventReadRepository.js';
-import { getAdaptationRollbackReadRepository } from '../repositories/InMemoryAdaptationRollbackReadRepository.js';
-import { getIntegritySnapshotRepository } from '../repositories/InMemoryIntegritySnapshotRepository.js';
-import { getSharedOptimizerStateRepository, getSharedApprovalRepository, getSharedLedger, getSharedProviderRepository, getSharedPolicyRepository } from '../repositories/sharedRepositories.js';
+import { createPgRepositoryContext, type GritsRepositoryContext } from '../repositories/createPgRepositoryContext.js';
 
-export async function runReleaseIntegrityCheck(): Promise<void> {
-  const execRepo = getExecutionRecordReadRepository();
-  const routingRepo = getRoutingDecisionReadRepository();
-  const auditRepo = getAuditEventReadRepository();
-  const rollbackRepo = getAdaptationRollbackReadRepository();
-  const providerRepo = getSharedProviderRepository();
-  const optimizerRepo = getSharedOptimizerStateRepository();
-  const approvalRepo = getSharedApprovalRepository();
-  const ledger = getSharedLedger();
-  const policyRepo = getSharedPolicyRepository();
-  const snapshotRepo = getIntegritySnapshotRepository();
-
+export async function runReleaseIntegrityCheck(
+  context: GritsRepositoryContext = createPgRepositoryContext(),
+) {
   const checkers = [
-    new ExecutionIntegrityChecker(execRepo, routingRepo, providerRepo, policyRepo),
-    new AdaptiveIntegrityChecker(optimizerRepo, approvalRepo, ledger, rollbackRepo, providerRepo),
-    new SecurityIntegrityChecker(auditRepo, providerRepo, execRepo, routingRepo),
-    new AuditIntegrityChecker(auditRepo, execRepo, approvalRepo),
-    new BoundaryIntegrityChecker(execRepo, providerRepo, auditRepo),
-    new PolicyIntegrityChecker(policyRepo, providerRepo),
-    new OperationalIntegrityChecker(execRepo),
+    new ExecutionIntegrityChecker(context.execRepo, context.routingRepo, context.providerRepo, context.policyRepo),
+    new AdaptiveIntegrityChecker(context.optimizerRepo, context.approvalRepo, context.ledger, context.rollbackRepo, context.providerRepo),
+    new SecurityIntegrityChecker(context.auditRepo, context.providerRepo, context.execRepo, context.routingRepo),
+    new AuditIntegrityChecker(context.auditRepo, context.execRepo, context.approvalRepo),
+    new BoundaryIntegrityChecker(context.execRepo, context.providerRepo, context.auditRepo),
+    new PolicyIntegrityChecker(context.policyRepo, context.providerRepo),
+    new OperationalIntegrityChecker(context.execRepo),
   ];
 
   const snapshot = await runIntegrityChecks(checkers, 'release');
-  await snapshotRepo.save(snapshot);
+  await context.snapshotRepo.save(snapshot);
 
   // Drift analysis against previous release snapshot
-  const previousRelease = await snapshotRepo.findLatestByCadence('release');
+  const previousRelease = await context.snapshotRepo.findLatestByCadence('release');
   if (previousRelease && previousRelease.id !== snapshot.id) {
     const drift = analyzeDrift(previousRelease, snapshot);
     console.log(
@@ -65,4 +51,5 @@ export async function runReleaseIntegrityCheck(): Promise<void> {
     `${snapshot.results.length} invariant(s) checked | ` +
     `Defects: ${critical}C ${high}H ${medium}M ${low}L ${info}I`,
   );
+  return snapshot;
 }

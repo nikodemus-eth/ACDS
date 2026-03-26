@@ -9,37 +9,36 @@ import { runIntegrityChecks } from '../engine/IntegrityEngine.js';
 import { ExecutionIntegrityChecker } from '../checkers/ExecutionIntegrityChecker.js';
 import { AdaptiveIntegrityChecker } from '../checkers/AdaptiveIntegrityChecker.js';
 import { AppleIntelligenceChecker } from '../checkers/AppleIntelligenceChecker.js';
-import { getExecutionRecordReadRepository } from '../repositories/InMemoryExecutionRecordReadRepository.js';
-import { getRoutingDecisionReadRepository } from '../repositories/InMemoryRoutingDecisionReadRepository.js';
-import { getAdaptationRollbackReadRepository } from '../repositories/InMemoryAdaptationRollbackReadRepository.js';
-import { getIntegritySnapshotRepository } from '../repositories/InMemoryIntegritySnapshotRepository.js';
-import { getSharedOptimizerStateRepository, getSharedApprovalRepository, getSharedLedger, getSharedProviderRepository, getSharedPolicyRepository } from '../repositories/sharedRepositories.js';
+import { createPgRepositoryContext, type GritsRepositoryContext } from '../repositories/createPgRepositoryContext.js';
 
-export async function runFastIntegrityCheck(): Promise<void> {
+export async function runFastIntegrityCheck(
+  context: GritsRepositoryContext = createPgRepositoryContext(),
+) {
   const checkers = [
     new ExecutionIntegrityChecker(
-      getExecutionRecordReadRepository(),
-      getRoutingDecisionReadRepository(),
-      getSharedProviderRepository(),
-      getSharedPolicyRepository(),
+      context.execRepo,
+      context.routingRepo,
+      context.providerRepo,
+      context.policyRepo,
     ),
     new AdaptiveIntegrityChecker(
-      getSharedOptimizerStateRepository(),
-      getSharedApprovalRepository(),
-      getSharedLedger(),
-      getAdaptationRollbackReadRepository(),
-      getSharedProviderRepository(),
+      context.optimizerRepo,
+      context.approvalRepo,
+      context.ledger,
+      context.rollbackRepo,
+      context.providerRepo,
     ),
     new AppleIntelligenceChecker(
-      getExecutionRecordReadRepository(),
-      getSharedProviderRepository(),
+      context.execRepo,
+      context.providerRepo,
     ),
   ];
 
   const snapshot = await runIntegrityChecks(checkers, 'fast');
-  await getIntegritySnapshotRepository().save(snapshot);
+  await context.snapshotRepo.save(snapshot);
 
   logSnapshotSummary('fast', snapshot);
+  return snapshot;
 }
 
 function logSnapshotSummary(cadence: string, snapshot: { overallStatus: string; defectCount: { critical: number; high: number; medium: number; low: number; info: number }; results: { length: number } }): void {

@@ -9,5 +9,7 @@ export const dailyIntegrityJob: JobDefinition = {
     process.env.GRITS_DAILY_INTERVAL_MS ?? String(DEFAULT_INTERVAL_MS),
     10,
   ),
-  handler: runDailyIntegrityCheck,
+  handler: async () => {
+    await runDailyIntegrityCheck();
+  },
 };

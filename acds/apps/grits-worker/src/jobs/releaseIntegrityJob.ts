@@ -4,5 +4,7 @@ import { runReleaseIntegrityCheck } from '../handlers/runReleaseIntegrityCheck.j
 export const releaseIntegrityJob: JobDefinition = {
   name: 'grits-release-integrity',
   intervalMs: 0, // Run once — triggered by GRITS_RELEASE_MODE env var
-  handler: runReleaseIntegrityCheck,
+  handler: async () => {
+    await runReleaseIntegrityCheck();
+  },
 };

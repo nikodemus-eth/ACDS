@@ -8,6 +8,13 @@
     "build": "tsc",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
+    "test": "bash -lc 'cd ../.. && pnpm exec vitest run apps/grits-worker/src/**/*.test.ts'",
+    "grits:fast": "tsx src/cli-fixture.ts fast",
+    "grits:daily": "tsx src/cli-fixture.ts daily",
+    "grits:release": "tsx src/cli-fixture.ts release",
+    "grits:pg:fast": "tsx src/cli-pg.ts fast",
+    "grits:pg:daily": "tsx src/cli-pg.ts daily",
+    "grits:pg:release": "tsx src/cli-pg.ts release",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -20,5 +27,9 @@
     "@acds/audit-ledger": "workspace:*",
     "@acds/execution-orchestrator": "workspace:*",
     "@acds/persistence-pg": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "vitest": "^3.0.0"
   }
 }

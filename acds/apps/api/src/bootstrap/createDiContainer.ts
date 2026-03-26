@@ -4,6 +4,7 @@ import type { Provider, ModelProfile, TacticProfile, RoutingRequest } from '@acd
 import { ProviderVendor } from '@acds/core-types';
 import { TaskType, LoadTier } from '@acds/core-types';
 import { FileKeyResolver, SecretRotationService } from '@acds/security';
+import { RoutingAuditWriter, ExecutionAuditWriter } from '@acds/audit-ledger';
 import {
   ProviderRegistryService,
   ProviderValidationService,
@@ -15,7 +16,7 @@ import {
 import { OpenAIAdapter, OllamaAdapter, LMStudioAdapter, GeminiAdapter, AppleIntelligenceAdapter, type AdapterRequest, type AdapterResponse } from '@acds/provider-adapters';
 import { DispatchResolver, type DispatchResult } from '@acds/routing-engine';
 import { DispatchRunService, ExecutionRecordService, ExecutionStatusTracker } from '@acds/execution-orchestrator';
-import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository, PgAuditEventRepository, PgFamilyPerformanceRepository, PgAdaptationEventRepository, PgAdaptationRecommendationRepository, PgSecretCipherStore, PgRollbackRecordWriter, PgApprovalAuditEmitter, PgRollbackAuditEmitter } from '@acds/persistence-pg';
+import { createPool, PgProviderRepository, PgProviderHealthRepository, PgExecutionRecordRepository, PgOptimizerStateRepository, PgAdaptationApprovalRepository, PgPolicyRepository, PgAuditEventRepository, PgFamilyPerformanceRepository, PgAdaptationEventRepository, PgAdaptationRecommendationRepository, PgSecretCipherStore, PgRollbackRecordWriter, PgApprovalAuditEmitter, PgRollbackAuditEmitter, PgAuditEventWriter } from '@acds/persistence-pg';
 import { PolicyMergeResolver, normalizeInstanceContext, computeInstanceOverrides, type EffectivePolicy } from '@acds/policy-engine';
 import { AdaptationRollbackService, type AdaptationApprovalRepository } from '@acds/adaptive-optimizer';
 import type { CandidatePerformanceState } from '@acds/adaptive-optimizer';
@@ -240,7 +241,10 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
 
   const dispatchResolver = new DispatchResolver();
   const executionRecordService = new ExecutionRecordService(executionRecordRepository);
-  const statusTracker = new ExecutionStatusTracker();
+  const statusTracker = new ExecutionStatusTracker(executionRecordRepository);
+  const auditEventWriter = new PgAuditEventWriter(pool);
+  const routingAuditWriter = new RoutingAuditWriter(auditEventWriter);
+  const executionAuditWriter = new ExecutionAuditWriter(auditEventWriter);
   const adaptationEventRepo = new PgAdaptationEventRepository(pool);
   const rollbackService = new AdaptationRollbackService(
     adaptationEventRepo,
@@ -275,6 +279,11 @@ export async function createDiContainer(config: AppConfig): Promise<FastifyInsta
       }
       return profile.modelId;
     },
+    writeRouteResolved: routingAuditWriter.writeRouteResolved.bind(routingAuditWriter),
+    writeRouteFallback: routingAuditWriter.writeRouteFallback.bind(routingAuditWriter),
+    writeExecutionStarted: executionAuditWriter.writeExecutionStarted.bind(executionAuditWriter),
+    writeExecutionCompleted: executionAuditWriter.writeExecutionCompleted.bind(executionAuditWriter),
+    writeExecutionFailed: executionAuditWriter.writeExecutionFailed.bind(executionAuditWriter),
   });
 
   const container: FastifyInstance['diContainer'] = {

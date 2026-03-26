@@ -10,6 +10,11 @@ export interface DispatchRunDeps {
   executeProvider(providerId: string, request: AdapterRequest, apiKey?: string): Promise<AdapterResponse>;
   resolveApiKey(providerId: string): Promise<string | undefined>;
   resolveModelId(modelProfileId: string): Promise<string>;
+  writeRouteResolved?(routingDecisionId: string, application: string, details: Record<string, unknown>): Promise<void>;
+  writeRouteFallback?(routingDecisionId: string, application: string, details: Record<string, unknown>): Promise<void>;
+  writeExecutionStarted?(executionId: string, application: string, details: Record<string, unknown>): Promise<void>;
+  writeExecutionCompleted?(executionId: string, application: string, details: Record<string, unknown>): Promise<void>;
+  writeExecutionFailed?(executionId: string, application: string, details: Record<string, unknown>): Promise<void>;
 }
 
 export class DispatchRunService {
@@ -32,14 +37,28 @@ export class DispatchRunService {
   }
 
   async resolveRoute(request: RoutingRequest): Promise<DispatchResult> {
-    return this.deps.resolveRoute(request);
+    const result = await this.deps.resolveRoute(request);
+    await this.deps.writeRouteResolved?.(result.decision.id, request.application, {
+      process: request.process,
+      step: request.step,
+      selectedProviderId: result.decision.selectedProviderId,
+      selectedModelProfileId: result.decision.selectedModelProfileId,
+      selectedTacticProfileId: result.decision.selectedTacticProfileId,
+      fallbackChainLength: result.decision.fallbackChain.length,
+    });
+    return result;
   }
 
   async run(request: DispatchRunRequest): Promise<DispatchRunResponse> {
-    const { decision, rationale } = await this.deps.resolveRoute(request.routingRequest);
+    const { decision, rationale } = await this.resolveRoute(request.routingRequest);
 
     const executionId = await this.statusTracker.create(decision, request.routingRequest);
     await this.statusTracker.markRunning(executionId);
+    await this.deps.writeExecutionStarted?.(executionId, request.routingRequest.application, {
+      routingDecisionId: decision.id,
+      requestId: request.requestId ?? null,
+      rationaleId: rationale.id,
+    });
 
     const primaryModelId = await this.deps.resolveModelId(decision.selectedModelProfileId);
     const adapterRequest: AdapterRequest = {
@@ -52,6 +71,12 @@ export class DispatchRunService {
       const apiKey = await this.deps.resolveApiKey(decision.selectedProviderId);
       const response = await this.deps.executeProvider(decision.selectedProviderId, adapterRequest, apiKey);
       await this.statusTracker.markSucceeded(executionId, response);
+      await this.deps.writeExecutionCompleted?.(executionId, request.routingRequest.application, {
+        status: 'succeeded',
+        selectedProviderId: decision.selectedProviderId,
+        latencyMs: response.latencyMs,
+        fallbackUsed: false,
+      });
 
       return {
         executionId,
@@ -78,6 +103,11 @@ export class DispatchRunService {
 
       if (!fallbackResponse) {
         await this.statusTracker.markFailed(executionId, errorMessage);
+        await this.deps.writeExecutionFailed?.(executionId, request.routingRequest.application, {
+          status: 'failed',
+          errorMessage,
+          fallbackUsed: decision.fallbackChain.length > 0,
+        });
         throw error;
       }
 
@@ -85,6 +115,18 @@ export class DispatchRunService {
         .getAttempts(executionId)
         .filter((attempt) => attempt.status === 'failed' || attempt.status === 'succeeded');
       const successfulAttempt = attempts.find((attempt) => attempt.status === 'succeeded');
+      await this.deps.writeRouteFallback?.(decision.id, request.routingRequest.application, {
+        executionId,
+        attempts: attempts.length,
+        finalProviderId: successfulAttempt?.entry.providerId ?? decision.selectedProviderId,
+      });
+      await this.deps.writeExecutionCompleted?.(executionId, request.routingRequest.application, {
+        status: 'fallback_succeeded',
+        fallbackUsed: true,
+        fallbackAttempts: attempts.length,
+        finalProviderId: successfulAttempt?.entry.providerId ?? decision.selectedProviderId,
+        latencyMs: fallbackResponse.latencyMs,
+      });
 
       return {
         executionId,

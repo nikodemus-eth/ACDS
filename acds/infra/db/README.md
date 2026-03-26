@@ -12,16 +12,16 @@ Migrations are numbered sequentially with a three-digit prefix (e.g., `001_`, `0
 | 004 | Global, application, and process policies |
 | 005 | Execution records, rationales, and fallback attempts |
 | 006 | Audit events |
+| 007 | Adaptive optimizer state |
+| 008 | Secret store and rollback snapshots |
+| 009 | GRITS snapshots and execution/runtime alignment |
 
 ## Running Migrations
 
 Apply migrations in order against your PostgreSQL database:
 
 ```bash
-# Apply all migrations in order
-for f in infra/db/migrations/*.sql; do
-  psql "$DATABASE_URL" -f "$f"
-done
+pnpm --filter @acds/db-tools run migrate
 ```
 
 Or apply a single migration:
@@ -32,7 +32,7 @@ psql "$DATABASE_URL" -f infra/db/migrations/001_initial_core_tables.sql
 
 ## Conventions
 
-- Each migration is idempotent-safe within its transaction (uses `CREATE TABLE`, not `CREATE TABLE IF NOT EXISTS`, to catch accidental re-runs).
+- Most migrations are written to be re-runnable only where safe and where schema alignment is required for MVP upgrades.
 - Foreign key references include `ON DELETE CASCADE` where appropriate.
 - All timestamp columns use `TIMESTAMPTZ` and default to `NOW()`.
 - UUIDs are generated server-side via `gen_random_uuid()`.

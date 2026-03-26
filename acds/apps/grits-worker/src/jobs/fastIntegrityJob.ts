@@ -9,5 +9,7 @@ export const fastIntegrityJob: JobDefinition = {
     process.env.GRITS_FAST_INTERVAL_MS ?? String(DEFAULT_INTERVAL_MS),
     10,
   ),
-  handler: runFastIntegrityCheck,
+  handler: async () => {
+    await runFastIntegrityCheck();
+  },
 };

@@ -1,6 +1,6 @@
 # Adaptive Cognitive Dispatch System
 
-A **Governed Adaptive Cognitive Dispatch System** that enables applications to safely, efficiently, and intelligently utilize both local and cloud-based AI services.
+A **governed, local-first cognitive dispatch platform** for routing AI work across approved providers with policy controls, auditability, adaptive optimization, and an operator-facing integrity gate.
 
 ## What It Does
 
@@ -10,11 +10,22 @@ ACDS sits between your applications and AI providers. Instead of hardcoding whic
 
 Applications like **Thingstead** (governance) and **Process Swarm** (content generation) need AI capabilities but should not be tightly coupled to specific vendors or models. ACDS provides:
 
-- **Vendor independence.** Applications describe intent, not providers. Switch from Ollama to OpenAI without changing application code.
+- **Vendor independence.** Applications describe intent, not providers. Switch between approved providers without changing application code.
 - **Policy governance.** A three-level policy cascade (global, application, process) controls which vendors, models, and tactics are allowed for each request.
 - **Automatic fallback.** If the primary provider fails, execution continues through a pre-computed fallback chain.
 - **Full auditability.** Every routing decision and execution is recorded with a human-readable rationale explaining why each choice was made.
 - **Adaptive optimization.** The system learns from execution outcomes to improve routing over time, within policy bounds.
+
+## MVP Support Posture
+
+ACDS `v0.1.0` is **ACDS-first, local-first, and operator-oriented**.
+
+- Supported now: PostgreSQL-backed API, admin UI, worker services, provider registration, policy/routing, audit persistence, and GRITS DB-backed release checks
+- Supported providers for MVP: **Ollama** and **LM Studio**
+- Experimental providers: **OpenAI**, **Gemini**, **Apple Intelligence**
+- Adaptation posture: **observe-first**. Adaptive state is persisted and inspected, but operators should treat automatic adaptation as controlled/limited until their environment-specific policies are validated
+
+See [docs/MVP_BOUNDARY.md](docs/MVP_BOUNDARY.md) for the exact release boundary.
 
 ## Integration with Thingstead and Process Swarm
 
@@ -112,7 +123,10 @@ cp .env.example .env
 # Edit .env with your configuration (database URL, master key path, etc.)
 
 # Run database migrations
-pnpm --filter ./infra/db run migrate
+pnpm --filter @acds/db-tools run migrate
+
+# Seed baseline profiles and policies
+pnpm --filter @acds/db-tools run seed
 
 # Start development (API server, admin UI, and worker)
 pnpm dev
@@ -135,12 +149,18 @@ The API package and its runtime dependencies now declare ESM package metadata as
 
 ### Register a Provider
 
-After starting, open the admin UI and register at least one provider:
+After starting, open the admin UI and register at least one provider.
+
+MVP-supported providers:
 
 - **Ollama** (local): Default endpoint `http://localhost:11434`, no API key needed
 - **LM Studio** (local): Default endpoint `http://localhost:1234`, no API key needed
+
+Experimental providers:
+
 - **Gemini** (cloud): Requires a Google AI API key
 - **OpenAI** (cloud): Requires an OpenAI API key
+- **Apple Intelligence** (bridge-backed): macOS-specific and not part of the baseline MVP operator path
 
 See [Provider Setup](docs/operator/PROVIDER_SETUP.md) for detailed instructions.
 
@@ -179,3 +199,5 @@ Mock mode is useful for demos, layout work, and route-level UI validation when P
 - **Architecture:** [Overview](docs/architecture/ARCHITECTURE_OVERVIEW.md) | [Component Boundaries](docs/architecture/COMPONENT_BOUNDARIES.md) | [Routing Model](docs/architecture/ROUTING_MODEL.md) | [Execution Flow](docs/architecture/EXECUTION_FLOW.md)
 - **Security:** [Secret Storage](docs/security/SECRET_STORAGE.md) | [Audit Model](docs/security/AUDIT_MODEL.md)
 - **Operator:** [Admin Guide](docs/operator/ADMIN_GUIDE.md) | [Admin UI Development](docs/operator/ADMIN_UI_DEVELOPMENT.md) | [Provider Setup](docs/operator/PROVIDER_SETUP.md) | [Policy Configuration](docs/operator/POLICY_CONFIGURATION.md) | [Troubleshooting](docs/operator/TROUBLESHOOTING.md)
+- **MVP:** [Boundary](docs/MVP_BOUNDARY.md) | [Operator Guide](docs/operator/MVP_OPERATOR_GUIDE.md) | [Environment Matrix](docs/operator/ENVIRONMENT_MATRIX.md)
+- **GRITS:** [Architecture](docs/grits/GRITS_ARCHITECTURE.md) | [Operations Runbook](docs/grits/OPERATIONS_RUNBOOK.md) | [Schema Mapping](docs/grits/SCHEMA_MAPPING.md)

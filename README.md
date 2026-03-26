@@ -1,53 +1,26 @@
-# ACDS + Process Swarm Integration
+# Adaptive Cognitive Dispatch System
 
-This repository contains two related systems:
+This repository is an ACDS-first workspace.
 
-- `acds/`: Adaptive Cognitive Dispatch System, the primary MVP product. It provides governed AI routing, execution orchestration, auditability, an admin UI, and worker services.
-- `process-swarm-gen2/`: Process Swarm Gen 2, a companion automation platform that can integrate with ACDS for inference routing and execution tracking.
+- `acds/` is the supported MVP product surface: API, admin UI, workers, policy/routing/runtime packages, and the GRITS release gate.
+- `process-swarm-gen2/` is a secondary companion integration that demonstrates how ACDS can be used from a larger workflow engine.
 
-## MVP Scope
+Start with [acds/README.md](acds/README.md). That is the canonical product README for setup, operations, and supported scope.
 
-For an MVP release, the main product surface is `acds/`.
+## Public MVP Boundary
 
-Use `process-swarm-gen2/` when you want an example or companion application that exercises ACDS integration in a larger workflow engine.
+- Product identity: ACDS-first
+- License: [MIT](LICENSE)
+- Canonical setup and usage: [acds/README.md](acds/README.md)
+- MVP boundary: [acds/docs/MVP_BOUNDARY.md](acds/docs/MVP_BOUNDARY.md)
+- Operator path: [acds/docs/operator/MVP_OPERATOR_GUIDE.md](acds/docs/operator/MVP_OPERATOR_GUIDE.md)
+- Release checklist: [docs/release/CHECKLIST.md](docs/release/CHECKLIST.md)
 
-## Quick Start
+## Repository Layout
 
-### ACDS
+- `acds/` - Adaptive Cognitive Dispatch System
+- `process-swarm-gen2/` - Example companion integration for Process Swarm
 
-```bash
-cd acds
-pnpm install
-cp .env.example .env
-pnpm test
-pnpm typecheck
-pnpm build
-```
+## Release Notes
 
-Primary entry points:
-
-- `acds/apps/api`
-- `acds/apps/admin-web`
-- `acds/apps/worker`
-- `acds/apps/grits-worker`
-
-### Process Swarm Gen 2
-
-```bash
-cd process-swarm-gen2
-python -m pip install -e .[dev]
-pytest tests/test_process_swarm tests/test_integration/test_acds_client.py -q
-```
-
-## Repository Validation
-
-GitHub Actions runs from the repository root and validates:
-
-- `acds/` workspace install, test, typecheck, and build
-- `process-swarm-gen2/` Python smoke tests
-
-## Documentation
-
-- ACDS overview: [acds/README.md](acds/README.md)
-- Process Swarm architecture: [process-swarm-gen2/docs/ARCHITECTURE.md](process-swarm-gen2/docs/ARCHITECTURE.md)
-- ACDS/Process Swarm integration notes: [process-swarm-gen2/docs/acds_process_swarm_integration.md](process-swarm-gen2/docs/acds_process_swarm_integration.md)
+- Initial MVP release notes: [docs/release/v0.1.0.md](docs/release/v0.1.0.md)
