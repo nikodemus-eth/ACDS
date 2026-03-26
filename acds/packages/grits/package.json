@@ -12,6 +12,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@acds/core-types": "workspace:*"
+    "@acds/core-types": "workspace:*",
+    "@acds/adaptive-optimizer": "workspace:*",
+    "@acds/audit-ledger": "workspace:*"
   }
 }

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  acds:
+    name: ACDS Workspace
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: acds
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: acds/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm build
+
+  process-swarm:
+    name: Process Swarm Smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: process-swarm-gen2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e .[dev]
+      - run: pytest tests/test_process_swarm tests/test_integration/test_acds_client.py -q
