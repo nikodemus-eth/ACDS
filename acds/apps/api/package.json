@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Fastify API surface for ACDS routing, audit, execution, provider, and adaptation operations.",
   "scripts": {
     "build": "pnpm --filter @acds/api^... run build && tsc",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
+    "test": "node ../../scripts/run-package-tests.mjs api",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

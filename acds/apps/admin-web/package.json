@@ -2,6 +2,7 @@
   "name": "@acds/admin-web",
   "version": "0.1.0",
   "private": true,
+  "description": "Standalone admin UI for operating ACDS providers, policies, audit, and runtime state.",
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite",

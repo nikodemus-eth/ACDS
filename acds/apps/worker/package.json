@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Background worker process for recurring ACDS jobs and integrity cadences.",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
+    "test": "node ../../scripts/run-package-tests.mjs worker",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

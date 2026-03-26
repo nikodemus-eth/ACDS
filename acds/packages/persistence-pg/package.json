@@ -5,8 +5,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "description": "PostgreSQL persistence adapters and audit/event writers for ACDS runtime state.",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node ../../scripts/run-package-tests.mjs persistence-pg",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "pg": "^8.13.0",
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.11.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

@@ -51,6 +51,8 @@ vi.mock('@acds/persistence-pg', async () => {
     constructor(public pool?: any) {}
   }
 
+  class MockAuditEventWriter extends MockRepo {}
+
   return {
     createPool: vi.fn().mockReturnValue(mockPool),
     PgProviderRepository: MockRepo,
@@ -71,6 +73,7 @@ vi.mock('@acds/persistence-pg', async () => {
     PgAdaptationRecommendationRepository: MockRepo,
     PgSecretCipherStore: MockRepo,
     PgRollbackRecordWriter: MockRepo,
+    PgAuditEventWriter: MockAuditEventWriter,
     PgApprovalAuditEmitter: MockRepo,
     PgRollbackAuditEmitter: MockRepo,
   };

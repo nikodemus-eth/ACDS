@@ -4,11 +4,15 @@
 
 ```bash
 cd acds
-pnpm install
+corepack enable
+corepack prepare pnpm@9.15.0 --activate
+pnpm run bootstrap
 cp .env.example .env
 ```
 
 Create a master key file and set `MASTER_KEY_PATH` in `.env`.
+
+`npm install` is not a supported substitute for this workspace. The product relies on `workspace:*` linking across apps and packages.
 
 ## 2. Validate and Seed Config
 
@@ -27,9 +31,15 @@ pnpm --filter @acds/worker run build
 pnpm --filter @acds/grits-worker run build
 
 pnpm --filter @acds/api run start
-pnpm --filter @acds/admin-web exec vite preview --host 0.0.0.0 --port 4173
+pnpm --filter @acds/admin-web run preview -- --host 0.0.0.0 --port 4173
 pnpm --filter @acds/worker run start
 ```
+
+Operator posture for the admin UI:
+
+- `preview` is the supported MVP operator path
+- `dev` is a developer-only live-reload workflow
+- `dev:mock` is a non-release/demo-only workflow
 
 ## 4. Register a Provider
 
@@ -60,13 +70,15 @@ Fixture mode:
 pnpm --filter @acds/grits-worker run grits:fast
 ```
 
+Fixture mode is for local/demo validation only.
+
 DB-backed release mode:
 
 ```bash
 pnpm --filter @acds/grits-worker run grits:pg:release
 ```
 
-The release command exits non-zero if blocking GRITS defects are detected.
+The `grits:pg:*` commands are the release path. `grits:pg:release` exits non-zero if blocking GRITS defects are detected.
 
 ## 8. Interpret Snapshot Outcomes
 

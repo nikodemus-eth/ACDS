@@ -4,12 +4,14 @@
   "private": true,
   "description": "Governed Adaptive Cognitive Dispatch System — centralized AI provider management with policy-based routing, adaptive optimization, and full auditability",
   "scripts": {
+    "bootstrap": "pnpm install && pnpm run verify:install",
     "build": "pnpm -r run build",
     "dev": "pnpm -r --parallel run dev",
     "lint": "pnpm -r run lint",
     "test": "pnpm -r exec vitest run --passWithNoTests",
     "test:integration": "pnpm --filter ./tests run test",
     "typecheck": "pnpm -r run typecheck",
+    "verify:install": "node ./scripts/verify-install.mjs && pnpm typecheck",
     "clean": "pnpm -r run clean"
   },
   "engines": {

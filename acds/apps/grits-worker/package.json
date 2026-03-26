@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "main": "./dist/main.js",
+  "description": "Operator-facing GRITS worker and CLI entrypoints for ACDS integrity validation.",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "test": "bash -lc 'cd ../.. && pnpm exec vitest run apps/grits-worker/src/**/*.test.ts'",
+    "test": "node ../../scripts/run-package-tests.mjs grits-worker",
     "grits:fast": "tsx src/cli-fixture.ts fast",
     "grits:daily": "tsx src/cli-fixture.ts daily",
     "grits:release": "tsx src/cli-fixture.ts release",

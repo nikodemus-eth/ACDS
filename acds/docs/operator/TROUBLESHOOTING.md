@@ -2,6 +2,41 @@
 
 This guide covers common operational issues and how to diagnose them.
 
+## Install and Workspace Linking Failures
+
+### Symptoms
+
+- `pnpm install` finishes with unresolved internal workspace packages
+- package-local scripts fail to find `@acds/*` dependencies
+- `pnpm run verify:install` fails before typecheck
+
+### Requirements
+
+- Node `>=20.0.0`
+- `pnpm >=9.0.0`
+- Recommended activation path:
+  - `corepack enable`
+  - `corepack prepare pnpm@9.15.0 --activate`
+
+`npm install` is not a supported alternative for this repository.
+
+### Resolution
+
+From the `acds/` workspace root:
+
+```bash
+rm -rf node_modules apps/*/node_modules packages/*/node_modules tests/node_modules infra/db/node_modules
+pnpm install
+pnpm run verify:install
+```
+
+Expected success signals:
+
+- `verify:install` resolves internal package manifests for the API, worker, GRITS worker, and tests workspace
+- workspace `typecheck` completes without missing-module errors
+
+If `verify:install` still fails, inspect the package called out in the output and confirm its `node_modules/@acds/*` links exist under the affected workspace package.
+
 ## Provider Connection Failures
 
 ### Symptoms

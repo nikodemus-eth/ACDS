@@ -2,6 +2,17 @@
 
 A **governed, local-first cognitive dispatch platform** for routing AI work across approved providers with policy controls, auditability, adaptive optimization, and an operator-facing integrity gate.
 
+## Install Contract
+
+ACDS is a `pnpm` workspace and treats `pnpm` as a hard requirement.
+
+- Required runtime: Node `>=20.0.0`
+- Required package manager: `pnpm >=9.0.0`
+- Recommended activation path: `corepack enable` followed by `corepack prepare pnpm@9.15.0 --activate`
+- Unsupported install path: `npm install`
+
+The workspace depends on `workspace:*` links across apps and packages, so a successful `pnpm` install is part of the product contract rather than a convenience detail.
+
 ## What It Does
 
 ACDS sits between your applications and AI providers. Instead of hardcoding which model to call, your application declares a **cognitive intent** -- what kind of thinking is needed -- and ACDS determines the best model, execution tactic, and provider to handle the request. Every decision is policy-governed, auditable, and resilient through automatic fallback.
@@ -115,8 +126,11 @@ adaptive-cognitive-dispatch/
 ## Quick Start
 
 ```bash
-# Install dependencies
-pnpm install
+corepack enable
+corepack prepare pnpm@9.15.0 --activate
+
+# Install and verify the workspace
+pnpm run bootstrap
 
 # Set up environment
 cp .env.example .env
@@ -128,9 +142,19 @@ pnpm --filter @acds/db-tools run migrate
 # Seed baseline profiles and policies
 pnpm --filter @acds/db-tools run seed
 
-# Start development (API server, admin UI, and worker)
-pnpm dev
+# Start the supported MVP surface
+pnpm --filter @acds/api run start
+pnpm --filter @acds/admin-web run preview -- --host 0.0.0.0 --port 4173
+pnpm --filter @acds/worker run start
 ```
+
+If you only need to confirm the workspace health after installation, run:
+
+```bash
+pnpm run verify:install
+```
+
+That command verifies internal `workspace:*` package resolution and then runs the workspace typecheck.
 
 ### Standalone API Bootstrap
 
@@ -164,19 +188,34 @@ Experimental providers:
 
 See [Provider Setup](docs/operator/PROVIDER_SETUP.md) for detailed instructions.
 
-### Admin UI Development
+### Admin UI Posture
 
-The admin UI is now a standalone Vite application with both live and mock-backed workflows.
+The admin UI is a standalone Vite application with distinct operator and development modes.
 
 ```bash
-# Live mode against the API proxy target
+# Operator-facing MVP mode: built assets served through Vite preview
+pnpm --filter @acds/admin-web run preview -- --host 0.0.0.0 --port 4173
+
+# Developer-only live-reload mode against the API proxy target
 pnpm --filter @acds/admin-web run dev
 
-# Mock mode with seeded in-browser data
+# Demo/non-release mock mode with seeded in-browser data
 pnpm --filter @acds/admin-web run dev:mock
 ```
 
-Mock mode is useful for demos, layout work, and route-level UI validation when Postgres or the API is unavailable. It exercises the full routed admin shell, including providers, profiles, policies, adaptation, approvals, rollbacks, audit, and executions.
+`preview` is the canonical operator-facing path for MVP. `dev` is a developer workflow, and `dev:mock` is a non-release/demo-only workflow when Postgres or the API is unavailable.
+
+## Install Troubleshooting
+
+If install or workspace linking fails:
+
+```bash
+rm -rf node_modules apps/*/node_modules packages/*/node_modules tests/node_modules infra/db/node_modules
+pnpm install
+pnpm run verify:install
+```
+
+To confirm `workspace:*` linking succeeded, `pnpm run verify:install` should print resolved internal package manifests for `@acds/api`, `@acds/worker`, `@acds/grits-worker`, and `@acds/tests` before running the workspace typecheck.
 
 ## Key Concepts
 
@@ -197,6 +236,7 @@ Mock mode is useful for demos, layout work, and route-level UI validation when P
 ## Documentation
 
 - **Architecture:** [Overview](docs/architecture/ARCHITECTURE_OVERVIEW.md) | [Component Boundaries](docs/architecture/COMPONENT_BOUNDARIES.md) | [Routing Model](docs/architecture/ROUTING_MODEL.md) | [Execution Flow](docs/architecture/EXECUTION_FLOW.md)
+- **Traceability:** [Runtime Traceability](docs/architecture/RUNTIME_TRACEABILITY.md)
 - **Security:** [Secret Storage](docs/security/SECRET_STORAGE.md) | [Audit Model](docs/security/AUDIT_MODEL.md)
 - **Operator:** [Admin Guide](docs/operator/ADMIN_GUIDE.md) | [Admin UI Development](docs/operator/ADMIN_UI_DEVELOPMENT.md) | [Provider Setup](docs/operator/PROVIDER_SETUP.md) | [Policy Configuration](docs/operator/POLICY_CONFIGURATION.md) | [Troubleshooting](docs/operator/TROUBLESHOOTING.md)
 - **MVP:** [Boundary](docs/MVP_BOUNDARY.md) | [Operator Guide](docs/operator/MVP_OPERATOR_GUIDE.md) | [Environment Matrix](docs/operator/ENVIRONMENT_MATRIX.md)

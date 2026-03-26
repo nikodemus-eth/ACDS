@@ -3,18 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Database migrations and seed utilities for bootstrapping ACDS runtime state.",
   "scripts": {
     "migrate": "bash -lc 'for f in migrations/*.sql; do psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$f\"; done'",
     "seed:validate": "tsx seeds/runSeeds.ts",
     "seed:model-profiles": "tsx seeds/seedModelProfiles.ts",
     "seed:tactic-profiles": "tsx seeds/seedTacticProfiles.ts",
     "seed:policies": "tsx seeds/seedPolicies.ts",
-    "seed": "pnpm run seed:model-profiles && pnpm run seed:tactic-profiles && pnpm run seed:policies"
+    "seed": "pnpm run seed:model-profiles && pnpm run seed:tactic-profiles && pnpm run seed:policies",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "tsx": "^4.19.2"
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
   }
 }

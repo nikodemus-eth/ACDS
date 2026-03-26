@@ -5,6 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "description": "Shared GRITS integrity engine, checkers, and snapshot types for ACDS.",
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",

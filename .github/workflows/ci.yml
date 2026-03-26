@@ -14,19 +14,26 @@ jobs:
       run:
         working-directory: acds
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 9
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
           cache-dependency-path: acds/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm typecheck
-      - run: pnpm build
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify install contract
+        run: pnpm run verify:install
+      - name: Run workspace tests
+        run: pnpm test
+      - name: Build workspace
+        run: pnpm build
 
   acds-release-gate:
     name: ACDS Release Gate
@@ -53,28 +60,44 @@ jobs:
       ADMIN_SESSION_SECRET: ci-admin-secret
       MASTER_KEY_PATH: /tmp/acds-master.key
       PORT: 3100
+      ADMIN_WEB_PORT: 4173
       MOCK_OLLAMA_PORT: 11434
       GRITS_OUTPUT_PATH: /tmp/grits-release-snapshot.json
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 9
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
           cache-dependency-path: acds/pnpm-lock.yaml
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-client curl
-      - run: pnpm install --frozen-lockfile
-      - run: openssl rand -hex 32 > "$MASTER_KEY_PATH"
-      - run: pnpm --filter @acds/db-tools run migrate
-      - run: pnpm --filter @acds/db-tools run seed:validate
-      - run: pnpm --filter @acds/db-tools run seed
-      - run: node infra/scripts/mock_ollama.mjs > /tmp/mock-ollama.log 2>&1 &
-      - run: pnpm build
-      - run: node apps/api/dist/main.js > /tmp/acds-api.log 2>&1 &
-      - run: |
+      - name: Install CI system packages
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client curl
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify install contract
+        run: pnpm run verify:install
+      - name: Prepare runtime secrets
+        run: openssl rand -hex 32 > "$MASTER_KEY_PATH"
+      - name: Validate seed inputs
+        run: pnpm --filter @acds/db-tools run seed:validate
+      - name: Run database migrations
+        run: pnpm --filter @acds/db-tools run migrate
+      - name: Seed database
+        run: pnpm --filter @acds/db-tools run seed
+      - name: Start mock Ollama provider
+        run: node infra/scripts/mock_ollama.mjs > /tmp/mock-ollama.log 2>&1 &
+      - name: Build release surface
+        run: pnpm build
+      - name: Start API
+        run: node apps/api/dist/main.js > /tmp/acds-api.log 2>&1 &
+      - name: Wait for API health
+        run: |
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:${PORT}/health > /tmp/acds-health.json; then
               exit 0
@@ -83,28 +106,58 @@ jobs:
           done
           cat /tmp/acds-api.log
           exit 1
-      - run: |
+      - name: Start admin preview
+        run: pnpm --filter @acds/admin-web run preview -- --host 127.0.0.1 --port ${ADMIN_WEB_PORT} > /tmp/acds-admin.log 2>&1 &
+      - name: Wait for admin preview
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${ADMIN_WEB_PORT} > /tmp/acds-admin-health.html; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/acds-admin.log
+          exit 1
+      - name: Start worker
+        run: node apps/worker/dist/main.js > /tmp/acds-worker.log 2>&1 &
+      - name: Confirm worker startup
+        run: |
+          sleep 5
+          if pgrep -f "apps/worker/dist/main.js" > /tmp/acds-worker-pids.txt; then
+            exit 0
+          fi
+          cat /tmp/acds-worker.log
+          exit 1
+      - name: Register provider
+        run: |
           curl -sf \
             -H "x-admin-session: ${ADMIN_SESSION_SECRET}" \
             -H "content-type: application/json" \
             -d '{"name":"CI Ollama","vendor":"ollama","authType":"none","baseUrl":"http://127.0.0.1:11434","enabled":true,"environment":"ci"}' \
             http://127.0.0.1:${PORT}/providers > /tmp/provider.json
-      - run: |
+      - name: Run dispatch smoke
+        run: |
           curl -sf \
             -H "x-admin-session: ${ADMIN_SESSION_SECRET}" \
             -H "content-type: application/json" \
             -d '{"routingRequest":{"application":"process_swarm","process":"content_review","step":"initial_draft","taskType":"classification","loadTier":"single_shot","decisionPosture":"operational","cognitiveGrade":"standard","input":"Smoke dispatch","constraints":{"privacy":"local_only","maxLatencyMs":30000,"costSensitivity":"medium","structuredOutputRequired":false,"traceabilityRequired":true}},"inputPayload":"Smoke dispatch","inputFormat":"text"}' \
             http://127.0.0.1:${PORT}/dispatch/run > /tmp/dispatch-run.json
-      - run: curl -sf -H "x-admin-session: ${ADMIN_SESSION_SECRET}" http://127.0.0.1:${PORT}/executions > /tmp/executions.json
-      - run: curl -sf -H "x-admin-session: ${ADMIN_SESSION_SECRET}" http://127.0.0.1:${PORT}/audit > /tmp/audit.json
-      - run: pnpm --filter @acds/grits-worker run grits:pg:release
-      - uses: actions/upload-artifact@v4
+      - name: Capture execution audit surfaces
+        run: |
+          curl -sf -H "x-admin-session: ${ADMIN_SESSION_SECRET}" http://127.0.0.1:${PORT}/executions > /tmp/executions.json
+          curl -sf -H "x-admin-session: ${ADMIN_SESSION_SECRET}" http://127.0.0.1:${PORT}/audit > /tmp/audit.json
+      - name: Run GRITS release gate
+        run: pnpm --filter @acds/grits-worker run grits:pg:release
+      - name: Upload release-gate artifacts
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: grits-release-artifacts
           path: |
             /tmp/grits-release-snapshot.json
             /tmp/acds-api.log
+            /tmp/acds-admin.log
+            /tmp/acds-worker.log
             /tmp/mock-ollama.log
             /tmp/executions.json
             /tmp/audit.json
