@@ -77,56 +77,78 @@ class CRPrioritizationAdapter(ToolAdapter):
         cluster_text = json.dumps(clusters, indent=2)
         prompt = _PRIORITIZATION_PROMPT.format(clusters=cluster_text)
 
-        apple = AppleIntelligenceClient(
-            timeout_seconds=ctx.config.get("timeout_seconds", 120),
-        )
-        result = apple.generate(
-            prompt,
-            system=_PRIORITIZATION_SYSTEM,
-            temperature=0.3,
-            model=ctx.config.get("model", "apple-fm-on-device"),
-        )
+        # Try ACDS dispatch first, fall back to direct Apple Intelligence
+        full_prompt = f"{_PRIORITIZATION_SYSTEM}\n\n{prompt}"
+        acds_output = None
+        engine_used = "apple_intelligence"
+        model_used = ctx.config.get("model", "apple-fm-on-device")
 
-        if not result.success:
-            # Per spec: Apple Intelligence failure → retry once, do NOT
-            # fallback to Ollama for prioritization
+        if ctx.inference is not None:
+            acds_output = ctx.inference.infer(
+                full_prompt,
+                task_type="reasoning",
+                cognitive_grade="enhanced",
+                process="context_report",
+                step="cr_prioritization",
+                run_id=ctx.run_id,
+            )
+
+        if acds_output is not None:
+            engine_used = "acds"
+            model_used = "acds-dispatched"
+            result_output = acds_output
+        else:
+            apple = AppleIntelligenceClient(
+                timeout_seconds=ctx.config.get("timeout_seconds", 120),
+            )
             result = apple.generate(
                 prompt,
                 system=_PRIORITIZATION_SYSTEM,
                 temperature=0.3,
+                model=ctx.config.get("model", "apple-fm-on-device"),
             )
+
             if not result.success:
-                return ToolResult(
-                    success=False,
-                    output_data={},
-                    artifacts=[],
-                    error=(
-                        f"Apple Intelligence prioritization failed after retry: "
-                        f"{result.error}"
-                    ),
-                    metadata={
-                        "duration_ms": result.latency_ms,
-                        "engine": "apple_intelligence",
-                        "retried": True,
-                    },
+                # Per spec: Apple Intelligence failure → retry once
+                result = apple.generate(
+                    prompt,
+                    system=_PRIORITIZATION_SYSTEM,
+                    temperature=0.3,
                 )
+                if not result.success:
+                    return ToolResult(
+                        success=False,
+                        output_data={},
+                        artifacts=[],
+                        error=(
+                            f"Apple Intelligence prioritization failed after retry: "
+                            f"{result.error}"
+                        ),
+                        metadata={
+                            "duration_ms": result.latency_ms,
+                            "engine": "apple_intelligence",
+                            "retried": True,
+                        },
+                    )
+
+            model_used = result.model
+            result_output = result.output
 
         # Parse output
         try:
-            parsed = json.loads(result.output.strip())
+            parsed = json.loads(result_output.strip())
         except json.JSONDecodeError:
-            parsed = _try_parse_json(result.output)
+            parsed = _try_parse_json(result_output)
             if parsed is None:
-                # Cannot degrade — prioritization needs Apple Intelligence
                 return ToolResult(
                     success=False,
                     output_data={},
                     artifacts=[],
-                    error="Apple Intelligence returned unparseable prioritization output",
+                    error="Prioritization returned unparseable output",
                     metadata={
-                        "duration_ms": result.latency_ms,
-                        "engine": "apple_intelligence",
-                        "raw_output_len": len(result.output),
+                        "duration_ms": int((time.monotonic() - t0) * 1000),
+                        "engine": engine_used,
+                        "raw_output_len": len(result_output),
                     },
                 )
 
@@ -157,15 +179,15 @@ class CRPrioritizationAdapter(ToolAdapter):
                 "priority_count": len(prioritized),
                 "top_category": prioritized[0]["category"] if prioritized else None,
                 "top_score": prioritized[0].get("composite_score") if prioritized else None,
-                "engine": "apple_intelligence",
-                "model": result.model,
+                "engine": engine_used,
+                "model": model_used,
             },
             artifacts=[str(artifact_path)],
             error=None,
             metadata={
                 "duration_ms": latency,
-                "engine": "apple_intelligence",
-                "model": result.model,
+                "engine": engine_used,
+                "model": model_used,
                 "priority_count": len(prioritized),
             },
         )

@@ -24,6 +24,7 @@ class ToolContext:
     repo: Any
     prior_results: dict
     config: dict
+    inference: Any = None  # InferenceProvider — routes through ACDS when available
 
 
 @dataclass

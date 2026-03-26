@@ -15,6 +15,13 @@ import tempfile
 from pathlib import Path
 from typing import Union
 
+from process_swarm.acds_client import (
+    ACDSClient,
+    ACDSClientError,
+    DispatchRunRequest,
+    RoutingConstraints,
+    RoutingRequest,
+)
 from process_swarm.config import load_inference_config
 from process_swarm.inference import InferenceProvider, create_inference_provider
 from swarm.compiler.compiler import BehaviorSequenceCompiler
@@ -75,6 +82,15 @@ class SwarmRunner:
         config = inference_config or load_inference_config()
         self.inference: InferenceProvider = create_inference_provider(config)
 
+        # ACDS client for execution tracking
+        self._acds_client: ACDSClient | None = None
+        if config.get("provider") == "acds":
+            self._acds_client = ACDSClient(
+                base_url=config.get("acds_base_url", "http://localhost:3100"),
+                auth_token=config.get("acds_auth_token"),
+                timeout_seconds=config.get("acds_timeout_seconds", 30),
+            )
+
         # ARGUS-Hold governed execution layer (optional)
         self._argus_hold = None
 
@@ -109,6 +125,54 @@ class SwarmRunner:
         run_id = self.repo.create_run(swarm_id, "manual")
         return self.execute_run(run_id)
 
+    def _acds_dispatch_run_event(
+        self, run_id: str, swarm_id: str, swarm_name: str, step: str,
+    ) -> str | None:
+        """Create an ACDS execution record for this Process Swarm run.
+
+        Returns the ACDS executionId or None if ACDS is unavailable.
+        """
+        if not self._acds_client:
+            return None
+        try:
+            swarm = self.repo.get_swarm(swarm_id)
+            desc = (swarm or {}).get("description", "")[:200]
+            routing = RoutingRequest(
+                application="process_swarm",
+                process=swarm_name,
+                step=step,
+                taskType="planning",
+                loadTier="single_shot",
+                decisionPosture="operational",
+                cognitiveGrade="basic",
+                input=f"Run {run_id} for swarm {swarm_name}",
+                constraints=RoutingConstraints(
+                    privacy="local_only",
+                    maxLatencyMs=30000,
+                    costSensitivity="low",
+                    structuredOutputRequired=False,
+                    traceabilityRequired=True,
+                ),
+            )
+            request = DispatchRunRequest(
+                routingRequest=routing,
+                inputPayload=f"Process Swarm run lifecycle event: {step}. {desc}",
+                inputFormat="text",
+                requestId=run_id,
+            )
+            response = self._acds_client.dispatch(request)
+            logger.info(
+                "ACDS dispatch for %s/%s: executionId=%s status=%s",
+                swarm_name, step, response.executionId, response.status,
+            )
+            return response.executionId
+        except ACDSClientError as e:
+            logger.warning("ACDS dispatch failed for %s/%s: %s", swarm_name, step, e)
+            return None
+        except Exception as e:
+            logger.warning("ACDS dispatch unexpected error: %s", e)
+            return None
+
     def execute_run(self, run_id: str) -> dict:
         run = self.repo.get_run(run_id)
         if not run:
@@ -124,6 +188,13 @@ class SwarmRunner:
             with self.repo.atomic():
                 self.repo.update_run(run_id, run_status="running")
                 self.events.run_started(swarm_id, run_id)
+
+            # Register run with ACDS for execution tracking
+            swarm = preconditions.get("swarm", {})
+            swarm_name = swarm.get("swarm_name", swarm_id)
+            acds_exec_id = self._acds_dispatch_run_event(
+                run_id, swarm_id, swarm_name, "run_started",
+            )
 
             # Get behavior sequence
             bs = preconditions.get("behavior_sequence")
@@ -161,7 +232,7 @@ class SwarmRunner:
             # Update run status
             status = exec_result.get("execution_status", "succeeded")
             artifact_refs = exec_result.get("artifacts", [])
-            runtime_exec_id = exec_result.get("runtime_execution_id")
+            runtime_exec_id = acds_exec_id or exec_result.get("runtime_execution_id")
 
             with self.repo.atomic():
                 self.repo.update_run(
@@ -283,6 +354,7 @@ class SwarmRunner:
                     repo=self.repo,
                     prior_results=prior_results,
                     config=action.get("config", {}),
+                    inference=self.inference,
                 )
                 t0 = _time.monotonic()
                 result = adapter.execute(ctx)

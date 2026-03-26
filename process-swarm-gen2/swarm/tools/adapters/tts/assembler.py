@@ -27,11 +27,20 @@ class TtsAssemblerAdapter(ToolAdapter):
 
         renderer_data = ctx.prior_results.get("tts_renderer")
         if not isinstance(renderer_data, dict) or "chunk_files" not in renderer_data:
+            # Diagnostic: what keys exist in prior_results?
+            available_keys = list(ctx.prior_results.keys())
+            renderer_type = type(renderer_data).__name__ if renderer_data is not None else "None"
+            renderer_keys = list(renderer_data.keys()) if isinstance(renderer_data, dict) else []
             return ToolResult(
                 success=False,
                 output_data={},
                 artifacts=[],
-                error="Missing tts_renderer.chunk_files in prior_results",
+                error=(
+                    f"Missing tts_renderer.chunk_files in prior_results. "
+                    f"Available keys: {available_keys}. "
+                    f"tts_renderer type: {renderer_type}, "
+                    f"keys: {renderer_keys}"
+                ),
                 metadata={"duration_ms": (time.monotonic() - t0) * 1000},
             )
 
@@ -67,7 +76,7 @@ class TtsAssemblerAdapter(ToolAdapter):
                 tmp.write(concat_content)
                 tmp_path = tmp.name
 
-            subprocess.run(
+            proc = subprocess.run(
                 [
                     "ffmpeg", "-y",
                     "-f", "concat",
@@ -78,8 +87,18 @@ class TtsAssemblerAdapter(ToolAdapter):
                 ],
                 check=True,
                 timeout=120,
+                capture_output=True,
             )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.decode("utf-8", errors="replace")[:500] if e.stderr else ""
+            return ToolResult(
+                success=False,
+                output_data={},
+                artifacts=[],
+                error=f"ffmpeg concat failed (exit {e.returncode}): {stderr}",
+                metadata={"duration_ms": (time.monotonic() - t0) * 1000},
+            )
+        except (subprocess.TimeoutExpired, OSError) as e:
             return ToolResult(
                 success=False,
                 output_data={},

@@ -17,8 +17,8 @@ def load_inference_config() -> dict:
         ACDS_TIMEOUT_SECONDS — Request timeout in seconds (default: 30)
     """
     return {
-        "provider": os.environ.get("INFERENCE_PROVIDER", "rules"),
-        "acds_base_url": os.environ.get("ACDS_BASE_URL", "http://localhost:3000"),
+        "provider": os.environ.get("INFERENCE_PROVIDER", "acds"),
+        "acds_base_url": os.environ.get("ACDS_BASE_URL", "http://localhost:3100"),
         "acds_auth_token": os.environ.get("ACDS_AUTH_TOKEN"),
         "acds_timeout_seconds": int(
             os.environ.get("ACDS_TIMEOUT_SECONDS", "30")

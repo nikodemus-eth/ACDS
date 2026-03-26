@@ -113,23 +113,41 @@ class CRValidationAdapter(ToolAdapter):
                     f"(min {_MIN_SECTION_CHARS})"
                 )
 
-        # ── LLM validation via Ollama (primary) ──
-        ollama = OllamaClient(
-            default_model=ctx.config.get("model", "qwen3:8b"),
-            timeout_seconds=ctx.config.get("timeout_seconds", 300),
-        )
-
+        # ── LLM validation — try ACDS, fall back to direct Ollama ──
         validation_prompt = (
             f"Validate this report:\n\n{report_text[:8000]}\n\n"
             "Check for required sections, substantive content, "
             "hallucinations, and professional tone."
         )
 
-        llm_result = ollama.generate(
-            validation_prompt,
-            system=_VALIDATION_SYSTEM,
-            temperature=0.1,
-        )
+        full_validation_prompt = f"{_VALIDATION_SYSTEM}\n\n{validation_prompt}"
+        acds_validation = None
+        if ctx.inference is not None:
+            acds_validation = ctx.inference.infer(
+                full_validation_prompt,
+                task_type="critique",
+                cognitive_grade="standard",
+                process="context_report",
+                step="cr_validation",
+                run_id=ctx.run_id,
+            )
+
+        if acds_validation is not None:
+            # Wrap in a fake InferenceResult-like for consistent parsing
+            class _R:
+                success = True
+                output = acds_validation
+            llm_result = _R()
+        else:
+            ollama = OllamaClient(
+                default_model=ctx.config.get("model", "qwen3:8b"),
+                timeout_seconds=ctx.config.get("timeout_seconds", 300),
+            )
+            llm_result = ollama.generate(
+                validation_prompt,
+                system=_VALIDATION_SYSTEM,
+                temperature=0.1,
+            )
 
         llm_validation = None
         if llm_result.success:
@@ -156,10 +174,6 @@ class CRValidationAdapter(ToolAdapter):
         fallback_used = False
 
         if not structural_pass and issues:
-            apple = AppleIntelligenceClient(
-                timeout_seconds=ctx.config.get("timeout_seconds", 180),
-            )
-
             refinement_prompt = (
                 f"The following report has these issues:\n"
                 f"{json.dumps(issues, indent=2)}\n\n"
@@ -167,16 +181,36 @@ class CRValidationAdapter(ToolAdapter):
                 f"Fix the issues while preserving all factual content."
             )
 
-            refine_result = apple.generate(
-                refinement_prompt,
-                system=_REFINEMENT_SYSTEM,
-                temperature=0.3,
-            )
+            # Try ACDS for refinement, fall back to direct Apple Intelligence
+            full_refine = f"{_REFINEMENT_SYSTEM}\n\n{refinement_prompt}"
+            acds_refined = None
+            if ctx.inference is not None:
+                acds_refined = ctx.inference.infer(
+                    full_refine,
+                    task_type="transformation",
+                    cognitive_grade="enhanced",
+                    process="context_report",
+                    step="cr_validation_refine",
+                    run_id=ctx.run_id,
+                )
 
-            if refine_result.success and len(refine_result.output.strip()) > 100:
-                refined_text = refine_result.output.strip()
+            if acds_refined is not None and len(acds_refined.strip()) > 100:
+                refined_text = acds_refined.strip()
                 fallback_used = True
+            else:
+                apple = AppleIntelligenceClient(
+                    timeout_seconds=ctx.config.get("timeout_seconds", 180),
+                )
+                refine_result = apple.generate(
+                    refinement_prompt,
+                    system=_REFINEMENT_SYSTEM,
+                    temperature=0.3,
+                )
+                if refine_result.success and len(refine_result.output.strip()) > 100:
+                    refined_text = refine_result.output.strip()
+                    fallback_used = True
 
+            if refined_text is not None:
                 # Write refined report
                 refined_path = ctx.workspace_root / "output" / "context_report_refined.md"
                 refined_path.parent.mkdir(parents=True, exist_ok=True)

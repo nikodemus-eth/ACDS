@@ -90,23 +90,44 @@ class CRClusteringAdapter(ToolAdapter):
             signals=fmt_list(raw_signals),
         )
 
-        ollama = OllamaClient(
-            default_model=ctx.config.get("model", "qwen3:8b"),
-            timeout_seconds=ctx.config.get("timeout_seconds", 300),
-        )
-        result = ollama.generate(prompt, system=_CLUSTERING_SYSTEM, temperature=0.1)
+        # Try ACDS dispatch first, fall back to direct Ollama
+        full_prompt = f"{_CLUSTERING_SYSTEM}\n\n{prompt}"
+        acds_output = None
+        engine_used = "ollama"
+        model_used = ctx.config.get("model", "qwen3:8b")
 
-        if not result.success:
-            return ToolResult(
-                success=False,
-                output_data={},
-                artifacts=[],
-                error=f"Ollama clustering failed: {result.error}",
-                metadata={"duration_ms": result.latency_ms, "engine": "ollama"},
+        if ctx.inference is not None:
+            acds_output = ctx.inference.infer(
+                full_prompt,
+                task_type="classification",
+                cognitive_grade="standard",
+                process="context_report",
+                step="cr_clustering",
+                run_id=ctx.run_id,
             )
 
-        # Parse output — strip qwen3 thinking tags if present
-        output_text = _strip_think_tags(result.output)
+        if acds_output is not None:
+            engine_used = "acds"
+            model_used = "acds-dispatched"
+            output_text = _strip_think_tags(acds_output)
+        else:
+            ollama = OllamaClient(
+                default_model=ctx.config.get("model", "qwen3:8b"),
+                timeout_seconds=ctx.config.get("timeout_seconds", 300),
+            )
+            result = ollama.generate(prompt, system=_CLUSTERING_SYSTEM, temperature=0.1)
+
+            if not result.success:
+                return ToolResult(
+                    success=False,
+                    output_data={},
+                    artifacts=[],
+                    error=f"Ollama clustering failed: {result.error}",
+                    metadata={"duration_ms": result.latency_ms, "engine": "ollama"},
+                )
+
+            model_used = result.model
+            output_text = _strip_think_tags(result.output)
         try:
             parsed = json.loads(output_text.strip())
         except json.JSONDecodeError:
@@ -142,15 +163,15 @@ class CRClusteringAdapter(ToolAdapter):
                     cat: sum(1 for c in clusters if c.get("category") == cat)
                     for cat in _CATEGORIES
                 },
-                "engine": "ollama",
-                "model": result.model,
+                "engine": engine_used,
+                "model": model_used,
             },
             artifacts=[str(artifact_path)],
             error=None,
             metadata={
                 "duration_ms": latency,
-                "engine": "ollama",
-                "model": result.model,
+                "engine": engine_used,
+                "model": model_used,
                 "cluster_count": len(clusters),
             },
         )

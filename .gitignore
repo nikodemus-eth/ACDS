@@ -24,3 +24,13 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Local tooling
+.claude/
+.superpowers/
+.gitignore 2
+
+# Local runtime artifacts
+process-swarm-gen2/workspace/
+*.db-shm
+*.db-wal

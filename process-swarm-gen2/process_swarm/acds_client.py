@@ -105,6 +105,78 @@ class RoutingRequest:
 
 
 @dataclass
+class ExecutionConstraints:
+    localOnly: bool = True
+    externalAllowed: bool = False
+    offlineRequired: bool = False
+
+
+@dataclass
+class IntentEnvelope:
+    intentId: str
+    taskClass: str
+    modality: str = "text_to_text"
+    sensitivity: str = "internal"
+    qualityTier: str = "medium"
+    latencyTargetMs: Optional[int] = None
+    costSensitivity: str = "medium"
+    executionConstraints: ExecutionConstraints = field(default_factory=ExecutionConstraints)
+    contextSizeEstimate: str = "small"
+    requiresSchemaValidation: bool = False
+    origin: str = "process_swarm"
+    timestamp: str = ""
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        return d
+
+
+@dataclass
+class TriageRunRequest:
+    envelope: IntentEnvelope
+    inputPayload: str
+
+    def to_dict(self) -> dict:
+        return {
+            "envelope": self.envelope.to_dict(),
+            "inputPayload": self.inputPayload,
+        }
+
+
+@dataclass
+class TriageRunResponse:
+    triageDecision: dict = field(default_factory=dict)
+    executionResult: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> TriageRunResponse:
+        return cls(
+            triageDecision=data.get("triageDecision", {}),
+            executionResult=data.get("executionResult", {}),
+        )
+
+    @property
+    def status(self) -> str:
+        return self.executionResult.get("status", "")
+
+    @property
+    def normalizedOutput(self) -> Optional[str]:
+        return self.executionResult.get("normalizedOutput")
+
+    @property
+    def selectedModelProfileId(self) -> str:
+        return self.executionResult.get("selectedModelProfileId", "")
+
+    @property
+    def selectedProviderId(self) -> str:
+        return self.executionResult.get("selectedProviderId", "")
+
+    @property
+    def latencyMs(self) -> int:
+        return self.executionResult.get("latencyMs", 0)
+
+
+@dataclass
 class DispatchRunRequest:
     routingRequest: RoutingRequest
     inputPayload: str
@@ -185,7 +257,7 @@ class ACDSClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:3000",
+        base_url: str = "http://localhost:3100",
         auth_token: Optional[str] = None,
         timeout_seconds: int = 30,
     ):
@@ -204,8 +276,14 @@ class ACDSClient:
     def dispatch(self, request: DispatchRunRequest) -> DispatchRunResponse:
         """Submit a dispatch run request and return the execution result."""
         body = request.to_dict()
-        data = self._post("/v1/dispatch/run", body)
+        data = self._post("/dispatch/run", body)
         return DispatchRunResponse.from_dict(data)
+
+    def triage(self, request: TriageRunRequest) -> TriageRunResponse:
+        """Submit a triage run request through the ITS pipeline."""
+        body = request.to_dict()
+        data = self._post("/triage/run", body)
+        return TriageRunResponse.from_dict(data)
 
     # ── HTTP helpers ──────────────────────────────────────────────────
 
@@ -216,6 +294,7 @@ class ACDSClient:
         }
         if self.auth_token:
             h["Authorization"] = f"Bearer {self.auth_token}"
+            h["x-admin-session"] = self.auth_token
         return h
 
     def _get(self, path: str) -> dict:

@@ -72,41 +72,62 @@ class CRSynthesisAdapter(ToolAdapter):
         signal_text = json.dumps(prioritized, indent=2)
         prompt = _SYNTHESIS_PROMPT.format(signals=signal_text)
 
-        apple = AppleIntelligenceClient(
-            timeout_seconds=ctx.config.get("timeout_seconds", 180),
-        )
-        result = apple.generate(
-            prompt,
-            system=_SYNTHESIS_SYSTEM,
-            temperature=0.4,
-            model=ctx.config.get("model", "apple-fm-on-device"),
-        )
+        # Try ACDS dispatch first, fall back to direct Apple Intelligence
+        full_prompt = f"{_SYNTHESIS_SYSTEM}\n\n{prompt}"
+        acds_output = None
+        engine_used = "apple_intelligence"
+        model_used = ctx.config.get("model", "apple-fm-on-device")
 
-        if not result.success:
-            # Per spec: Apple Intelligence failure → retry once,
-            # do NOT fallback to Ollama for synthesis
+        if ctx.inference is not None:
+            acds_output = ctx.inference.infer(
+                full_prompt,
+                task_type="generation",
+                cognitive_grade="frontier",
+                process="context_report",
+                step="cr_synthesis",
+                run_id=ctx.run_id,
+            )
+
+        if acds_output is not None:
+            engine_used = "acds"
+            model_used = "acds-dispatched"
+            report_text = acds_output.strip()
+        else:
+            apple = AppleIntelligenceClient(
+                timeout_seconds=ctx.config.get("timeout_seconds", 180),
+            )
             result = apple.generate(
                 prompt,
                 system=_SYNTHESIS_SYSTEM,
                 temperature=0.4,
+                model=ctx.config.get("model", "apple-fm-on-device"),
             )
-            if not result.success:
-                return ToolResult(
-                    success=False,
-                    output_data={},
-                    artifacts=[],
-                    error=(
-                        f"Apple Intelligence synthesis failed after retry: "
-                        f"{result.error}"
-                    ),
-                    metadata={
-                        "duration_ms": result.latency_ms,
-                        "engine": "apple_intelligence",
-                        "retried": True,
-                    },
-                )
 
-        report_text = result.output.strip()
+            if not result.success:
+                # Per spec: Apple Intelligence failure → retry once
+                result = apple.generate(
+                    prompt,
+                    system=_SYNTHESIS_SYSTEM,
+                    temperature=0.4,
+                )
+                if not result.success:
+                    return ToolResult(
+                        success=False,
+                        output_data={},
+                        artifacts=[],
+                        error=(
+                            f"Apple Intelligence synthesis failed after retry: "
+                            f"{result.error}"
+                        ),
+                        metadata={
+                            "duration_ms": result.latency_ms,
+                            "engine": "apple_intelligence",
+                            "retried": True,
+                        },
+                    )
+
+            model_used = result.model
+            report_text = result.output.strip()
 
         # Parse into sections
         sections = _parse_sections(report_text)
@@ -128,15 +149,15 @@ class CRSynthesisAdapter(ToolAdapter):
                 "sections": sections,
                 "section_count": len(sections),
                 "char_count": len(report_text),
-                "engine": "apple_intelligence",
-                "model": result.model,
+                "engine": engine_used,
+                "model": model_used,
             },
             artifacts=[str(report_path), str(sections_path)],
             error=None,
             metadata={
                 "duration_ms": latency,
-                "engine": "apple_intelligence",
-                "model": result.model,
+                "engine": engine_used,
+                "model": model_used,
                 "char_count": len(report_text),
                 "section_count": len(sections),
             },
