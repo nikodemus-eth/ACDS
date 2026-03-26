@@ -9,10 +9,19 @@ This runbook covers day-to-day operation of the GRITS (Generalized Runtime Integ
 Launch the GRITS worker process:
 
 ```bash
-npx tsx apps/grits-worker/src/main.ts
+pnpm --filter @acds/grits-worker run start
 ```
 
 The worker registers its job schedules on startup and begins executing integrity checks according to the configured cadences.
+
+For ad hoc operator use, prefer the explicit CLI entrypoints:
+
+```bash
+pnpm --filter @acds/grits-worker run grits:fast
+pnpm --filter @acds/grits-worker run grits:pg:release
+```
+
+Fixture commands are for local/demo validation. The `grits:pg:*` commands are the real release posture.
 
 ---
 

@@ -8,6 +8,7 @@
     "dev": "vite",
     "dev:mock": "VITE_USE_MOCKS=true vite",
     "preview": "vite preview",
+    "test": "node ../../scripts/run-package-tests.mjs admin-web",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

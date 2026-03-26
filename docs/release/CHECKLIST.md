@@ -2,6 +2,9 @@
 
 ## Release Gate
 
+- `corepack`/`pnpm` install contract documented and verified
+- `pnpm run bootstrap` succeeds on a clean workspace
+- `pnpm run verify:install` succeeds before release tagging
 - License present at repository root
 - Root README points to `acds/README.md` as canonical docs
 - MVP boundary doc reviewed
@@ -9,9 +12,11 @@
 - Database migrations apply cleanly on a fresh Postgres instance
 - Seeds validate and apply cleanly
 - API health endpoint starts successfully on fresh setup
+- Admin UI preview starts successfully on fresh setup
 - Provider registration path works
 - GRITS DB-backed release mode completes and produces an artifact
 - No blocking GRITS defects (`critical`, `high`, or red snapshot)
+- ACDS workspace tests, package-local release-critical tests, and Process Swarm smoke tests pass
 - Release notes match the supported MVP scope
 
 ## Tagging

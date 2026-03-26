@@ -17,6 +17,8 @@ const globsByTarget = {
   worker: [],
   'grits-worker': ['apps/grits-worker/src'],
   'persistence-pg': ['tests/unit/persistence'],
+  'admin-web': [],
+  'db-tools': [],
 };
 
 if (!target || !(target in globsByTarget)) {

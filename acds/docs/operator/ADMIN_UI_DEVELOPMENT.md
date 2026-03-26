@@ -1,9 +1,21 @@
 # Admin UI Development and Demo Mode
 
-The admin web application (`apps/admin-web`) now supports two useful local workflows:
+The admin web application (`apps/admin-web`) now supports three distinct workflows:
 
+- **Preview mode** for operator-facing MVP validation against built assets
 - **Live API mode** for full-stack development against `apps/api`
 - **Mock mode** for UI development, demos, and smoke checks without the API or Postgres
+
+## Preview Mode
+
+Use preview mode when you want the supported MVP operator posture.
+
+```bash
+pnpm --filter @acds/admin-web run build
+pnpm --filter @acds/admin-web run preview -- --host 0.0.0.0 --port 4173
+```
+
+Preview mode should be the default for release checks and operator validation.
 
 ## Live API Mode
 
@@ -85,7 +97,8 @@ For authenticated calls, the API accepts either:
 
 For frontend changes:
 
-1. Run `pnpm --filter @acds/admin-web run build`
-2. Run `pnpm --filter @acds/admin-web run dev:mock`
-3. Walk the routed screens in a browser
-4. Use live API mode before merging changes that depend on backend contract updates
+1. Run `pnpm --filter @acds/admin-web run test`
+2. Run `pnpm --filter @acds/admin-web run build`
+3. Run `pnpm --filter @acds/admin-web run dev:mock`
+4. Walk the routed screens in a browser
+5. Use live API mode and preview mode before merging changes that depend on backend contract updates

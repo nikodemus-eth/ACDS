@@ -4,7 +4,14 @@ The ACDS admin web interface (`apps/admin-web`) provides the operator-facing UI 
 
 ## Accessing the Admin Interface
 
-Run the full stack with:
+The canonical MVP operator path is the built admin UI served in preview mode:
+
+```bash
+pnpm --filter @acds/admin-web run build
+pnpm --filter @acds/admin-web run preview -- --host 0.0.0.0 --port 4173
+```
+
+For full-stack development, run:
 
 ```bash
 pnpm dev

@@ -4,6 +4,14 @@ Tracking lessons learned to prevent repeating pain points.
 
 ---
 
+## 2026-03-26 — Install Contract and Release Surface
+
+- **A pnpm workspace needs an explicit operator contract, not just an `engines` stanza.** Declaring Node/pnpm versions in `package.json` is not enough; public docs and release checks must say that `npm install` is unsupported when the repo depends on `workspace:*` linking.
+- **A bootstrap command should prove linking before it proves behavior.** `verify:install` catching workspace-resolution issues up front is cheaper than discovering them halfway through typecheck or runtime startup.
+- **Package-local test scripts matter even when the root suite passes.** Operators and CI need package-shaped entrypoints for API, worker, GRITS, persistence, admin, and DB tooling so release-critical surfaces can be exercised directly.
+- **Dependency trimming should follow proof, not aesthetics.** Attempting to reduce `@acds/grits-worker` dependencies before re-validating typecheck immediately exposed which packages were still real compile-time requirements.
+- **Docs drift fastest around run modes.** If `preview`, `dev`, and `dev:mock` are all real workflows, each must be labeled with its release posture everywhere or operators will choose the wrong one.
+
 ## 2026-03-15 — Project Setup
 
 - Establish documentation structure before writing code to maintain architectural clarity

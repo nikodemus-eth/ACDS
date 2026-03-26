@@ -5,12 +5,14 @@
   "type": "module",
   "description": "Database migrations and seed utilities for bootstrapping ACDS runtime state.",
   "scripts": {
+    "build": "tsc --noEmit",
     "migrate": "bash -lc 'for f in migrations/*.sql; do psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$f\"; done'",
     "seed:validate": "tsx seeds/runSeeds.ts",
     "seed:model-profiles": "tsx seeds/seedModelProfiles.ts",
     "seed:tactic-profiles": "tsx seeds/seedTacticProfiles.ts",
     "seed:policies": "tsx seeds/seedPolicies.ts",
     "seed": "pnpm run seed:model-profiles && pnpm run seed:tactic-profiles && pnpm run seed:policies",
+    "test": "node ../../scripts/run-package-tests.mjs db-tools",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

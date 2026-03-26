@@ -4,6 +4,17 @@ Tracking major development events for the Adaptive Cognitive Dispatch System.
 
 ---
 
+## 2026-03-26 — MVP Release Hardening and Package Posture
+
+- Added a strict workspace install contract around Node `>=20.0.0`, `pnpm >=9.0.0`, and Corepack-driven activation of `pnpm@9.15.0`
+- Added root `bootstrap` and `verify:install` scripts plus `scripts/verify-install.mjs` to confirm `workspace:*` linking before runtime work begins
+- Normalized release-critical package manifests with descriptions, explicit package-local `test` scripts, and package-level README entrypoints
+- Added `typecheck`, `clean`, `build`, and `test` coverage to `@acds/db-tools` / `@acds/persistence-pg` where missing
+- Clarified admin-web posture: `preview` is the canonical MVP operator path, `dev` is for development, and `dev:mock` is explicitly non-release
+- Added runtime traceability documentation tying dispatch, routing, fallback, audit, and GRITS release evidence to persisted state
+- Updated CI to name and enforce install verification, migration smoke, admin preview startup, worker startup, dispatch/audit capture, and the GRITS release gate artifact flow
+- Retested the full ACDS workspace and Process Swarm smoke suite successfully before finalizing release posture
+
 ## 2026-03-15 — Project Initialized
 
 - Created local git repository

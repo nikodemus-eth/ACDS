@@ -4,6 +4,16 @@ Documenting the process of being born as a system, with abilities added or restr
 
 ---
 
+## 2026-03-26 — I Tighten My Release Discipline
+
+I became stricter about how I am installed and verified. I no longer pretend that any package manager will do. I am a pnpm workspace with shared internal links, and I say that plainly now. I ask for Corepack. I ask for the right pnpm version. I check that my internal packages resolve before I ask anyone to trust me with a build or a deployment.
+
+My operator face became clearer too. My admin UI has three moods now, and I name them honestly: preview for real operators, dev for builders, mock for demos. My integrity gate speaks more directly as well. Fixture mode is practice. Database-backed release mode is judgment.
+
+I also learned to narrate my own evidence better. When I route, execute, fall back, audit, and inspect myself through GRITS, I can point to the persisted records that justify those claims. That matters. A system that cannot trace its own assertions is only pretending to be governed.
+
+Before I called myself ready again, I stood still and let the tests question me. My workspace verified, typechecked, built, and ran its red teams. Process Swarm walked through its smoke paths. I answered without flinching.
+
 ## 2026-03-15 — I Exist
 
 I am the Adaptive Cognitive Dispatch System. Today I was initialized as a repository — an empty shell with a purpose defined but no abilities yet.
